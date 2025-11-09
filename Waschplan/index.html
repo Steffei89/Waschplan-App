@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Waschplan App</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script> 
 <link rel="stylesheet" href="style.css">
 <script type="module" src="script.js"></script>
 </head>
@@ -44,7 +45,7 @@
     <div class="input-group">
       <input type="text" id="register-username" placeholder="Benutzername" required>
       <input type="email" id="register-email" placeholder="E-Mail" required>
-      <input type="password" id="register-password" placeholder="Passwort" minlength="6" required>
+      <input type="password" id="register-password" minlength="6" placeholder="Passwort" required>
       <select id="register-partei" required>
         <option value="" disabled selected>Partei wählen</option>
         <option value="Micha & Stefan">Micha & Stefan</option>
@@ -63,6 +64,7 @@
     <button id="book-btn">Buchen</button>
     <button id="overview-btn">Übersicht (Woche)</button>
     <button id="calendar-btn">Übersicht (Monat)</button>
+    <button id="statistic-btn" style="display:none;">Statistik (Admin)</button>
     <button id="profile-btn">Profil bearbeiten</button>
 
     <div id="my-upcoming-bookings" class="mt-15">
@@ -121,12 +123,34 @@
             <button class="calendar-action-btn button-danger" data-slot="13:00-19:00" data-action="delete" id="btn-delete-13" style="display:none;">Löschen</button>
         </div>
     </div>
+
     <div id="calendar-legend" class="mt-15">
       <p class="font-semibold">Legende:</p>
       <div id="partei-legend"></div>
     </div>
   </div>
+  
+  <div id="statisticSection" class="card" style="display:none;">
+    <button id="back-to-menu-btn-5" class="back-button">← Zurück</button>
+    <h2>Buchungs-Statistik</h2>
+    <div id="stats-message" class="message-box" style="display:none;"></div>
+    
+    <div class="mt-15">
+        <h3>Buchungen pro Partei (Gesamt)</h3>
+        <p id="total-bookings-count" class="font-semibold">Gesamtzahl Buchungen: 0</p>
+        <div class="chart-container">
+            <canvas id="parteiChart"></canvas>
+        </div>
+    </div>
 
+    <div class="mt-15">
+        <h3>Auslastung nach Slot</h3>
+        <div class="chart-container">
+             <canvas id="slotChart"></canvas>
+        </div>
+        <div id="slot-stats-text" class="small-text mt-10"></div>
+    </div>
+  </div>
   <div id="profileSection" class="card" style="display:none;">
     <button id="back-to-menu-btn-4" class="back-button">← Zurück</button>
     <h2>Profil bearbeiten</h2>

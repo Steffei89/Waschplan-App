@@ -69,9 +69,10 @@ let quickViewUnsubscribe = null;
 let bookingToDelete = null; 
 let currentCalendarDate = new Date(); 
 let currentTheme = 'light'; 
-// NEU: Zustand für Kalender-Aktion
 let selectedCalendarDate = null; 
-let allBookingsForMonth = {}; // { 'YYYY-MM-DD': [{slot: '...', partei: '...'}, ...], ... }
+let allBookingsForMonth = {}; 
+let parteiChart = null; // Instanz für das Kreisdiagramm
+let slotChart = null; // Instanz für das Balkendiagramm
 
 
 const loadingOverlay = document.getElementById("loadingOverlay");
@@ -83,6 +84,10 @@ const bookingSection = document.getElementById("bookingSection");
 const overviewSection = document.getElementById("overviewSection");
 const calendarSection = document.getElementById("calendarSection"); 
 const profileSection = document.getElementById("profileSection");
+// NEU: Statistik Sektion
+const statisticSection = document.getElementById("statisticSection");
+const statisticBtn = document.getElementById("statistic-btn");
+
 const bookingsList = document.getElementById("bookingsList");
 const userInfo = document.getElementById("userInfo");
 const confirmationModal = document.getElementById("confirmationModal");
@@ -90,13 +95,12 @@ const confirmText = document.getElementById("confirm-text");
 const themeIcon = document.getElementById("theme-icon"); 
 const calendarGrid = document.getElementById("calendar-grid");
 const currentMonthDisplay = document.getElementById("current-month-display");
-// NEU: Kalender-Aktionsfelder
 const calendarDayActions = document.getElementById("calendar-day-actions");
 const selectedDayTitle = document.getElementById("selected-day-title");
 const calendarActionMessage = document.getElementById("calendar-action-message");
 
 
-// Farbzuweisung für Parteien (für Kalender-Punkte)
+// Farbzuweisung für Parteien (für Kalender-Punkte und Charts)
 const PARTEI_COLORS = {
     "Micha & Stefan": "#007AFF", // Blau
     "Sarah & Florian": "#FF9500", // Orange
@@ -253,7 +257,7 @@ function unsubscribeAll() {
 
 function navigateTo(section) {
     // Liste aller Sektionen
-    const sections = [loginForm, registerForm, mainMenu, bookingSection, overviewSection, calendarSection, profileSection];
+    const sections = [loginForm, registerForm, mainMenu, bookingSection, overviewSection, calendarSection, profileSection, statisticSection];
     
     // Animation und Anzeige
     sections.forEach(el => {
@@ -290,6 +294,9 @@ function navigateTo(section) {
             // Lade den Kalender für den aktuellen Monat
             renderCalendar(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth());
             loadBookingsForMonth(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth());
+        } else if (section === 'statisticSection') {
+            // NEU: Lade die Statistikdaten
+            loadStatistics();
         }
     }
 }
@@ -300,12 +307,16 @@ function updateUserInfo(userData) {
         userIsAdmin = !!userData.isAdmin;
         document.getElementById('current-role').textContent = userIsAdmin ? 'Administrator' : 'Nutzer';
         
-        // NEU: Theme des Benutzers laden und setzen
+        // NEU: Statistik-Button nur für Admins anzeigen
+        statisticBtn.style.display = userIsAdmin ? 'block' : 'none';
+
+        // Theme des Benutzers laden und setzen
         const userTheme = userData.theme || 'light';
         setTheme(userTheme);
         
     } else {
         userIsAdmin = false;
+        statisticBtn.style.display = 'none'; // Button ausblenden
         // Standard-Theme setzen, wenn ausgeloggt
         setTheme('light'); 
     }
@@ -607,7 +618,7 @@ document.addEventListener('click', async (e) => {
 });
 
 
-// --- LÄDT DIE NÄCHSTEN 2 GESAMTBUCHUNGEN ALLER PARTEIEN (für Quick View) ---
+// --- LÄDT DIE NÄCHSTEN 5 GESAMTBUCHUNGEN ALLER PARTEIEN (für Quick View) ---
 async function loadNextBookingsOverview() {
     if (quickViewUnsubscribe) { quickViewUnsubscribe(); }
     
@@ -891,7 +902,7 @@ function updateCalendarDayActions(dateString) {
 
             bookBtn.style.display = 'none'; // Buchen ist nicht möglich
 
-            // NEU: Nur Eigene oder Admin dürfen löschen
+            // Nur Eigene oder Admin dürfen löschen
             if (booking.userId === currentUserId) {
                 statusEl.textContent = `Gebucht (Sie)`;
                 statusEl.classList.add('booked-me');
@@ -940,8 +951,6 @@ document.querySelectorAll('.calendar-action-btn').forEach(btn => {
         if (action === 'book') {
             success = await performBooking(dateString, slot, 'calendar-action-message');
         } else if (action === 'delete') {
-            // Beim Löschen wird immer die ID des aktuellen Benutzers übergeben, da die performDeletion-Logik 
-            // entscheidet, ob aufgrund der Admin-Rechte alle oder nur eigene Buchungen gelöscht werden dürfen.
             success = await performDeletion(dateString, slot, 'calendar-action-message', currentUserId);
         }
         
@@ -972,7 +981,166 @@ document.getElementById('next-month-btn').addEventListener('click', () => {
 });
 
 
-// --- 10. WEITERE EVENT LISTENER ---
+// --- 10. STATISTIK LOGIK ---
+
+/**
+ * Lädt alle Buchungsdaten und ruft die Chart-Renderer auf.
+ */
+async function loadStatistics() {
+    if (!userIsAdmin) {
+        showMessage('stats-message', 'Zugriff verweigert. Nur Administratoren dürfen die Statistik einsehen.', 'error');
+        return;
+    }
+    
+    showMessage('stats-message', 'Lade Statistikdaten...', 'success');
+    
+    try {
+        // Lade alle Buchungen, sortiert nach Datum (optional)
+        const q = query(getBookingsCollectionRef(), orderBy("bookedAt", "desc"));
+        const querySnapshot = await getDocs(q);
+        const allBookings = [];
+        querySnapshot.forEach(doc => allBookings.push(doc.data()));
+
+        if (allBookings.length === 0) {
+            showMessage('stats-message', 'Keine Buchungsdaten zur Auswertung vorhanden.', 'error');
+            document.getElementById('total-bookings-count').textContent = 'Gesamtzahl Buchungen: 0';
+            return;
+        }
+
+        document.getElementById('total-bookings-count').textContent = `Gesamtzahl Buchungen: ${allBookings.length}`;
+        document.getElementById('stats-message').style.display = 'none'; // Lade-Nachricht ausblenden
+
+        // Datenverarbeitung
+        const parteiCounts = {};
+        const slotCounts = { '07:00-13:00': 0, '13:00-19:00': 0 };
+
+        allBookings.forEach(b => {
+            // Zähle Buchungen pro Partei
+            parteiCounts[b.partei] = (parteiCounts[b.partei] || 0) + 1;
+            
+            // Zähle Buchungen pro Slot
+            if (slotCounts.hasOwnProperty(b.slot)) {
+                slotCounts[b.slot]++;
+            }
+        });
+
+        // Rendere die Diagramme
+        renderParteienChart(parteiCounts);
+        renderSlotChart(slotCounts);
+
+    } catch (e) {
+        showMessage('stats-message', `Fehler beim Laden der Statistikdaten: ${e.message}`, 'error');
+        console.error("Statistik Load Error:", e);
+    }
+}
+
+/**
+ * Rendert ein Kreisdiagramm (Doughnut) zur Verteilung der Buchungen pro Partei.
+ * @param {Object} parteiCounts - Zählungen { parteiName: count }
+ */
+function renderParteienChart(parteiCounts) {
+    if (parteiChart) parteiChart.destroy(); // Vorheriges Chart zerstören
+
+    const dataLabels = ALL_PARTEIEN.filter(p => parteiCounts[p] > 0 || p in parteiCounts);
+    const dataValues = dataLabels.map(p => parteiCounts[p] || 0);
+    const backgroundColors = dataLabels.map(p => PARTEI_COLORS[p]);
+
+    const ctx = document.getElementById('parteiChart').getContext('2d');
+    parteiChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: dataLabels,
+            datasets: [{
+                data: dataValues,
+                backgroundColor: backgroundColors,
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            aspectRatio: 1, // Behält ein quadratisches Seitenverhältnis bei
+            plugins: {
+                legend: {
+                    position: 'top',
+                    labels: {
+                        color: document.body.style.getPropertyValue('--text-color') // Nutze Theme-Farbe
+                    }
+                },
+                title: {
+                    display: false
+                }
+            }
+        }
+    });
+}
+
+/**
+ * Rendert ein Balkendiagramm zur Auslastung der Slots.
+ * @param {Object} slotCounts - Zählungen { slot: count }
+ */
+function renderSlotChart(slotCounts) {
+    if (slotChart) slotChart.destroy(); // Vorheriges Chart zerstören
+
+    const labels = Object.keys(slotCounts);
+    const dataValues = Object.values(slotCounts);
+    const totalCount = dataValues.reduce((a, b) => a + b, 0);
+
+    const ctx = document.getElementById('slotChart').getContext('2d');
+    slotChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Anzahl Buchungen',
+                data: dataValues,
+                backgroundColor: ['rgba(0, 122, 255, 0.7)', 'rgba(255, 149, 0, 0.7)'],
+                borderColor: ['#007AFF', '#FF9500'],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        color: document.body.style.getPropertyValue('--text-color'),
+                        stepSize: 1 
+                    },
+                    grid: {
+                         color: 'rgba(128, 128, 128, 0.1)' // Dezenteres Gitter
+                    }
+                },
+                x: {
+                    ticks: {
+                        color: document.body.style.getPropertyValue('--text-color')
+                    },
+                    grid: {
+                         color: 'rgba(128, 128, 128, 0.1)'
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: false
+                }
+            }
+        }
+    });
+
+    // Zusätzlicher Text für die Auslastung
+    const textEl = document.getElementById('slot-stats-text');
+    if (totalCount > 0) {
+        const percent07 = ((slotCounts['07:00-13:00'] / totalCount) * 100).toFixed(1);
+        const percent13 = ((slotCounts['13:00-19:00'] / totalCount) * 100).toFixed(1);
+        textEl.innerHTML = `Der Früh-Slot (07-13 Uhr) wurde zu **${percent07}%** und der Spät-Slot (13-19 Uhr) zu **${percent13}%** gebucht (Gesamt: ${totalCount} Buchungen).`;
+    } else {
+         textEl.innerHTML = 'Keine Slot-Buchungen vorhanden.';
+    }
+}
+
+
+// --- 11. WEITERE EVENT LISTENER ---
 
 // Navigation
 document.getElementById('show-register').addEventListener('click', () => navigateTo('registerForm'));
@@ -989,6 +1157,9 @@ document.getElementById('calendar-btn').addEventListener('click', () => {
     selectedCalendarDate = null;
     navigateTo('calendarSection');
 });
+// NEU: Statistik Button
+statisticBtn.addEventListener('click', () => navigateTo('statisticSection'));
+
 document.getElementById('profile-btn').addEventListener('click', () => {
     document.getElementById('profile-username').textContent = currentUser.username;
     document.getElementById('profile-email').textContent = currentUser.email;
@@ -1001,6 +1172,8 @@ document.getElementById('back-to-menu-btn-1').addEventListener('click', () => na
 document.getElementById('back-to-menu-btn-2').addEventListener('click', () => navigateTo('mainMenu'));
 document.getElementById('back-to-menu-btn-3').addEventListener('click', () => navigateTo('mainMenu'));
 document.getElementById('back-to-menu-btn-4').addEventListener('click', () => navigateTo('mainMenu'));
+// NEU: Zurück-Button Statistik
+document.getElementById('back-to-menu-btn-5').addEventListener('click', () => navigateTo('mainMenu'));
 
 // Theme-Wechsel
 themeIcon.addEventListener('click', () => {
