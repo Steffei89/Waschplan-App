@@ -5,7 +5,8 @@ import {
     createUserWithEmailAndPassword, 
     signInWithEmailAndPassword, 
     onAuthStateChanged, 
-    signOut 
+    signOut,
+    updatePassword // Für Profilbearbeitung
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { 
     getFirestore, 
@@ -18,7 +19,8 @@ import {
     getDoc, 
     onSnapshot, 
     addDoc, 
-    deleteDoc 
+    deleteDoc,
+    updateDoc // Für Theme-Speicherung
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- 1. FIREBASE KONFIGURATION (Ihre Daten) ---
@@ -63,6 +65,7 @@ let overviewUnsubscribe = null;
 let calendarUnsubscribe = null;
 let bookingToDelete = null; 
 let currentCalendarDate = new Date(); // Für den Monatskalender
+let currentTheme = 'light'; // Standard-Theme
 
 const loadingOverlay = document.getElementById("loadingOverlay");
 const appContainer = document.getElementById("app");
@@ -71,11 +74,12 @@ const registerForm = document.getElementById("registerForm");
 const mainMenu = document.getElementById("mainMenu");
 const bookingSection = document.getElementById("bookingSection");
 const overviewSection = document.getElementById("overviewSection");
-const calendarSection = document.getElementById("calendarSection"); // NEU
+const calendarSection = document.getElementById("calendarSection"); 
 const bookingsList = document.getElementById("bookingsList");
 const userInfo = document.getElementById("userInfo");
 const confirmationModal = document.getElementById("confirmationModal");
 const confirmText = document.getElementById("confirm-text");
+const themeIcon = document.getElementById("theme-icon"); // NEU
 
 // Farbzuweisung für Parteien (für Kalender-Punkte)
 const PARTEI_COLORS = {
@@ -104,7 +108,8 @@ function showMessage(elementId, message, type = 'error') {
 
 function showConfirmation(booking) {
     bookingToDelete = booking;
-    confirmText.innerHTML = `Soll die Buchung von <strong>${booking.partei}</strong> am ${new Date(booking.date + "T00:00:00").toLocaleDateString('de-DE')} (${booking.slot}) wirklich gelöscht werden?`;
+    const dateStr = new Date(booking.date + "T00:00:00").toLocaleDateString('de-DE');
+    confirmText.innerHTML = `Soll die Buchung von <strong>${booking.partei}</strong> am ${dateStr} (${booking.slot}) wirklich gelöscht werden?`;
     confirmationModal.style.display = 'flex';
 }
 
@@ -114,7 +119,6 @@ function hideConfirmation() {
 }
 
 function getBookingsCollectionRef() {
-    // Da wir keine App-ID und Nutzer-ID von außen haben, nutzen wir die Standard-Collection
     return collection(db, "bookings");
 }
 
@@ -188,6 +192,41 @@ function setupWeekDropdown() {
     }
 }
 
+// --- NEUE THEME FUNKTIONEN ---
+
+/**
+ * Setzt das Theme (light/dark) und aktualisiert das Icon.
+ * @param {string} theme 'light' oder 'dark'
+ */
+function setTheme(theme) {
+    currentTheme = theme;
+    document.body.setAttribute('data-theme', theme);
+    
+    if (themeIcon) {
+        if (theme === 'dark') {
+            themeIcon.className = 'fa-solid fa-moon clickable';
+            themeIcon.title = 'Zum Hell-Modus wechseln';
+        } else {
+            themeIcon.className = 'fa-solid fa-sun clickable';
+            themeIcon.title = 'Zum Dunkel-Modus wechseln';
+        }
+    }
+}
+
+/**
+ * Speichert das aktuelle Theme im Firestore-Benutzerprofil.
+ */
+async function saveThemePreference() {
+    if (!currentUserId) return;
+    try {
+        await updateDoc(getUserProfileDocRef(currentUserId), {
+            theme: currentTheme
+        });
+        console.log("Theme-Präferenz gespeichert:", currentTheme);
+    } catch (e) {
+        console.error("Fehler beim Speichern der Theme-Präferenz:", e);
+    }
+}
 
 // --- 5. HAUPT-ROUTING UND UI-FUNKTIONEN ---
 
@@ -198,7 +237,7 @@ function unsubscribeAll() {
 
 function navigateTo(section) {
     // Alle Hauptsektionen ausblenden
-    [loginForm, registerForm, mainMenu, bookingSection, overviewSection, calendarSection].forEach(el => el.style.display = 'none');
+    [loginForm, registerForm, mainMenu, bookingSection, overviewSection, calendarSection, profileSection].forEach(el => el.style.display = 'none');
     
     // Alle Nachrichten-Boxen zurücksetzen
     document.querySelectorAll('.message-box').forEach(el => el.style.display = 'none');
@@ -209,7 +248,7 @@ function navigateTo(section) {
     }
     
     // User-Info nur anzeigen, wenn eingeloggt und nicht auf Login/Register
-    userInfo.style.display = (currentUser && (section === 'mainMenu' || section === 'bookingSection' || section === 'overviewSection' || section === 'calendarSection')) ? 'flex' : 'none';
+    userInfo.style.display = (currentUser && section !== 'loginForm' && section !== 'registerForm') ? 'flex' : 'none';
 
     const targetElement = document.getElementById(section);
     if(targetElement) targetElement.style.display = 'block';
@@ -220,8 +259,15 @@ function updateUserInfo(userData) {
         document.getElementById('current-username').textContent = userData.username || 'Unbekannt';
         userIsAdmin = !!userData.isAdmin;
         document.getElementById('current-role').textContent = userIsAdmin ? 'Administrator' : 'Nutzer';
+        
+        // NEU: Theme des Benutzers laden und setzen
+        const userTheme = userData.theme || 'light';
+        setTheme(userTheme);
+        
     } else {
         userIsAdmin = false;
+        // Standard-Theme setzen, wenn ausgeloggt
+        setTheme('light'); 
     }
 }
 
@@ -291,7 +337,8 @@ document.getElementById("register-btn").addEventListener("click", async () => {
             username: username,
             email: email,
             partei: partei,
-            isAdmin: false
+            isAdmin: false,
+            theme: 'light' // NEU: Initiales Theme setzen
         });
 
         showMessage('register-error', "Registrierung erfolgreich! Bitte melden Sie sich an.", 'success');
@@ -516,7 +563,7 @@ async function confirmDeleteBooking() {
 }
 
 
-// --- 9. MONATSKALENDER LOGIK (NEU) ---
+// --- 9. MONATSKALENDER LOGIK ---
 
 function getMonthStartAndEnd(date) {
     // Liefert den 1. Tag des Monats
@@ -591,6 +638,8 @@ function renderCalendarUI(date) {
     ALL_PARTEIEN.forEach(partei => {
         const item = document.createElement('div');
         item.className = 'legend-item';
+        // Wir verwenden PARTEI_COLORS[partei] direkt für die Hintergrundfarbe, 
+        // da die Farbe im CSS definiert ist.
         item.innerHTML = `
             <span class="legend-color" style="background-color: ${PARTEI_COLORS[partei]}"></span>
             ${partei}
@@ -671,9 +720,18 @@ document.getElementById("show-register").addEventListener("click", () => navigat
 document.getElementById("show-login").addEventListener("click", () => navigateTo('loginForm'));
 document.getElementById("book-btn").addEventListener("click", () => navigateTo('bookingSection'));
 
+// Theme-Wechsel Logik (NEU)
+if (themeIcon) {
+    themeIcon.addEventListener("click", () => {
+        const newTheme = (currentTheme === 'light') ? 'dark' : 'light';
+        setTheme(newTheme);
+        saveThemePreference(); // Speichert die Präferenz im Firestore
+    });
+}
+
+
 // --- 11. PROFILBEARBEITUNG ---
 // Navigation zum Profilbereich
-const profileSection = document.getElementById("profileSection");
 
 document.getElementById("profile-btn").addEventListener("click", async () => {
     if (!currentUserId) return;
@@ -697,8 +755,6 @@ document.getElementById("profile-btn").addEventListener("click", async () => {
 document.getElementById("back-to-menu-btn-4").addEventListener("click", () => navigateTo("mainMenu"));
 
 // Passwort ändern
-import { updatePassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-
 document.getElementById("change-password-btn").addEventListener("click", async () => {
     const newPassword = document.getElementById("new-password").value;
 
@@ -762,7 +818,7 @@ document.getElementById("kw-select").addEventListener("change", (e) => loadBooki
 // Zurück-Buttons
 document.getElementById("back-to-menu-btn-1").addEventListener("click", () => navigateTo('mainMenu'));
 document.getElementById("back-to-menu-btn-2").addEventListener("click", () => navigateTo('mainMenu'));
-document.getElementById("back-to-menu-btn-3").addEventListener("click", () => navigateTo('mainMenu')); // NEU
+document.getElementById("back-to-menu-btn-3").addEventListener("click", () => navigateTo('mainMenu')); 
 
 // Logout
 document.getElementById("logout-btn").addEventListener("click", async () => {
