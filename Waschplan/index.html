@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Waschplan App</title>
+<link rel="stylesheet" href="style.css">
+<script type="module" src="script.js"></script>
+</head>
+<body>
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <p>Lade App...</p>
+</div>
+<div id="app" style="display:none;">
+  <h1>🧺 Waschplan</h1>
+
+  <!-- Benutzerinformation -->
+  <div id="userInfo" class="user-info-bar" style="display:none;">
+    <span id="current-username" class="font-semibold"></span> 
+    (<span id="current-role"></span>)
+    <button id="logout-btn" class="button-small">Abmelden</button>
+  </div>
+
+  <!-- Login -->
+  <div id="loginForm" class="card">
+    <h2>Login</h2>
+    <div id="login-error" class="message-box error" style="display:none;"></div>
+    <input type="text" id="login-identifier" placeholder="Benutzername oder E-Mail">
+    <input type="password" id="login-password" placeholder="Passwort">
+    <button id="login-btn">Einloggen</button>
+    <p id="switch-register">Noch nicht registriert? 
+      <span id="show-register" class="clickable">Registrieren</span>
+    </p>
+  </div>
+
+  <!-- Registrierung -->
+  <div id="registerForm" class="card" style="display:none;">
+    <div id="register-error" class="message-box error" style="display:none;"></div>
+    <h2>Registrierung</h2>
+    <input type="text" id="register-username" placeholder="Benutzername">
+    <input type="email" id="register-email" placeholder="E-Mail">
+    <input type="password" id="register-password" placeholder="Passwort">
+    <select id="register-partei">
+      <option value="" disabled selected>Partei wählen</option>
+      <option value="Micha & Stefan">Micha & Stefan</option>
+      <option value="Sarah & Florian">Sarah & Florian</option>
+      <option value="Christa & Uli">Christa & Uli</option>
+    </select>
+    <button id="register-btn">Registrieren</button>
+    <p id="switch-login">Bereits registriert? 
+      <span id="show-login" class="clickable">Login</span>
+    </p>
+  </div>
+
+  <!-- Hauptmenü -->
+  <div id="mainMenu" class="card" style="display:none;">
+    <h2>Menü</h2>
+    <button id="book-btn">Buchen</button>
+    <button id="overview-btn">Übersicht (Woche)</button>
+    <button id="calendar-btn">Übersicht (Monat)</button>
+    <button id="profile-btn">Profil bearbeiten</button>
+  </div>
+
+  <!-- Buchungsbereich -->
+  <div id="bookingSection" class="card" style="display:none;">
+    <button id="back-to-menu-btn-1" class="back-button">← Zurück</button>
+    <h2>Buchung vornehmen</h2>
+    <div id="booking-error" class="message-box" style="display:none;"></div>
+    <input type="date" id="booking-date">
+    <select id="booking-slot">
+      <option value="" disabled selected>Slot wählen</option>
+      <option value="07:00-13:00">07:00 - 13:00</option>
+      <option value="13:00-19:00">13:00 - 19:00</option>
+    </select>
+    <button id="book-submit">Buchen</button>
+  </div>
+
+  <!-- Wochenübersicht -->
+  <div id="overviewSection" class="card" style="display:none;">
+    <button id="back-to-menu-btn-2" class="back-button">← Zurück</button>
+    <h2>Wochenübersicht</h2>
+    <div id="overview-message" class="message-box" style="display:none;"></div>
+    <select id="kw-select" class="mb-10"></select>
+    <div id="bookingsList"></div>
+  </div>
+
+  <!-- Monatsübersicht -->
+  <div id="calendarSection" class="card" style="display:none;">
+    <button id="back-to-menu-btn-3" class="back-button">← Zurück</button>
+    <h2>Monatsübersicht</h2>
+    <div class="calendar-controls">
+      <button id="prev-month-btn">←</button>
+      <span id="current-month-display" class="font-semibold"></span>
+      <button id="next-month-btn">→</button>
+    </div>
+    <div id="calendar-grid"></div>
+    <div id="calendar-legend" class="mt-15">
+      <p class="font-semibold">Legende:</p>
+      <div id="partei-legend"></div>
+    </div>
+  </div>
+
+  <!-- Profil bearbeiten -->
+  <div id="profileSection" class="card" style="display:none;">
+    <button id="back-to-menu-btn-4" class="back-button">← Zurück</button>
+    <h2>Profil bearbeiten</h2>
+    <div id="profile-message" class="message-box" style="display:none;"></div>
+    <p><strong>Benutzer:</strong> <span id="profile-username"></span></p>
+    <p><strong>E-Mail:</strong> <span id="profile-email"></span></p>
+    <h3>Passwort ändern</h3>
+    <input type="password" id="new-password" placeholder="Neues Passwort">
+    <button id="change-password-btn">Passwort aktualisieren</button>
+  </div>
+
+  <!-- Bestätigungs-Modal -->
+  <div id="confirmationModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h3>Buchung löschen</h3>
+      <p id="confirm-text">Soll die Buchung wirklich gelöscht werden?</p>
+      <div class="modal-actions">
+        <button id="confirm-cancel" class="button-secondary">Abbrechen</button>
+        <button id="confirm-delete" class="button-danger">Löschen bestätigen</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
