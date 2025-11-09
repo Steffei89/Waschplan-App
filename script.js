@@ -6,7 +6,7 @@ import {
     signInWithEmailAndPassword, 
     onAuthStateChanged, 
     signOut,
-    updatePassword // Für Profilbearbeitung
+    updatePassword 
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { 
     getFirestore, 
@@ -20,7 +20,9 @@ import {
     onSnapshot, 
     addDoc, 
     deleteDoc,
-    updateDoc // Für Theme-Speicherung
+    updateDoc, 
+    orderBy, 
+    limit 
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- 1. FIREBASE KONFIGURATION (Ihre Daten) ---
@@ -63,9 +65,14 @@ let currentUserId = null;
 let userIsAdmin = false;
 let overviewUnsubscribe = null; 
 let calendarUnsubscribe = null;
+let quickViewUnsubscribe = null;
 let bookingToDelete = null; 
-let currentCalendarDate = new Date(); // Für den Monatskalender
-let currentTheme = 'light'; // Standard-Theme
+let currentCalendarDate = new Date(); 
+let currentTheme = 'light'; 
+// NEU: Zustand für Kalender-Aktion
+let selectedCalendarDate = null; 
+let allBookingsForMonth = {}; // { 'YYYY-MM-DD': [{slot: '...', partei: '...'}, ...], ... }
+
 
 const loadingOverlay = document.getElementById("loadingOverlay");
 const appContainer = document.getElementById("app");
@@ -75,11 +82,19 @@ const mainMenu = document.getElementById("mainMenu");
 const bookingSection = document.getElementById("bookingSection");
 const overviewSection = document.getElementById("overviewSection");
 const calendarSection = document.getElementById("calendarSection"); 
+const profileSection = document.getElementById("profileSection");
 const bookingsList = document.getElementById("bookingsList");
 const userInfo = document.getElementById("userInfo");
 const confirmationModal = document.getElementById("confirmationModal");
 const confirmText = document.getElementById("confirm-text");
-const themeIcon = document.getElementById("theme-icon"); // NEU
+const themeIcon = document.getElementById("theme-icon"); 
+const calendarGrid = document.getElementById("calendar-grid");
+const currentMonthDisplay = document.getElementById("current-month-display");
+// NEU: Kalender-Aktionsfelder
+const calendarDayActions = document.getElementById("calendar-day-actions");
+const selectedDayTitle = document.getElementById("selected-day-title");
+const calendarActionMessage = document.getElementById("calendar-action-message");
+
 
 // Farbzuweisung für Parteien (für Kalender-Punkte)
 const PARTEI_COLORS = {
@@ -192,7 +207,7 @@ function setupWeekDropdown() {
     }
 }
 
-// --- NEUE THEME FUNKTIONEN ---
+// --- THEME FUNKTIONEN ---
 
 /**
  * Setzt das Theme (light/dark) und aktualisiert das Icon.
@@ -233,16 +248,23 @@ async function saveThemePreference() {
 function unsubscribeAll() {
     if (overviewUnsubscribe) { overviewUnsubscribe(); overviewUnsubscribe = null; }
     if (calendarUnsubscribe) { calendarUnsubscribe(); calendarUnsubscribe = null; }
+    if (quickViewUnsubscribe) { quickViewUnsubscribe(); quickViewUnsubscribe = null; }
 }
 
 function navigateTo(section) {
-    // Alle Hauptsektionen ausblenden
-    [loginForm, registerForm, mainMenu, bookingSection, overviewSection, calendarSection, profileSection].forEach(el => el.style.display = 'none');
+    // Liste aller Sektionen
+    const sections = [loginForm, registerForm, mainMenu, bookingSection, overviewSection, calendarSection, profileSection];
+    
+    // Animation und Anzeige
+    sections.forEach(el => {
+        el.style.display = 'none';
+        el.classList.remove('active'); // Animation zurücksetzen
+    });
     
     // Alle Nachrichten-Boxen zurücksetzen
     document.querySelectorAll('.message-box').forEach(el => el.style.display = 'none');
     
-    // Listener beenden, wenn die Ansicht gewechselt wird
+    // Listener beenden
     if (section !== 'overviewSection' && section !== 'calendarSection') {
         unsubscribeAll();
     }
@@ -251,7 +273,25 @@ function navigateTo(section) {
     userInfo.style.display = (currentUser && section !== 'loginForm' && section !== 'registerForm') ? 'flex' : 'none';
 
     const targetElement = document.getElementById(section);
-    if(targetElement) targetElement.style.display = 'block';
+    if(targetElement) {
+        targetElement.style.display = 'block';
+        // Fügt die Klasse nach einem kurzen Timeout hinzu, um die Animation auszulösen
+        setTimeout(() => targetElement.classList.add('active'), 50); 
+        
+        // Auto-Fokus
+        if (section === 'loginForm') {
+            document.getElementById('login-identifier').focus();
+        } else if (section === 'registerForm') {
+            document.getElementById('register-username').focus();
+        } else if (section === 'mainMenu') {
+            // Lade die Quick View Buchungen, wenn das Menü angezeigt wird
+            loadNextBookingsOverview(); 
+        } else if (section === 'calendarSection') {
+            // Lade den Kalender für den aktuellen Monat
+            renderCalendar(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth());
+            loadBookingsForMonth(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth());
+        }
+    }
 }
 
 function updateUserInfo(userData) {
@@ -304,7 +344,7 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-// --- 7. REGISTRIERUNG & LOGIN (Funktionen mit showMessage) ---
+// --- 7. REGISTRIERUNG & LOGIN ---
 document.getElementById("register-btn").addEventListener("click", async () => {
     const username = document.getElementById("register-username").value.trim();
     const email = document.getElementById("register-email").value.trim();
@@ -338,7 +378,7 @@ document.getElementById("register-btn").addEventListener("click", async () => {
             email: email,
             partei: partei,
             isAdmin: false,
-            theme: 'light' // NEU: Initiales Theme setzen
+            theme: 'light' 
         });
 
         showMessage('register-error', "Registrierung erfolgreich! Bitte melden Sie sich an.", 'success');
@@ -402,17 +442,27 @@ document.getElementById("login-btn").addEventListener("click", async () => {
 document.getElementById("book-submit").addEventListener("click", async () => {
     const date = document.getElementById("booking-date").value;
     const slot = document.getElementById("booking-slot").value;
-    
+    await performBooking(date, slot, 'booking-error', document.getElementById("book-submit"));
+});
+
+/**
+ * Führt eine Buchung aus.
+ * @param {string} date - Das Datum (YYYY-MM-DD).
+ * @param {string} slot - Der Slot (z.B. '07:00-13:00').
+ * @param {string} messageElementId - ID des DOM-Elements für Fehlermeldungen.
+ * @param {HTMLElement} [buttonElement] - Optionaler Button für visuelles Feedback.
+ * @returns {boolean} - True bei Erfolg, False bei Fehler.
+ */
+async function performBooking(date, slot, messageElementId, buttonElement = null) {
     if (!date || !slot) {
-        showMessage('booking-error', "Bitte Datum und Slot wählen!", 'error');
-        return;
+        showMessage(messageElementId, "Datum und Slot müssen ausgewählt werden!", 'error');
+        return false;
     }
-
     if (!currentUser || !currentUserId) {
-        showMessage('booking-error', "Fehler: Sie sind nicht angemeldet. Bitte neu einloggen.", 'error');
-        return;
+        showMessage(messageElementId, "Fehler: Sie sind nicht angemeldet. Bitte neu einloggen.", 'error');
+        return false;
     }
-
+    
     const bookingsColRef = getBookingsCollectionRef();
     
     try {
@@ -420,8 +470,8 @@ document.getElementById("book-submit").addEventListener("click", async () => {
         const existingBookings = await getDocs(q);
 
         if (!existingBookings.empty) {
-            showMessage('booking-error', "Dieser Slot ist bereits belegt!", 'error');
-            return;
+             showMessage(messageElementId, "Dieser Slot ist bereits belegt!", 'error');
+             return false;
         }
 
         await addDoc(bookingsColRef, {
@@ -432,403 +482,654 @@ document.getElementById("book-submit").addEventListener("click", async () => {
             bookedAt: new Date().toISOString()
         });
 
-        // KEIN RÜCKSPRUNG MEHR ZUM HAUPTMENÜ
-        showMessage('booking-error', "Buchung erfolgreich! Sie können weitere Buchungen vornehmen.", 'success');
+        if (buttonElement) {
+             const bookText = document.getElementById("book-text"); 
+             const bookIcon = document.getElementById("book-success-icon"); 
+             buttonElement.classList.add('booking-success');
+             if(bookText) bookText.style.display = 'none';
+             if(bookIcon) bookIcon.style.display = 'block';
+
+             setTimeout(() => {
+                buttonElement.classList.remove('booking-success');
+                if(bookText) bookText.style.display = 'block';
+                if(bookIcon) bookIcon.style.display = 'none';
+             }, 2000);
+        }
+
+        showMessage(messageElementId, "Buchung erfolgreich!", 'success');
         
-        // Slot-Auswahl zurücksetzen (Datum bleibt zur Vereinfachung)
-        document.getElementById("booking-slot").value = ''; 
+        // Slot-Auswahl zurücksetzen in der Buchungs-Sektion
+        if (messageElementId === 'booking-error') {
+            document.getElementById("booking-slot").value = ''; 
+            document.getElementById("booking-date").value = ''; 
+        }
+
+        return true;
 
     } catch (e) {
-        showMessage('booking-error', `Fehler beim Speichern der Buchung: ${e.message}`, 'error');
+        showMessage(messageElementId, `Fehler beim Speichern der Buchung: ${e.message}`, 'error');
         console.error("Buchungsfehler:", e);
+        return false;
     }
-});
-
-// Buchungen laden (Wochenübersicht)
-function loadBookings(kwValue) {
-    if (!currentUserId) return;
-
-    if (overviewUnsubscribe) { overviewUnsubscribe(); }
-
-    const [yearStr, kwStr] = kwValue.split('-W');
-    const year = parseInt(yearStr);
-    const week = parseInt(kwStr);
-
-    if (isNaN(year) || isNaN(week)) return;
-
-    const startOfWeek = getMonday(year, week);
-    startOfWeek.setHours(0, 0, 0, 0);
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(endOfWeek.getDate() + 6);
-    endOfWeek.setHours(23, 59, 59, 999);
-    
-    bookingsList.innerHTML = `<p class="small-text">Lade KW ${String(week).padStart(2, '0')}/${year}...</p>`;
-
-    const q = getBookingsCollectionRef();
-
-    overviewUnsubscribe = onSnapshot(q, (querySnapshot) => {
-        bookingsList.innerHTML = "";
-        let foundBookings = false;
-        const currentBookings = [];
-
-        querySnapshot.forEach((docSnap) => {
-            const booking = docSnap.data();
-            const bookingDate = new Date(booking.date + "T00:00:00");
-            
-            // Wichtig: Wir filtern hier auf das Datum in der Datenbank, da Firestore keinen Date-Range-Filter auf den Date-String erlaubt.
-            // Die Datumsberechnung in JS ist präziser.
-            if (bookingDate >= startOfWeek && bookingDate <= endOfWeek) {
-                foundBookings = true;
-                currentBookings.push({ id: docSnap.id, ...booking });
-            }
-        });
-
-        currentBookings.sort((a, b) => {
-            if (a.date !== b.date) {
-                return a.date.localeCompare(b.date);
-            }
-            return a.slot.localeCompare(b.slot);
-        });
-
-        renderBookings(currentBookings);
-
-        if (!foundBookings) {
-            bookingsList.innerHTML = `<p class="small-text">Keine Buchungen für KW ${String(week).padStart(2, '0')}/${year} gefunden.</p>`;
-        }
-    }, (error) => {
-        showMessage('overview-message', "Fehler beim Laden der Übersicht: " + error.message, 'error');
-        console.error("Firestore onSnapshot error:", error);
-    });
 }
 
-function renderBookings(bookings) {
-    bookingsList.innerHTML = '';
-    
-    bookings.forEach(booking => {
-        const item = document.createElement('div');
-        item.className = 'booking-item';
+/**
+ * Löscht eine Buchung.
+ * @param {string} date - Das Datum (YYYY-MM-DD).
+ * @param {string} slot - Der Slot (z.B. '07:00-13:00').
+ * @param {string} messageElementId - ID des DOM-Elements für Fehlermeldungen.
+ * @param {string} expectedUserId - Die ID des Benutzers, der die Löschung durchführt (aktueller Nutzer).
+ * @returns {boolean} - True bei Erfolg, False bei Fehler.
+ */
+async function performDeletion(date, slot, messageElementId, expectedUserId) {
+    if (!date || !slot || !currentUserId) return false;
 
-        const details = document.createElement('div');
-        details.className = 'booking-details';
-        
-        const bookingDate = new Date(booking.date + "T00:00:00");
-        const formattedDate = bookingDate.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+    const bookingsColRef = getBookingsCollectionRef();
+    let q;
 
-        details.innerHTML = `
-            <div class="font-semibold">${formattedDate} (${booking.slot})</div>
-            <div class="small-text" style="text-align: left;">Gebucht von: <strong>${booking.partei}</strong></div>
-        `;
-        item.appendChild(details);
-
-        const actions = document.createElement('div');
-        actions.className = 'booking-actions';
-        
-        const isOwner = booking.userId === currentUserId;
-        const canDelete = userIsAdmin || isOwner;
-
-        if (canDelete) {
-            const deleteBtn = document.createElement('button');
-            deleteBtn.textContent = 'Löschen';
-            deleteBtn.className = 'button-danger';
-            deleteBtn.addEventListener('click', () => showConfirmation(booking)); 
-            actions.appendChild(deleteBtn);
-        }
-        
-        item.appendChild(actions);
-        bookingsList.appendChild(item);
-    });
-}
-
-// Löschlogik
-async function confirmDeleteBooking() {
-    const booking = bookingToDelete;
-    hideConfirmation();
-    if (!booking) return;
-
-    const docRef = doc(db, "bookings", booking.id);
+    if (userIsAdmin) {
+        // ADMIN-LOGIK: Der Admin darf jede Buchung an diesem Datum/Slot löschen.
+        q = query(
+            bookingsColRef, 
+            where("date", "==", date), 
+            where("slot", "==", slot)
+        );
+        console.log("Admin versucht, Buchung zu löschen...");
+    } else {
+        // NUTZER-LOGIK: Normale Nutzer dürfen nur ihre eigenen Buchungen löschen.
+        q = query(
+            bookingsColRef, 
+            where("date", "==", date), 
+            where("slot", "==", slot),
+            where("userId", "==", expectedUserId) // Muss eigener Nutzer sein
+        );
+        console.log("Nutzer versucht, eigene Buchung zu löschen...");
+    }
     
     try {
-        if (!userIsAdmin && booking.userId !== currentUserId) {
-            showMessage('overview-message', "Sie haben keine Berechtigung, diese Buchung zu löschen.", 'error');
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            if (userIsAdmin) {
+                // Dies sollte nur passieren, wenn die Buchung in der Zwischenzeit gelöscht wurde.
+                showMessage(messageElementId, "Fehler: Die Buchung wurde nicht gefunden.", 'error');
+            } else {
+                showMessage(messageElementId, "Fehler: Sie können nur Ihre eigenen Buchungen löschen.", 'error');
+            }
+            return false;
+        }
+
+        // Es sollte nur eine Buchung pro Slot/Tag geben. Wir löschen die erste gefundene.
+        const docToDelete = querySnapshot.docs[0];
+        const bookingData = docToDelete.data();
+
+        // Zusätzliche Sicherheitsprüfung für Nicht-Admins (falls sie versuchen, einen Button zu manipulieren)
+        if (!userIsAdmin && bookingData.userId !== currentUserId) {
+             showMessage(messageElementId, "Löschung fehlgeschlagen: Sie sind nicht berechtigt, diese Buchung zu löschen.", 'error');
+             return false;
+        }
+        
+        await deleteDoc(docToDelete.ref);
+        
+        showMessage(messageElementId, `Buchung von ${bookingData.partei || 'Unbekannt'} erfolgreich gelöscht.`, 'success');
+        return true;
+
+    } catch (e) {
+        showMessage(messageElementId, `Fehler beim Löschen der Buchung: ${e.message}`, 'error');
+        console.error("Löschfehler:", e);
+        return false;
+    }
+}
+
+
+// Globaler Listener für das Löschen meiner Buchungen aus dem QuickView
+document.addEventListener('click', async (e) => {
+    if (e.target.classList.contains('delete-my-booking-btn')) {
+        const date = e.target.dataset.date;
+        const slot = e.target.dataset.slot;
+
+        if (!currentUserId || !date || !slot) {
+            showMessage('my-upcoming-bookings', 'Löschfehler: Ungültige Buchungsdaten.', 'error');
             return;
         }
 
-        await deleteDoc(docRef);
-        showMessage('overview-message', "Buchung erfolgreich gelöscht.", 'success');
+        e.target.disabled = true;
+        e.target.textContent = 'Lösche...';
+
+        const success = await performDeletion(date, slot, 'my-upcoming-bookings', currentUserId);
         
-    } catch (e) {
-        showMessage('overview-message', `Fehler beim Löschen: ${e.message}`, 'error');
-        console.error("Löschfehler:", e);
-    }
-}
-
-
-// --- 9. MONATSKALENDER LOGIK ---
-
-function getMonthStartAndEnd(date) {
-    // Liefert den 1. Tag des Monats
-    const start = new Date(date.getFullYear(), date.getMonth(), 1);
-    // Liefert den letzten Tag des Monats (setMonth erhöht den Monat, Tag 0 gibt den letzten Tag des Vormonats)
-    const end = new Date(date.getFullYear(), date.getMonth() + 1, 0); 
-    
-    // Setzt die Uhrzeit auf Mitternacht für den Start des Monats und 23:59 für das Ende.
-    start.setHours(0, 0, 0, 0);
-    end.setHours(23, 59, 59, 999);
-    
-    return { start, end };
-}
-
-function getBookingsByDate(bookings) {
-    // Gruppiert Buchungen nach Datum und Slot
-    const map = {};
-    bookings.forEach(b => {
-        const dateKey = b.date; // YYYY-MM-DD
-        if (!map[dateKey]) {
-            map[dateKey] = [];
+        if (!success) {
+            e.target.disabled = false;
+            e.target.textContent = 'Löschen';
         }
-        map[dateKey].push({
-            partei: b.partei,
-            slot: b.slot
+        // onSnapshot wird die Liste automatisch aktualisieren.
+    }
+});
+
+
+// --- LÄDT DIE NÄCHSTEN 2 GESAMTBUCHUNGEN ALLER PARTEIEN (für Quick View) ---
+async function loadNextBookingsOverview() {
+    if (quickViewUnsubscribe) { quickViewUnsubscribe(); }
+    
+    const myBookingsList = document.getElementById('my-bookings-list');
+    myBookingsList.innerHTML = '<p class="small-text">Lade die nächsten Buchungen...</p>';
+    
+    const today = formatDate(new Date());
+
+    // Abfrage: Filtere ab heute, sortiere chronologisch (Datum, Slot), begrenze auf 5
+    const q = query(
+        getBookingsCollectionRef(),
+        where("date", ">=", today), // Nur zukünftige Buchungen
+        orderBy("date"),
+        orderBy("slot"),
+        limit(5) // Zeigt die nächsten 5 Buchungen
+    );
+
+    quickViewUnsubscribe = onSnapshot(q, (querySnapshot) => {
+        myBookingsList.innerHTML = '';
+        const bookings = [];
+        querySnapshot.forEach(docSnap => bookings.push({id: docSnap.id, ...docSnap.data()}));
+
+        if (bookings.length === 0) {
+            myBookingsList.innerHTML = `<p class="small-text">Keine kommenden Buchungen gefunden.</p>`;
+            return;
+        }
+
+        bookings.forEach(booking => {
+            const bookingDate = new Date(booking.date + "T00:00:00");
+            const formattedDate = bookingDate.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
+            
+            const item = document.createElement('div');
+            item.className = 'my-booking-item';
+            
+            const isMyBooking = booking.userId === currentUserId;
+            
+            item.innerHTML = `
+                <div>
+                    <strong>${formattedDate}</strong> (${booking.slot})
+                    <span class="small-text ml-10">${booking.partei}</span>
+                </div>
+                ${isMyBooking || userIsAdmin ? 
+                    `<button class="button-small button-danger delete-my-booking-btn" 
+                        data-id="${booking.id}" 
+                        data-date="${booking.date}" 
+                        data-slot="${booking.slot}">
+                        Löschen
+                    </button>` : ''}
+            `;
+            myBookingsList.appendChild(item);
         });
+    }, (error) => {
+        myBookingsList.innerHTML = `<p class="small-text" style="color: var(--error-color);">Fehler beim Laden der Buchungen.</p>`;
+        console.error("QuickView Load Error:", error);
     });
-    return map;
 }
 
-function loadCalendar(date) {
-    if (!currentUserId) return;
-    
+
+// --- 9. KALENDER-LOGIK ---
+
+/**
+ * Holt alle Buchungen für den angegebenen Monat.
+ * @param {number} year 
+ * @param {number} monthIndex - 0-basiert
+ */
+function loadBookingsForMonth(year, monthIndex) {
     if (calendarUnsubscribe) { calendarUnsubscribe(); }
-
-    const { start, end } = getMonthStartAndEnd(date);
     
-    renderCalendarUI(date);
-
-    // Buchungsdatenbank-Referenz
-    const q = getBookingsCollectionRef();
+    const startOfMonth = new Date(year, monthIndex, 1);
+    const endOfMonth = new Date(year, monthIndex + 1, 0); // Letzter Tag des Monats
+    
+    const startDateString = formatDate(startOfMonth);
+    const endDateString = formatDate(endOfMonth);
+    
+    // Abfrage: alle Buchungen im aktuellen Monatsbereich
+    const q = query(
+        getBookingsCollectionRef(),
+        where("date", ">=", startDateString), 
+        where("date", "<=", endDateString), 
+        orderBy("date"),
+        orderBy("slot")
+    );
 
     calendarUnsubscribe = onSnapshot(q, (querySnapshot) => {
-        const allBookings = [];
+        allBookingsForMonth = {};
         querySnapshot.forEach(docSnap => {
-            const booking = docSnap.data();
-            // Erstellt ein Date-Objekt aus dem YYYY-MM-DD String für den Vergleich
-            const bookingDate = new Date(booking.date + "T00:00:00"); 
-
-            // Filterung in JS: Nur Buchungen im angezeigten Monat verwenden
-            if (bookingDate >= start && bookingDate <= end) {
-                 allBookings.push(booking);
+            const data = docSnap.data();
+            const dateKey = data.date;
+            const bookingData = { 
+                slot: data.slot, 
+                partei: data.partei, 
+                userId: data.userId, 
+                id: docSnap.id // Füge die Dokumenten-ID hinzu
+            };
+            
+            if (!allBookingsForMonth[dateKey]) {
+                allBookingsForMonth[dateKey] = [];
             }
+            allBookingsForMonth[dateKey].push(bookingData);
         });
         
-        const groupedBookings = getBookingsByDate(allBookings);
-        renderCalendarGrid(date, groupedBookings);
+        // Kalender neu rendern mit den neuen Buchungsdaten
+        renderCalendar(year, monthIndex);
+
+        // Aktionen für den eventuell ausgewählten Tag aktualisieren
+        if (selectedCalendarDate) {
+            const selectedDateString = formatDate(selectedCalendarDate);
+            updateCalendarDayActions(selectedDateString);
+        }
 
     }, (error) => {
-        console.error("Firestore Kalender error:", error);
+        console.error("Kalender Buchungs-Load Error:", error);
     });
 }
 
-function renderCalendarUI(date) {
-    const monthYear = date.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
-    document.getElementById('current-month-display').textContent = monthYear;
+/**
+ * Rendert den Kalender für den angegebenen Monat.
+ * @param {number} year 
+ * @param {number} monthIndex - 0-basiert
+ */
+function renderCalendar(year, monthIndex) {
+    const today = formatDate(new Date());
+    const firstDayOfMonth = new Date(year, monthIndex, 1);
+    const lastDayOfMonth = new Date(year, monthIndex + 1, 0);
+    const daysInMonth = lastDayOfMonth.getDate();
     
+    currentMonthDisplay.textContent = firstDayOfMonth.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+    calendarGrid.innerHTML = ''; // Vorherige Kalendereinträge löschen
+    
+    const dayNames = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
+    dayNames.forEach(day => {
+        const header = document.createElement('div');
+        header.className = 'day-header';
+        header.textContent = day;
+        calendarGrid.appendChild(header);
+    });
+
+    // Füllt leere Zellen am Anfang (Montag = 1, Sonntag = 0 -> Sonntag = 7)
+    let startDay = firstDayOfMonth.getDay();
+    if (startDay === 0) startDay = 7; // Mache Sonntag zum 7. Tag
+    
+    for (let i = 1; i < startDay; i++) {
+        const emptyDay = document.createElement('div');
+        calendarGrid.appendChild(emptyDay);
+    }
+    
+    // Erstellt die Tage des Monats
+    for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(year, monthIndex, day);
+        const dateString = formatDate(date);
+        
+        const dayEl = document.createElement('div');
+        dayEl.className = 'calendar-day clickable-day';
+        dayEl.dataset.date = dateString;
+        
+        // Prüfen, ob der Tag heute oder in der Vergangenheit liegt
+        const isPast = date < new Date(today + "T00:00:00"); 
+
+        if (dateString === today) {
+            dayEl.classList.add('is-today');
+        }
+
+        // Deaktiviert vergangene Tage für die Klick-Aktion
+        if (isPast) {
+            dayEl.classList.add('inactive');
+        }
+
+        // Setze den Tag als ausgewählt, wenn er es ist
+        if (selectedCalendarDate && formatDate(selectedCalendarDate) === dateString) {
+            dayEl.classList.add('selected-day');
+        }
+
+        dayEl.innerHTML = `<span class="day-number">${day}</span>`;
+
+        // Fügt Buchungsindikatoren hinzu
+        const bookings = allBookingsForMonth[dateString] || [];
+        if (bookings.length > 0) {
+            const indicatorContainer = document.createElement('div');
+            indicatorContainer.className = 'booking-indicator-container';
+            
+            const slots = {
+                '07:00-13:00': null,
+                '13:00-19:00': null
+            };
+            bookings.forEach(b => slots[b.slot] = b.partei);
+            
+            Object.values(slots).forEach(partei => {
+                const indicator = document.createElement('div');
+                indicator.className = 'booking-indicator';
+                if (partei && PARTEI_COLORS[partei]) {
+                    indicator.style.backgroundColor = PARTEI_COLORS[partei];
+                } else {
+                    indicator.style.backgroundColor = 'transparent'; // Leerer Slot
+                }
+                indicatorContainer.appendChild(indicator);
+            });
+            dayEl.appendChild(indicatorContainer);
+        }
+
+        calendarGrid.appendChild(dayEl);
+    }
+
+    // Event Listener für die Tage hinzufügen
+    document.querySelectorAll('.calendar-day.clickable-day').forEach(dayEl => {
+        const dateString = dayEl.dataset.date;
+        const date = new Date(dateString + "T00:00:00");
+        const todayNoTime = new Date(today + "T00:00:00");
+        
+        // Nur zukünftige oder heutige Tage sind klickbar
+        if (date >= todayNoTime) { 
+            dayEl.addEventListener('click', () => {
+                // Entferne die 'selected' Klasse von allen Tagen
+                document.querySelectorAll('.calendar-day.selected-day').forEach(el => el.classList.remove('selected-day'));
+
+                // Setze den neuen ausgewählten Tag
+                selectedCalendarDate = date;
+                dayEl.classList.add('selected-day');
+
+                // Zeige Aktionen an
+                updateCalendarDayActions(dateString);
+            });
+        }
+    });
+
+    // Legende aktualisieren
+    renderCalendarLegend();
+}
+
+/**
+ * Rendert die Legende für die Parteien und Farben.
+ */
+function renderCalendarLegend() {
     const legendEl = document.getElementById('partei-legend');
     legendEl.innerHTML = '';
     
-    // Legende rendern
     ALL_PARTEIEN.forEach(partei => {
         const item = document.createElement('div');
         item.className = 'legend-item';
-        // Wir verwenden PARTEI_COLORS[partei] direkt für die Hintergrundfarbe, 
-        // da die Farbe im CSS definiert ist.
         item.innerHTML = `
-            <span class="legend-color" style="background-color: ${PARTEI_COLORS[partei]}"></span>
-            ${partei}
+            <div class="legend-color" style="background-color: ${PARTEI_COLORS[partei]}"></div>
+            <span>${partei}</span>
         `;
         legendEl.appendChild(item);
     });
 }
 
-function renderCalendarGrid(date, groupedBookings) {
-    const gridEl = document.getElementById('calendar-grid');
-    gridEl.innerHTML = '';
+/**
+ * Aktualisiert den Aktionsbereich für den ausgewählten Kalendertag (mit Admin-Logik).
+ * @param {string} dateString - Das Datum (YYYY-MM-DD).
+ */
+function updateCalendarDayActions(dateString) {
+    calendarActionMessage.style.display = 'none';
+    calendarDayActions.style.display = 'block';
     
-    const daysOfWeek = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
-    daysOfWeek.forEach(day => {
-        const header = document.createElement('div');
-        header.className = 'day-header';
-        header.textContent = day;
-        gridEl.appendChild(header);
-    });
+    const date = new Date(dateString + "T00:00:00");
+    selectedDayTitle.textContent = `Aktionen für: ${date.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}`;
     
-    const firstDayOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
-    const lastDayOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+    const bookings = allBookingsForMonth[dateString] || [];
+    const today = formatDate(new Date());
 
-    // Der Wochentag des ersten Tages (1=Mo, ..., 7=So)
-    let startingDay = firstDayOfMonth.getDay(); 
-    startingDay = (startingDay === 0) ? 6 : startingDay - 1; // 0 (So) -> 6, 1 (Mo) -> 0
+    const slots = [
+        { id: '07', slot: '07:00-13:00' },
+        { id: '13', slot: '13:00-19:00' }
+    ];
 
-    // Fülltage am Anfang (für Mo-So Ausrichtung)
-    for (let i = 0; i < startingDay; i++) {
-        const emptyDay = document.createElement('div');
-        emptyDay.className = 'calendar-day inactive';
-        gridEl.appendChild(emptyDay);
-    }
+    slots.forEach(slotInfo => {
+        const statusEl = document.getElementById(`slot-status-${slotInfo.id}`);
+        const bookBtn = document.getElementById(`btn-book-${slotInfo.id}`);
+        const deleteBtn = document.getElementById(`btn-delete-${slotInfo.id}`);
 
-    // Tage des Monats
-    for (let day = 1; day <= lastDayOfMonth.getDate(); day++) {
-        const currentDate = new Date(date.getFullYear(), date.getMonth(), day);
-        const dateKey = formatDate(currentDate);
-
-        const dayEl = document.createElement('div');
-        dayEl.className = 'calendar-day';
-        dayEl.innerHTML = `<span class="day-number">${day}</span>`;
+        statusEl.className = '';
+        bookBtn.style.display = 'block';
+        deleteBtn.style.display = 'none';
         
-        const bookingsForDay = groupedBookings[dateKey];
-        
-        const indicatorContainer = document.createElement('div');
-        indicatorContainer.className = 'booking-indicator-container';
+        const booking = bookings.find(b => b.slot === slotInfo.slot);
 
-        // Wir definieren die Slots, um sicherzustellen, dass die Reihenfolge der Punkte immer gleich ist
-        const slots = ["07:00-13:00", "13:00-19:00"];
-        
-        slots.forEach(slotKey => {
-            let color = '#e0e0e0'; // Grau für frei
-            
-            if (bookingsForDay) {
-                // Finde die Buchung für diesen Slot
-                const booking = bookingsForDay.find(b => b.slot === slotKey);
-                if (booking && PARTEI_COLORS[booking.partei]) {
-                    color = PARTEI_COLORS[booking.partei];
-                }
+        if (booking) {
+            // Slot ist belegt
+            statusEl.textContent = `Gebucht (${booking.partei})`;
+            statusEl.classList.add('booked');
+
+            bookBtn.style.display = 'none'; // Buchen ist nicht möglich
+
+            // NEU: Nur Eigene oder Admin dürfen löschen
+            if (booking.userId === currentUserId) {
+                statusEl.textContent = `Gebucht (Sie)`;
+                statusEl.classList.add('booked-me');
+                deleteBtn.style.display = 'block'; // Eigener Slot kann gelöscht werden
+                deleteBtn.dataset.id = booking.id; 
+            } else if (userIsAdmin) {
+                // ADMIN-FALL: Darf fremde Buchung löschen
+                deleteBtn.style.display = 'block'; 
+                deleteBtn.dataset.id = booking.id;
+            } else {
+                // Fremder Slot, kein Admin
+                deleteBtn.style.display = 'none';
             }
             
-            const indicator = document.createElement('div');
-            indicator.className = 'booking-indicator';
-            indicator.style.backgroundColor = color;
-            indicatorContainer.appendChild(indicator);
-        });
+        } else {
+            // Slot ist frei
+            statusEl.textContent = `Verfügbar`;
+            bookBtn.style.display = 'block'; // Buchen möglich
+            deleteBtn.style.display = 'none'; // Löschen nicht nötig
+        }
         
-        dayEl.appendChild(indicatorContainer);
-        gridEl.appendChild(dayEl);
-    }
-}
-
-// --- 10. EVENT LISTENER ---
-
-// Navigation
-document.getElementById("show-register").addEventListener("click", () => navigateTo('registerForm'));
-document.getElementById("show-login").addEventListener("click", () => navigateTo('loginForm'));
-document.getElementById("book-btn").addEventListener("click", () => navigateTo('bookingSection'));
-
-// Theme-Wechsel Logik (NEU)
-if (themeIcon) {
-    themeIcon.addEventListener("click", () => {
-        const newTheme = (currentTheme === 'light') ? 'dark' : 'light';
-        setTheme(newTheme);
-        saveThemePreference(); // Speichert die Präferenz im Firestore
+        // Deaktiviere alle Aktionen, wenn der Tag in der Vergangenheit liegt
+        if (dateString < today) {
+            statusEl.textContent = booking ? statusEl.textContent : 'Vergangen';
+            bookBtn.style.display = 'none';
+            deleteBtn.style.display = 'none';
+        }
     });
 }
 
+// Globaler Event Listener für die Kalender-Aktions-Buttons
+document.querySelectorAll('.calendar-action-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+        if (!selectedCalendarDate || !currentUserId) return;
 
-// --- 11. PROFILBEARBEITUNG ---
-// Navigation zum Profilbereich
+        const action = e.target.dataset.action;
+        const slot = e.target.dataset.slot;
+        const dateString = formatDate(selectedCalendarDate);
 
-document.getElementById("profile-btn").addEventListener("click", async () => {
-    if (!currentUserId) return;
+        e.target.disabled = true;
+        const originalText = e.target.textContent;
+        e.target.textContent = action === 'book' ? 'Buche...' : 'Lösche...';
 
-    navigateTo("profileSection");
-
-    try {
-        const userDocSnap = await getDoc(getUserProfileDocRef(currentUserId));
-        if (userDocSnap.exists()) {
-            const userData = userDocSnap.data();
-            document.getElementById("profile-username").textContent = userData.username || "Unbekannt";
-            document.getElementById("profile-email").textContent = userData.email || "-";
+        let success = false;
+        
+        if (action === 'book') {
+            success = await performBooking(dateString, slot, 'calendar-action-message');
+        } else if (action === 'delete') {
+            // Beim Löschen wird immer die ID des aktuellen Benutzers übergeben, da die performDeletion-Logik 
+            // entscheidet, ob aufgrund der Admin-Rechte alle oder nur eigene Buchungen gelöscht werden dürfen.
+            success = await performDeletion(dateString, slot, 'calendar-action-message', currentUserId);
         }
-    } catch (err) {
-        console.error("Fehler beim Laden des Profils:", err);
-        showMessage("profile-message", "Fehler beim Laden des Profils.", "error");
-    }
+        
+        // Nach der Aktion wird der onSnapshot-Listener den UI-Zustand automatisch aktualisieren.
+        if (!success) {
+             e.target.disabled = false;
+             e.target.textContent = originalText;
+        }
+    });
 });
 
-// Zurück-Button im Profilbereich
-document.getElementById("back-to-menu-btn-4").addEventListener("click", () => navigateTo("mainMenu"));
+
+// Navigation durch die Monate
+document.getElementById('prev-month-btn').addEventListener('click', () => {
+    currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
+    // Zustand der Aktionsfelder zurücksetzen
+    calendarDayActions.style.display = 'none'; 
+    selectedCalendarDate = null;
+    loadBookingsForMonth(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth());
+});
+
+document.getElementById('next-month-btn').addEventListener('click', () => {
+    currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
+    // Zustand der Aktionsfelder zurücksetzen
+    calendarDayActions.style.display = 'none';
+    selectedCalendarDate = null;
+    loadBookingsForMonth(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth());
+});
+
+
+// --- 10. WEITERE EVENT LISTENER ---
+
+// Navigation
+document.getElementById('show-register').addEventListener('click', () => navigateTo('registerForm'));
+document.getElementById('show-login').addEventListener('click', () => navigateTo('loginForm'));
+document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+document.getElementById('book-btn').addEventListener('click', () => navigateTo('bookingSection'));
+document.getElementById('overview-btn').addEventListener('click', () => {
+    setupWeekDropdown();
+    navigateTo('overviewSection');
+});
+document.getElementById('calendar-btn').addEventListener('click', () => {
+    currentCalendarDate = new Date(); // Setzt auf den aktuellen Monat zurück
+    calendarDayActions.style.display = 'none'; // Versteckt Aktionsfeld
+    selectedCalendarDate = null;
+    navigateTo('calendarSection');
+});
+document.getElementById('profile-btn').addEventListener('click', () => {
+    document.getElementById('profile-username').textContent = currentUser.username;
+    document.getElementById('profile-email').textContent = currentUser.email;
+    document.getElementById('profile-partei').textContent = currentUser.partei;
+    navigateTo('profileSection');
+});
+
+// Zurück-Buttons
+document.getElementById('back-to-menu-btn-1').addEventListener('click', () => navigateTo('mainMenu'));
+document.getElementById('back-to-menu-btn-2').addEventListener('click', () => navigateTo('mainMenu'));
+document.getElementById('back-to-menu-btn-3').addEventListener('click', () => navigateTo('mainMenu'));
+document.getElementById('back-to-menu-btn-4').addEventListener('click', () => navigateTo('mainMenu'));
+
+// Theme-Wechsel
+themeIcon.addEventListener('click', () => {
+    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    saveThemePreference();
+});
 
 // Passwort ändern
 document.getElementById("change-password-btn").addEventListener("click", async () => {
     const newPassword = document.getElementById("new-password").value;
-
-    if (!newPassword || newPassword.length < 6) {
-        showMessage("profile-message", "Das Passwort muss mindestens 6 Zeichen lang sein.", "error");
+    if (newPassword.length < 6) {
+        showMessage('profile-message', "Das Passwort muss mindestens 6 Zeichen lang sein.", 'error');
+        return;
+    }
+    if (!auth.currentUser) {
+        showMessage('profile-message', "Fehler: Nicht angemeldet.", 'error');
         return;
     }
 
     try {
-        const user = auth.currentUser;
-        if (!user) {
-            showMessage("profile-message", "Fehler: Kein Benutzer angemeldet.", "error");
+        await updatePassword(auth.currentUser, newPassword);
+        showMessage('profile-message', "Passwort erfolgreich aktualisiert!", 'success');
+        document.getElementById("new-password").value = '';
+    } catch (error) {
+         // Bei 'auth/requires-recent-login' muss sich der Nutzer neu anmelden
+         let msg = "Fehler beim Aktualisieren des Passworts. Bitte melden Sie sich neu an und versuchen Sie es erneut.";
+         if (error.code === 'auth/weak-password') {
+             msg = "Das neue Passwort ist zu schwach.";
+         }
+         showMessage('profile-message', msg, 'error');
+         console.error("Passwort-Update-Fehler:", error);
+    }
+});
+
+/**
+ * Lade Buchungen für die ausgewählte KW (Wochenübersicht).
+ */
+function loadBookings(kwString) {
+    if (overviewUnsubscribe) { overviewUnsubscribe(); }
+    const bookingsListEl = document.getElementById("bookingsList");
+    bookingsListEl.innerHTML = '<p class="small-text">Lade Wochenbuchungen...</p>';
+
+    // Logik zur Berechnung des Datumsbereichs aus der KW-Zeichenkette
+    const [yearStr, weekStr] = kwString.split('-W');
+    const year = parseInt(yearStr);
+    const week = parseInt(weekStr);
+    
+    // Ermittelt den Montag und Sonntag der KW
+    const monday = getMonday(year, week);
+    const sunday = new Date(monday);
+    sunday.setDate(sunday.getDate() + 6);
+
+    const startDate = formatDate(monday);
+    const endDate = formatDate(sunday);
+
+    const q = query(
+        getBookingsCollectionRef(),
+        where("date", ">=", startDate), 
+        where("date", "<=", endDate), 
+        orderBy("date"),
+        orderBy("slot")
+    );
+
+    overviewUnsubscribe = onSnapshot(q, (querySnapshot) => {
+        bookingsListEl.innerHTML = '';
+        const bookings = [];
+        querySnapshot.forEach(docSnap => bookings.push({id: docSnap.id, ...docSnap.data()}));
+
+        if (bookings.length === 0) {
+            bookingsListEl.innerHTML = `<p class="small-text">In dieser Woche sind keine Buchungen vorhanden.</p>`;
             return;
         }
 
-        await updatePassword(user, newPassword);
-        showMessage("profile-message", "Passwort erfolgreich aktualisiert!", "success");
-        document.getElementById("new-password").value = "";
-    } catch (err) {
-        console.error("Fehler beim Passwort-Update:", err);
-        let message = "Fehler beim Aktualisieren des Passworts.";
-        if (err.code === "auth/requires-recent-login") {
-            message = "Bitte logge dich erneut ein, um dein Passwort zu ändern.";
-        }
-        showMessage("profile-message", message, "error");
-    }
+        let currentDay = '';
+        bookings.forEach(booking => {
+            const bookingDate = new Date(booking.date + "T00:00:00");
+            const formattedDate = bookingDate.toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit' });
+            
+            if (formattedDate !== currentDay) {
+                const dayHeader = document.createElement('h3');
+                dayHeader.textContent = formattedDate;
+                dayHeader.style.marginTop = '15px';
+                dayHeader.style.marginBottom = '5px';
+                bookingsListEl.appendChild(dayHeader);
+                currentDay = formattedDate;
+            }
+
+            const isMyBooking = booking.userId === currentUserId;
+            
+            const item = document.createElement('div');
+            item.className = 'booking-item';
+            
+            item.innerHTML = `
+                <div>
+                    <strong>${booking.slot}</strong> 
+                    <span class="small-text ml-10">${booking.partei}</span>
+                </div>
+                ${isMyBooking || userIsAdmin ? 
+                    `<button class="button-small button-danger delete-overview-btn" 
+                        data-id="${booking.id}" 
+                        data-date="${booking.date}" 
+                        data-slot="${booking.slot}">
+                        Löschen
+                    </button>` : ''}
+            `;
+            bookingsListEl.appendChild(item);
+        });
+
+        // Füge Event-Listener für Lösch-Buttons in der Wochenübersicht hinzu
+        document.querySelectorAll('.delete-overview-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const date = e.target.dataset.date;
+                const slot = e.target.dataset.slot;
+                
+                e.target.disabled = true;
+                e.target.textContent = 'Lösche...';
+
+                await performDeletion(date, slot, 'overview-message', currentUserId);
+            });
+        });
+
+    }, (error) => {
+        bookingsListEl.innerHTML = `<p class="small-text" style="color: var(--error-color);">Fehler beim Laden der Wochenbuchungen.</p>`;
+        console.error("Overview Load Error:", error);
+    });
+}
+
+// Listener für KW-Auswahl in der Wochenübersicht
+document.getElementById("kw-select").addEventListener('change', (e) => {
+    loadBookings(e.target.value);
 });
-
-// Initialisiert das KW Dropdown, wenn die Übersichtsseite aufgerufen wird
-document.getElementById("overview-btn").addEventListener("click", () => {
-    navigateTo('overviewSection');
-    setupWeekDropdown();
-});
-
-// Initialisiert den Monatskalender, wenn die Kalenderansicht aufgerufen wird
-document.getElementById("calendar-btn").addEventListener("click", () => {
-    navigateTo('calendarSection');
-    // Setzt auf den 1. des aktuellen Monats zurück (um unnötige Seiteneffekte zu vermeiden)
-    currentCalendarDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1); 
-    loadCalendar(currentCalendarDate);
-});
-
-
-// Kalender Navigation
-document.getElementById("prev-month-btn").addEventListener("click", () => {
-    // Monat dekrementieren (setMonth handhabt Jahreswechsel korrekt)
-    currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
-    loadCalendar(currentCalendarDate);
-});
-
-document.getElementById("next-month-btn").addEventListener("click", () => {
-    // Monat inkrementieren
-    currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
-    loadCalendar(currentCalendarDate);
-});
-
-
-// Listener für das Dropdown
-document.getElementById("kw-select").addEventListener("change", (e) => loadBookings(e.target.value));
-
-// Zurück-Buttons
-document.getElementById("back-to-menu-btn-1").addEventListener("click", () => navigateTo('mainMenu'));
-document.getElementById("back-to-menu-btn-2").addEventListener("click", () => navigateTo('mainMenu'));
-document.getElementById("back-to-menu-btn-3").addEventListener("click", () => navigateTo('mainMenu')); 
-
-// Logout
-document.getElementById("logout-btn").addEventListener("click", async () => {
-    try {
-        await signOut(auth);
-    } catch (e) {
-        console.error("Logout Fehler:", e);
-    }
-});
-
-// Modal-Aktionen
-document.getElementById("confirm-cancel").addEventListener("click", hideConfirmation);
-document.getElementById("confirm-delete").addEventListener("click", confirmDeleteBooking);

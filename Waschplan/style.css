@@ -1,61 +1,45 @@
-:root {
-    /* Light Mode Variablen */
-    --bg-color: #f0f0f5;
-    --card-bg: rgba(255, 255, 255, 0.7); /* Heller, glasiger Hintergrund */
-    --text-color: #222;
-    --secondary-text: #666;
-    --border-color: rgba(255, 255, 255, 0.5); /* Glasrand */
-    --shadow-color: rgba(0, 0, 0, 0.15);
-    --input-bg: rgba(255, 255, 255, 0.9);
-    --input-border: 1px solid rgba(0, 0, 0, 0.1);
-    --primary-color: #007AFF; /* iOS Blau */
-    --error-bg: #f8d7da;
-    --error-color: #721c24;
-    --success-bg: #d4edda;
-    --success-color: #155724;
-}
-
-[data-theme='dark'] {
-    /* Dark Mode Variablen */
-    --bg-color: #1c1c1e; /* Dunkler Hintergrund */
-    --card-bg: rgba(44, 44, 46, 0.7); /* Dunkler, glasiger Hintergrund */
-    --text-color: #f2f2f7; /* Helle Schrift */
-    --secondary-text: #aeaeb2; /* Graue Schrift */
-    --border-color: rgba(255, 255, 255, 0.05);
-    --shadow-color: rgba(0, 0, 0, 0.5);
-    --input-bg: rgba(58, 58, 60, 0.9);
-    --input-border: 1px solid rgba(255, 255, 255, 0.1);
-    --primary-color: #0a84ff; /* Dunkler iOS Blau */
-    --error-bg: #4c1114;
-    --error-color: #ffbaba;
-    --success-bg: #144f24;
-    --success-color: #c3e6cb;
-}
-
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg-color);
-    margin: 0;
-    padding: 0;
-    display: flex;
-    justify-content: center;
-    transition: background-color 0.3s ease; /* Übergang für Dark/Light Mode */
+  /* CSS Variablen für Theme-Unterstützung */
+  --text-color: #333;
+  --background-color: #f0f0f5;
+  --card-background: #fff;
+  --primary-color: #007AFF; /* Blau */
+  --primary-color-light: #e6f2ff; /* Hellblau */
+  --secondary-color: #f5f5f5;
+  --error-color: #ff3b30;
+  --success-color: #34c759;
+  --border-color: #ccc;
+  
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--background-color);
+  color: var(--text-color);
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
 }
 
-/* Glassmorphismus Effekt */
-.card, .modal-content {
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+/* Dunkler Modus */
+[data-theme="dark"] {
+  --text-color: #f0f0f5;
+  --background-color: #1c1c1e;
+  --card-background: #2c2c2e;
+  --primary-color: #0A84FF; /* Helleres Blau */
+  --primary-color-light: #16365b; /* Dunkelblau für Hover */
+  --secondary-color: #3a3a3c;
+  --error-color: #ff453a;
+  --success-color: #30d158;
+  --border-color: #48484a;
 }
 
-
+/* Allgemeine Styles */
 #loadingOverlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: var(--bg-color);
+    background: var(--background-color);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -65,7 +49,7 @@ body {
 }
 
 .spinner {
-    border: 4px solid var(--secondary-text);
+    border: 4px solid var(--border-color);
     border-top: 4px solid var(--primary-color);
     border-radius: 50%;
     width: 40px;
@@ -80,138 +64,137 @@ body {
 }
 
 #app {
-    width: 95%;
-    max-width: 450px;
-    margin-top: 20px;
-    position: relative;
+  width: 95%;
+  max-width: 450px;
+  margin-top: 20px;
+  margin-bottom: 50px;
+  position: relative; 
+}
+
+h1 {
+  text-align: center;
+  color: var(--primary-color);
+  margin-bottom: 20px;
+}
+
+h2 {
+  text-align: center;
+  margin-bottom: 20px;
+  color: var(--text-color);
 }
 
 .card {
-    background: var(--card-bg);
-    border-radius: 16px;
-    padding: 25px; /* Etwas mehr Padding */
-    margin-bottom: 20px;
-    box-shadow: 0 4px 30px var(--shadow-color);
-    border: 1px solid var(--border-color); /* Glasiger Rand */
-    position: relative; 
-    animation: fadeIn 0.5s ease-out; /* Kleine Animation */
+  background: var(--card-background);
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+  transition: all 0.3s ease;
+  opacity: 0;
+  transform: translateY(20px);
 }
 
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-
-h1, h2 {
-    color: var(--text-color);
-    margin: 0 0 15px 0;
-    text-align: center;
-    transition: color 0.3s ease;
-}
-
-/* Eingabefelder im Login/Register zentrieren */
-.input-group {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 100%;
-}
-.input-group input, .input-group select {
-    width: 100%; /* Wichtig, damit sie die volle Breite des input-group Containers nutzen */
-    box-sizing: border-box;
-}
-
-/* Back Button Styling (Oben Links) */
-.back-button {
-    position: absolute;
-    top: 15px;
-    left: 15px;
-    width: auto;
-    padding: 8px 12px;
-    background-color: #555;
-    color: white;
-    z-index: 10;
-    font-size: 14px;
-    box-shadow: 0 2px 5px var(--shadow-color);
-}
-.card h2 {
-    margin-top: 30px; 
-}
-
-
-input, select, button {
-    width: 100%;
-    padding: 12px;
-    margin-bottom: 10px;
-    border-radius: 10px;
-    border: none;
-    outline: none;
-    font-size: 16px;
-    transition: all 0.2s;
-}
-
-input, select {
-    background: var(--input-bg);
-    color: var(--text-color);
-    border: var(--input-border);
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-button {
-    background-color: var(--primary-color);
-    color: white;
-    font-weight: bold;
-    cursor: pointer;
-    box-shadow: 0 4px 15px rgba(0, 122, 255, 0.3); /* Button Schatten */
-}
-button:hover {
-    opacity: 0.9;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0, 122, 255, 0.4);
-}
-button:active {
+.card.active {
+    opacity: 1;
     transform: translateY(0);
 }
 
-.button-small {
-    width: auto;
-    padding: 5px 10px;
-    font-size: 14px;
-    display: inline-block;
-    box-shadow: none;
+/* Eingabefelder und Dropdowns */
+input[type="text"], 
+input[type="password"],
+input[type="email"],
+input[type="date"],
+select {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 15px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  box-sizing: border-box;
+  background: var(--card-background);
+  color: var(--text-color);
+  transition: border-color 0.2s;
+}
+
+input:focus, select:focus {
+    border-color: var(--primary-color);
+    outline: none;
+}
+
+/* Buttons */
+button {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 10px;
+  border: none;
+  border-radius: 8px;
+  background-color: var(--primary-color);
+  color: white;
+  font-size: 1em;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.1s;
+}
+
+button:hover {
+  background-color: #005bb5;
+}
+
+button:active {
+    transform: scale(0.99);
 }
 
 .button-secondary {
-    background-color: #6c757d;
+    background-color: var(--secondary-color);
+    color: var(--text-color);
+}
+
+.button-secondary:hover {
+    background-color: var(--border-color);
 }
 
 .button-danger {
-    background-color: #dc3545;
+    background-color: var(--error-color);
 }
 
-.clickable {
-    color: var(--primary-color);
-    font-weight: bold;
-    cursor: pointer;
-    text-decoration: underline;
+.button-danger:hover {
+    background-color: #cc0000;
 }
 
+.button-small {
+    padding: 6px 10px;
+    width: auto;
+    font-size: 0.8em;
+    margin: 0;
+}
+
+/* Messaging */
 .message-box {
-    padding: 10px;
-    border-radius: 8px;
-    margin-bottom: 10px;
-    font-size: 14px;
-    transition: all 0.3s ease;
+  padding: 10px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+  font-size: 0.9em;
+  text-align: center;
 }
-.error {
-    background-color: var(--error-bg);
-    color: var(--error-color);
-    border: 1px solid var(--error-color);
+
+.message-box.error {
+  background-color: #fee;
+  color: var(--error-color);
+  border: 1px solid var(--error-color);
 }
-.success {
-    background-color: var(--success-bg);
-    color: var(--success-color);
-    border: 1px solid var(--success-color);
+
+.message-box.success {
+  background-color: #eef;
+  color: var(--success-color);
+  border: 1px solid var(--success-color);
+}
+
+/* Quick Navigation */
+.clickable {
+  color: var(--primary-color);
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
 }
 
 /* User Info Bar */
@@ -219,93 +202,120 @@ button:active {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 15px;
-    margin-bottom: 15px;
-    border-bottom: 1px solid var(--border-color);
+    padding: 10px 0;
+    margin-bottom: 10px;
     color: var(--text-color);
-    background: var(--card-bg);
-    border-radius: 10px;
-    box-shadow: 0 2px 10px var(--shadow-color);
-}
-.theme-switch-container {
-    padding: 0 10px;
-}
-#theme-icon {
-    font-size: 1.2em;
 }
 
-/* Booking List */
-.booking-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 15px;
-    margin-bottom: 8px;
-    background: var(--input-bg); /* Heller als die Card */
-    border-radius: 10px;
-    box-shadow: 0 1px 5px rgba(0,0,0,0.05);
-    color: var(--text-color);
-    transition: background-color 0.3s ease;
-}
-.booking-details {
-    flex-grow: 1;
-    text-align: left;
-}
-.booking-actions button {
-    width: auto;
-    padding: 6px 10px;
-    margin-left: 10px;
-}
-.small-text {
-    font-size: 13px;
-    color: var(--secondary-text);
-}
 .font-semibold {
     font-weight: 600;
 }
-.mt-15 { margin-top: 15px; }
-.mb-10 { margin-bottom: 10px; }
 
-/* Modal Styling */
-.modal {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.7);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-}
-.modal-content {
-    background: var(--card-bg);
-    padding: 30px;
-    border-radius: 16px;
-    max-width: 350px;
-    text-align: center;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+.small-text {
+    font-size: 0.9em;
     color: var(--text-color);
+    opacity: 0.7;
+}
+
+.mt-15 {
+    margin-top: 15px;
+}
+
+/* Back Button */
+.back-button {
+    background: none;
+    border: none;
+    color: var(--primary-color);
+    text-align: left;
+    padding: 0;
+    margin-bottom: 20px;
+    width: auto;
+    font-size: 1em;
+    cursor: pointer;
+}
+
+.back-button:hover {
+    background: none;
+    text-decoration: underline;
+}
+
+/* Buchungsliste */
+.booking-item, .my-booking-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    margin-bottom: 8px;
+    background: var(--secondary-color);
+    border-radius: 6px;
     border: 1px solid var(--border-color);
 }
+
+.booking-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.booking-item button {
+    padding: 5px 10px;
+    width: auto;
+    font-size: 0.85em;
+    margin: 0;
+}
+
+/* Success Animation */
+#book-submit.booking-success {
+    background-color: var(--success-color);
+}
+
+#book-success-icon {
+    font-size: 1.2em;
+}
+
+/* Modal */
+.modal {
+  position: fixed;
+  z-index: 1000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0,0,0,0.4); 
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal-content {
+  background-color: var(--card-background);
+  padding: 20px;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 350px;
+  text-align: center;
+}
+
+.modal-content h3 {
+    margin-top: 0;
+}
+
 .modal-actions {
     display: flex;
     gap: 10px;
     margin-top: 20px;
 }
+
 .modal-actions button {
     flex: 1;
 }
 
-
-/* --- KALENDER STYLING --- */
+/* Kalender Styles */
 .calendar-controls {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 15px;
-    color: var(--text-color);
 }
 .calendar-controls button {
     width: 40px;
@@ -314,7 +324,6 @@ button:active {
     margin: 0;
     line-height: 40px;
     border-radius: 50%;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
 #current-month-display {
     font-size: 1.2em;
@@ -337,7 +346,8 @@ button:active {
 .calendar-day {
     padding: 10px 0;
     border-radius: 8px;
-    background: var(--input-bg);
+    background: var(--card-background);
+    border: 1px solid var(--border-color);
     min-height: 40px;
     display: flex;
     flex-direction: column;
@@ -345,52 +355,138 @@ button:active {
     justify-content: flex-start;
     position: relative;
     font-size: 0.9em;
-    color: var(--text-color);
-    transition: background-color 0.3s ease;
+    transition: background 0.2s, border 0.2s, box-shadow 0.2s;
 }
 
 .day-number {
     font-weight: bold;
+    color: var(--text-color);
 }
 
+/* Styles für Klickbarkeit und Selektion */
+.calendar-day.clickable-day {
+    cursor: pointer;
+}
+
+.calendar-day.clickable-day:hover:not(.inactive) {
+    background: var(--primary-color-light);
+    box-shadow: 0 0 8px rgba(0, 122, 255, 0.2);
+}
+
+.calendar-day.selected-day {
+    border: 3px solid var(--primary-color);
+    box-shadow: 0 0 10px rgba(0, 122, 255, 0.6);
+}
+/* ENDE NEU */
+
 .calendar-day.inactive {
-    color: var(--secondary-text);
-    background: var(--bg-color);
-    opacity: 0.6;
+    color: #ccc;
+    background: var(--secondary-color);
+    border: 1px solid var(--secondary-color);
 }
 
 .booking-indicator-container {
     display: flex;
     margin-top: 4px;
     height: 6px;
-    justify-content: center; 
+    justify-content: center;
+    gap: 3px;
 }
 
 .booking-indicator {
-    width: 8px; 
-    height: 8px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
-    margin: 0 2px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    /* Standardfarbe wird durch JS überschrieben */
+    background-color: #e0e0e0; 
 }
 
-/* Legende Styling */
-#partei-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 15px;
-    margin-top: 10px;
-}
 .legend-item {
     display: flex;
     align-items: center;
-    font-size: 14px;
-    color: var(--secondary-text);
+    gap: 8px;
+    margin-top: 5px;
 }
+
 .legend-color {
-    width: 12px;
-    height: 12px;
-    border-radius: 3px;
-    margin-right: 5px;
-    border: 1px solid var(--border-color);
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
 }
+
+/* Hervorhebung des heutigen Tages */
+
+/* Standard (Hell-Modus) */
+.calendar-day.is-today {
+    background: var(--primary-color-light); 
+    border: 2px solid var(--primary-color);
+    box-shadow: 0 0 5px rgba(0, 122, 255, 0.4);
+    font-size: 1em; 
+}
+
+/* Dunkel-Modus Anpassung */
+[data-theme="dark"] .calendar-day.is-today {
+    background: rgba(0, 122, 255, 0.2); 
+    border: 2px solid var(--primary-color);
+    box-shadow: 0 0 5px rgba(0, 122, 255, 0.6);
+}
+
+/* Styles für den Kalender-Aktionsbereich */
+.slot-action-item {
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    overflow: auto; /* Um floatende Buttons zu kapseln */
+}
+
+.slot-action-item p {
+    margin-top: 0;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.slot-action-item p strong {
+    flex-grow: 1;
+}
+
+.slot-action-item button {
+    width: 48%; /* Macht die Buttons kleiner */
+    display: block;
+    padding: 8px;
+    margin-bottom: 0;
+    font-size: 0.9em;
+}
+
+.slot-action-item button.calendar-action-btn[data-action="book"] {
+    float: left;
+}
+
+.slot-action-item button.calendar-action-btn[data-action="delete"] {
+    float: right;
+}
+
+/* Anpassung der Breite für die Buttons, wenn nur einer angezeigt wird */
+/* Dieser komplexe Selektor stellt sicher, dass der verbleibende Button 100% Breite erhält */
+.slot-action-item:not(:has(button[data-action="book"][style*="display: none"])) button[data-action="delete"][style*="display: none"],
+.slot-action-item:not(:has(button[data-action="delete"][style*="display: none"])) button[data-action="book"][style*="display: none"] {
+    float: none;
+    width: 100%;
+}
+
+/* Styles für Partei-Status-Anzeige im Aktionsfeld */
+.slot-action-item #slot-status-07.booked, 
+.slot-action-item #slot-status-13.booked {
+    font-weight: bold;
+    color: var(--error-color);
+}
+
+.slot-action-item #slot-status-07.booked-me, 
+.slot-action-item #slot-status-13.booked-me {
+    font-weight: bold;
+    color: var(--success-color);
+}
+/* ENDE NEUE KALENDER-AKTIONEN STYLES */

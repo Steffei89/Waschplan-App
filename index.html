@@ -29,8 +29,8 @@
     <h2>Login</h2>
     <div id="login-error" class="message-box error" style="display:none;"></div>
     <div class="input-group">
-      <input type="text" id="login-identifier" placeholder="Benutzername oder E-Mail">
-      <input type="password" id="login-password" placeholder="Passwort">
+      <input type="text" id="login-identifier" placeholder="Benutzername oder E-Mail" required>
+      <input type="password" id="login-password" placeholder="Passwort" required>
     </div>
     <button id="login-btn">Einloggen</button>
     <p id="switch-register">Noch nicht registriert? 
@@ -42,10 +42,10 @@
     <div id="register-error" class="message-box error" style="display:none;"></div>
     <h2>Registrierung</h2>
     <div class="input-group">
-      <input type="text" id="register-username" placeholder="Benutzername">
-      <input type="email" id="register-email" placeholder="E-Mail">
-      <input type="password" id="register-password" placeholder="Passwort">
-      <select id="register-partei">
+      <input type="text" id="register-username" placeholder="Benutzername" required>
+      <input type="email" id="register-email" placeholder="E-Mail" required>
+      <input type="password" id="register-password" placeholder="Passwort" minlength="6" required>
+      <select id="register-partei" required>
         <option value="" disabled selected>Partei wählen</option>
         <option value="Micha & Stefan">Micha & Stefan</option>
         <option value="Sarah & Florian">Sarah & Florian</option>
@@ -64,19 +64,27 @@
     <button id="overview-btn">Übersicht (Woche)</button>
     <button id="calendar-btn">Übersicht (Monat)</button>
     <button id="profile-btn">Profil bearbeiten</button>
+
+    <div id="my-upcoming-bookings" class="mt-15">
+        <p class="font-semibold">Aktuelle Buchungen:</p>
+        <div id="my-bookings-list"></div>
+    </div>
   </div>
 
   <div id="bookingSection" class="card" style="display:none;">
     <button id="back-to-menu-btn-1" class="back-button">← Zurück</button>
     <h2>Buchung vornehmen</h2>
     <div id="booking-error" class="message-box" style="display:none;"></div>
-    <input type="date" id="booking-date">
-    <select id="booking-slot">
+    <input type="date" id="booking-date" required>
+    <select id="booking-slot" required>
       <option value="" disabled selected>Slot wählen</option>
       <option value="07:00-13:00">07:00 - 13:00</option>
       <option value="13:00-19:00">13:00 - 19:00</option>
     </select>
-    <button id="book-submit">Buchen</button>
+    <button id="book-submit">
+        <span id="book-text">Buchen</span>
+        <i id="book-success-icon" class="fa-solid fa-check" style="display:none;"></i>
+    </button>
   </div>
 
   <div id="overviewSection" class="card" style="display:none;">
@@ -96,6 +104,23 @@
       <button id="next-month-btn">→</button>
     </div>
     <div id="calendar-grid"></div>
+
+    <div id="calendar-day-actions" class="mt-15" style="display:none;">
+        <h3 id="selected-day-title">Aktionen für: </h3>
+        <div id="calendar-action-message" class="message-box" style="display:none;"></div>
+        
+        <div id="slot-action-07" class="slot-action-item">
+            <p><strong>07:00 - 13:00:</strong> <span id="slot-status-07">Verfügbar</span></p>
+            <button class="calendar-action-btn" data-slot="07:00-13:00" data-action="book" id="btn-book-07">Buchen</button>
+            <button class="calendar-action-btn button-danger" data-slot="07:00-13:00" data-action="delete" id="btn-delete-07" style="display:none;">Löschen</button>
+        </div>
+        
+        <div id="slot-action-13" class="slot-action-item">
+            <p><strong>13:00 - 19:00:</strong> <span id="slot-status-13">Verfügbar</span></p>
+            <button class="calendar-action-btn" data-slot="13:00-19:00" data-action="book" id="btn-book-13">Buchen</button>
+            <button class="calendar-action-btn button-danger" data-slot="13:00-19:00" data-action="delete" id="btn-delete-13" style="display:none;">Löschen</button>
+        </div>
+    </div>
     <div id="calendar-legend" class="mt-15">
       <p class="font-semibold">Legende:</p>
       <div id="partei-legend"></div>
@@ -108,6 +133,7 @@
     <div id="profile-message" class="message-box" style="display:none;"></div>
     <p><strong>Benutzer:</strong> <span id="profile-username"></span></p>
     <p><strong>E-Mail:</strong> <span id="profile-email"></span></p>
+    <p><strong>Partei:</strong> <span id="profile-partei"></span></p> 
     <h3>Passwort ändern</h3>
     <input type="password" id="new-password" placeholder="Neues Passwort">
     <button id="change-password-btn">Passwort aktualisieren</button>
