@@ -1,0 +1,310 @@
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #f0f0f5;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+}
+
+#loadingOverlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #f0f0f5;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 2000;
+    color: #333;
+}
+
+.spinner {
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    border-top: 4px solid #007AFF;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 10px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+#app {
+  width: 95%;
+  max-width: 450px;
+  margin-top: 20px;
+  position: relative; /* Für absolute Positionierung der Back-Buttons */
+}
+
+.card {
+  background: rgba(255,255,255,0.9); /* Weniger transparent für bessere Lesbarkeit */
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 15px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  position: relative; /* Wichtig für Back-Button */
+}
+
+h1, h2 {
+  color: #222;
+  margin: 0 0 10px 0;
+  text-align: center;
+}
+
+/* Back Button Styling (Oben Links) */
+.back-button {
+  position: absolute;
+  top: 15px;
+  left: 15px;
+  width: auto;
+  padding: 8px 12px;
+  background-color: #555;
+  color: white;
+  z-index: 10;
+  font-size: 14px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+.card h2 {
+    /* Sicherstellen, dass der Titel nicht mit dem Back-Button überlappt */
+    margin-top: 30px; 
+}
+
+
+input, select, button {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 10px;
+  border-radius: 10px;
+  border: none;
+  outline: none;
+  font-size: 16px;
+  transition: all 0.2s;
+}
+
+input, select {
+  background: rgba(255,255,255,0.9);
+  color: #222;
+  border: 1px solid #ddd;
+}
+
+button {
+  background-color: #007AFF;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+button:hover {
+    opacity: 0.9;
+    transform: translateY(-1px);
+}
+
+.button-small {
+    width: auto;
+    padding: 5px 10px;
+    font-size: 14px;
+    display: inline-block;
+}
+
+.button-secondary {
+    background-color: #6c757d;
+}
+
+.button-danger {
+    background-color: #dc3545;
+}
+
+.clickable {
+  color: #007AFF;
+  font-weight: bold;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.message-box {
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+.success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+/* User Info Bar */
+.user-info-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    margin-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+/* Booking List */
+.booking-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    margin-bottom: 8px;
+    background: #fff;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.booking-details {
+    flex-grow: 1;
+    text-align: left;
+}
+.booking-actions button {
+    width: auto;
+    padding: 6px 10px;
+    margin-left: 10px;
+}
+.small-text {
+    font-size: 13px;
+    color: #666;
+}
+.font-semibold {
+    font-weight: 600;
+}
+.mt-15 { margin-top: 15px; }
+.mb-10 { margin-bottom: 10px; }
+
+/* Modal Styling */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+.modal-content {
+  background: white;
+  padding: 30px;
+  border-radius: 16px;
+  max-width: 350px;
+  text-align: center;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+}
+.modal-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+.modal-actions button {
+    flex: 1;
+}
+
+
+/* --- KALENDER STYLING (NEU) --- */
+.calendar-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+.calendar-controls button {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    margin: 0;
+    line-height: 40px;
+    border-radius: 50%;
+}
+#current-month-display {
+    font-size: 1.2em;
+}
+
+#calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 5px;
+    text-align: center;
+}
+
+.day-header {
+    font-weight: bold;
+    color: #007AFF;
+    padding: 5px 0;
+    font-size: 0.9em;
+}
+
+.calendar-day {
+    padding: 10px 0;
+    border-radius: 8px;
+    background: #fcfcfc;
+    min-height: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    position: relative;
+    font-size: 0.9em;
+}
+
+.day-number {
+    font-weight: bold;
+}
+
+.calendar-day.inactive {
+    color: #ccc;
+    background: #f5f5f5;
+}
+
+.booking-indicator-container {
+    display: flex;
+    margin-top: 4px;
+    height: 6px;
+    /* Zentriert die Punkte */
+    justify-content: center; 
+}
+
+.booking-indicator {
+    width: 8px; /* Etwas größer für bessere Sichtbarkeit */
+    height: 8px;
+    border-radius: 50%;
+    margin: 0 2px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Legende Styling */
+#partei-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 10px;
+}
+.legend-item {
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    color: #444;
+}
+.legend-color {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    margin-right: 5px;
+    border: 1px solid #ccc;
+}
