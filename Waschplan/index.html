@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Waschplan App</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 <link rel="stylesheet" href="style.css">
 <script type="module" src="script.js"></script>
 </head>
@@ -15,45 +16,48 @@
 <div id="app" style="display:none;">
   <h1>🧺 Waschplan</h1>
 
-  <!-- Benutzerinformation -->
   <div id="userInfo" class="user-info-bar" style="display:none;">
     <span id="current-username" class="font-semibold"></span> 
     (<span id="current-role"></span>)
+    <div class="theme-switch-container">
+      <i id="theme-icon" class="fa-solid fa-sun clickable"></i> 
+    </div>
     <button id="logout-btn" class="button-small">Abmelden</button>
   </div>
 
-  <!-- Login -->
   <div id="loginForm" class="card">
     <h2>Login</h2>
     <div id="login-error" class="message-box error" style="display:none;"></div>
-    <input type="text" id="login-identifier" placeholder="Benutzername oder E-Mail">
-    <input type="password" id="login-password" placeholder="Passwort">
+    <div class="input-group">
+      <input type="text" id="login-identifier" placeholder="Benutzername oder E-Mail">
+      <input type="password" id="login-password" placeholder="Passwort">
+    </div>
     <button id="login-btn">Einloggen</button>
     <p id="switch-register">Noch nicht registriert? 
       <span id="show-register" class="clickable">Registrieren</span>
     </p>
   </div>
 
-  <!-- Registrierung -->
   <div id="registerForm" class="card" style="display:none;">
     <div id="register-error" class="message-box error" style="display:none;"></div>
     <h2>Registrierung</h2>
-    <input type="text" id="register-username" placeholder="Benutzername">
-    <input type="email" id="register-email" placeholder="E-Mail">
-    <input type="password" id="register-password" placeholder="Passwort">
-    <select id="register-partei">
-      <option value="" disabled selected>Partei wählen</option>
-      <option value="Micha & Stefan">Micha & Stefan</option>
-      <option value="Sarah & Florian">Sarah & Florian</option>
-      <option value="Christa & Uli">Christa & Uli</option>
-    </select>
+    <div class="input-group">
+      <input type="text" id="register-username" placeholder="Benutzername">
+      <input type="email" id="register-email" placeholder="E-Mail">
+      <input type="password" id="register-password" placeholder="Passwort">
+      <select id="register-partei">
+        <option value="" disabled selected>Partei wählen</option>
+        <option value="Micha & Stefan">Micha & Stefan</option>
+        <option value="Sarah & Florian">Sarah & Florian</option>
+        <option value="Christa & Uli">Christa & Uli</option>
+      </select>
+    </div>
     <button id="register-btn">Registrieren</button>
     <p id="switch-login">Bereits registriert? 
       <span id="show-login" class="clickable">Login</span>
     </p>
   </div>
 
-  <!-- Hauptmenü -->
   <div id="mainMenu" class="card" style="display:none;">
     <h2>Menü</h2>
     <button id="book-btn">Buchen</button>
@@ -62,7 +66,6 @@
     <button id="profile-btn">Profil bearbeiten</button>
   </div>
 
-  <!-- Buchungsbereich -->
   <div id="bookingSection" class="card" style="display:none;">
     <button id="back-to-menu-btn-1" class="back-button">← Zurück</button>
     <h2>Buchung vornehmen</h2>
@@ -76,7 +79,6 @@
     <button id="book-submit">Buchen</button>
   </div>
 
-  <!-- Wochenübersicht -->
   <div id="overviewSection" class="card" style="display:none;">
     <button id="back-to-menu-btn-2" class="back-button">← Zurück</button>
     <h2>Wochenübersicht</h2>
@@ -85,7 +87,6 @@
     <div id="bookingsList"></div>
   </div>
 
-  <!-- Monatsübersicht -->
   <div id="calendarSection" class="card" style="display:none;">
     <button id="back-to-menu-btn-3" class="back-button">← Zurück</button>
     <h2>Monatsübersicht</h2>
@@ -101,7 +102,6 @@
     </div>
   </div>
 
-  <!-- Profil bearbeiten -->
   <div id="profileSection" class="card" style="display:none;">
     <button id="back-to-menu-btn-4" class="back-button">← Zurück</button>
     <h2>Profil bearbeiten</h2>
@@ -113,7 +113,6 @@
     <button id="change-password-btn">Passwort aktualisieren</button>
   </div>
 
-  <!-- Bestätigungs-Modal -->
   <div id="confirmationModal" class="modal" style="display:none;">
     <div class="modal-content">
       <h3>Buchung löschen</h3>
