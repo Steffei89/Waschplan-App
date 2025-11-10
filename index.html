@@ -20,15 +20,30 @@
   <p>Lade App...</p>
 </div>
 <div id="app" style="display:none;">
-  <h1>🧺 Waschplan</h1>
 
+  <div class="header-container">
+    <img src="img/icon-192.png" alt="Waschplan App Icon" id="app-icon">
+    <div id="weather-widget" style="display:none;" title="Wetter & Trocken-Prognose für 83471 Schönau">
+      <i id="weather-icon" class="fa-solid fa-spinner fa-spin"></i>
+      <span id="weather-temp">--</span>°C
+      <span id="weather-label">Lade...</span>
+    </div>
+  </div>
   <div id="userInfo" class="user-info-bar" style="display:none;">
-    <span id="current-username" class="font-semibold"></span> 
-    (<span id="current-role"></span>)
+    <div> 
+      <span id="current-username" class="font-semibold"></span> 
+      <span id="current-role" class="user-role-label"></span> 
+    </div>
     <div class="theme-switch-container">
       <i id="theme-icon" class="fa-solid fa-sun clickable"></i> 
     </div>
     <button id="logout-btn" class="button-small">Abmelden</button>
+  </div>
+
+  <div id="incomingRequestsContainer" style="display:none;">
+      </div>
+      
+  <div id="outgoingRequestsStatusContainer" style="display:none;">
   </div>
 
   <div id="loginForm" class="card">
@@ -75,14 +90,17 @@
     <div id="my-upcoming-bookings" class="mt-15">
         <p class="font-semibold">Aktuelle Buchungen:</p>
         <div id="my-bookings-list"></div>
-    </div>
+        </div>
   </div>
 
   <div id="bookingSection" class="card" style="display:none;">
     <button id="back-to-menu-btn-1" class="back-button">← Zurück</button>
     <h2>Buchung vornehmen</h2>
     <div id="booking-error" class="message-box" style="display:none;"></div>
+    
     <input type="date" id="booking-date" required>
+    <div id="date-validation-message" class="small-text" style="color: var(--error-color);"></div>
+
     <select id="booking-slot" required>
       <option value="" disabled selected>Slot wählen</option>
       <option value="07:00-13:00">07:00 - 13:00</option>
@@ -120,12 +138,14 @@
             <p><strong>07:00 - 13:00:</strong> <span id="slot-status-07">Verfügbar</span></p>
             <button class="calendar-action-btn" data-slot="07:00-13:00" data-action="book" id="btn-book-07">Buchen</button>
             <button class="calendar-action-btn button-danger" data-slot="07:00-13:00" data-action="delete" id="btn-delete-07" style="display:none;">Löschen</button>
+            <button class="calendar-action-btn button-primary" data-slot="07:00-13:00" data-action="request" id="btn-request-07" style="display:none;">Slot anfragen</button>
         </div>
         
         <div id="slot-action-13" class="slot-action-item">
             <p><strong>13:00 - 19:00:</strong> <span id="slot-status-13">Verfügbar</span></p>
             <button class="calendar-action-btn" data-slot="13:00-19:00" data-action="book" id="btn-book-13">Buchen</button>
             <button class="calendar-action-btn button-danger" data-slot="13:00-19:00" data-action="delete" id="btn-delete-13" style="display:none;">Löschen</button>
+            <button class="calendar-action-btn button-primary" data-slot="13:00-19:00" data-action="request" id="btn-request-13" style="display:none;">Slot anfragen</button>
         </div>
     </div>
 
@@ -156,6 +176,7 @@
         <div id="slot-stats-text" class="small-text mt-10"></div>
     </div>
   </div>
+
   <div id="profileSection" class="card" style="display:none;">
     <button id="back-to-menu-btn-4" class="back-button">← Zurück</button>
     <h2>Profil bearbeiten</h2>
