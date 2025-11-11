@@ -3,26 +3,27 @@ body {
   --text-color: #333;
   --background-color: #f0f0f5; /* Fallback-Farbe */
   
-  /* GEÄNDERT: Wassertropfen-Effekt (von 0.35 auf 0.20) */
-  --card-background: rgba(255, 255, 255, 0.20); 
+  --card-background: rgba(255, 255, 255, 0.10); 
   --card-border: rgba(255, 255, 255, 0.3);
   
-  /* GEÄNDERT: Inputs transparenter (von 0.5 auf 0.4) */
-  --input-background: rgba(255, 255, 255, 0.4); 
+  --input-background: rgba(255, 255, 255, 0.20); 
   
   --primary-color: #007AFF; /* Blau */
   
-  /* GEÄNDERT: Buttons transparenter (von 0.8 auf 0.7) */
   --primary-color-transparent: rgba(0, 122, 255, 0.7);
   --primary-color-transparent-hover: rgba(0, 89, 181, 0.7); 
 
   --primary-color-light: #e6f2ff; /* Hellblau */
   --secondary-color: #f5f5f5;
   --error-color: #ff3b30;
-  --success-color: #34c759;
+  --success-color: #34c759; /* Standard Hellgrün */
   --border-color: #ccc;
   
   --bg-image: url('img/bg-alps-day.jpg');
+  
+  --placeholder-color: rgba(51, 51, 51, 0.7);
+  
+  --weather-dry-color: #1D873A; 
   
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   
@@ -46,26 +47,27 @@ body {
   --text-color: #f0f0f5;
   --background-color: #1c1c1e; 
   
-  /* GEÄNDERT: Wassertropfen-Effekt (von 0.35 auf 0.25) */
-  --card-background: rgba(44, 44, 46, 0.25); 
+  --card-background: rgba(44, 44, 46, 0.15); 
   --card-border: rgba(255, 255, 255, 0.2);
   
-  /* GEÄNDERT: Inputs transparenter (von 0.5 auf 0.4) */
-  --input-background: rgba(70, 70, 70, 0.4); 
+  --input-background: rgba(70, 70, 70, 0.25); 
 
   --primary-color: #0A84FF; /* Helleres Blau */
   
-  /* GEÄNDERT: Buttons transparenter (von 0.8 auf 0.7) */
   --primary-color-transparent: rgba(10, 132, 255, 0.7);
   --primary-color-transparent-hover: rgba(50, 158, 255, 0.7); 
 
   --primary-color-light: #16365b; 
   --secondary-color: #3a3a3c;
   --error-color: #ff453a;
-  --success-color: #30d158;
+  --success-color: #30d158; /* Helles Grün für Dark Mode */
   --border-color: #48484a;
 
   --bg-image: url('img/bg-alps-night.jpg');
+  
+  --placeholder-color: rgba(240, 240, 245, 0.7);
+  
+  --weather-dry-color: var(--success-color);
 }
 
 /* Allgemeine Styles */
@@ -77,9 +79,8 @@ body {
     height: 100%;
     background: var(--card-background);
     
-    /* GEÄNDERT: Maximaler Blur (von 25px auf 30px) */
-    -webkit-backdrop-filter: blur(30px) saturate(180%);
-    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(15px) saturate(180%);
+    backdrop-filter: blur(15px) saturate(180%);
     
     display: flex;
     flex-direction: column;
@@ -128,9 +129,8 @@ body {
   font-weight: 600;
   
   background: var(--card-background);
-  /* GEÄNDERT: Starker Blur (von 20px auf 25px) */
-  -webkit-backdrop-filter: blur(25px) saturate(180%);
-  backdrop-filter: blur(25px) saturate(180%);
+  -webkit-backdrop-filter: blur(15px) saturate(180%);
+  backdrop-filter: blur(15px) saturate(180%);
   border: 1px solid var(--card-border);
   
   color: var(--text-color); 
@@ -156,19 +156,17 @@ body {
   margin-left: 2px;
 }
 
-/* START ÄNDERUNG: h1-Stil durch #app-icon-Stil ersetzt */
 #app-icon {
-    height: 44px; /* Gute Höhe, passt zur Schriftgröße */
+    height: 44px;
     width: 44px;
-    border-radius: 10px; /* Abgerundete Ecken, wie bei iOS */
+    border-radius: 10px; 
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-    object-fit: cover; /* Stellt sicher, dass das Bild passt */
+    object-fit: cover; 
 }
 
 [data-theme="dark"] #app-icon {
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
-/* ENDE ÄNDERUNG */
 
 h2 {
   text-align: center;
@@ -179,9 +177,8 @@ h2 {
 .card {
   background: var(--card-background);
   
-  /* GEÄNDERT: Maximaler Blur (von 25px auf 30px) */
-  -webkit-backdrop-filter: blur(30px) saturate(180%);
-  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(15px) saturate(180%);
+  backdrop-filter: blur(15px) saturate(180%);
   
   border: 1px solid var(--card-border);
   padding: 20px;
@@ -219,6 +216,20 @@ input:focus, select:focus {
     border-color: var(--primary-color);
     outline: none;
 }
+
+/* Bessere Platzhalter-Lesbarkeit */
+input::placeholder,
+select::placeholder {
+  color: var(--placeholder-color);
+  opacity: 1; 
+}
+input::-webkit-input-placeholder {
+  color: var(--placeholder-color);
+}
+input:-ms-input-placeholder {
+  color: var(--placeholder-color);
+}
+
 
 /* Buttons */
 button {
@@ -314,8 +325,8 @@ button:active {
     color: var(--text-color);
     background: var(--card-background);
     
-    -webkit-backdrop-filter: blur(30px) saturate(180%);
-    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(15px) saturate(180%);
+    backdrop-filter: blur(15px) saturate(180%);
     
     border: 1px solid var(--card-border);
     border-radius: 12px;
@@ -344,7 +355,7 @@ button:active {
     margin-top: 15px;
 }
 
-/* Back Button */
+/* Back Button Styling */
 .back-button {
     background: none;
     border: none;
@@ -355,6 +366,11 @@ button:active {
     width: auto;
     font-size: 1em;
     cursor: pointer;
+    
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
 }
 
 .back-button:hover {
@@ -416,8 +432,8 @@ button:active {
 
 .modal-content {
   background: var(--card-background);
-  -webkit-backdrop-filter: blur(30px) saturate(180%);
-  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(15px) saturate(180%);
+  backdrop-filter: blur(15px) saturate(180%);
   border: 1px solid var(--card-border);
   
   padding: 20px;
@@ -448,6 +464,7 @@ button:active {
     align-items: center;
     margin-bottom: 15px;
 }
+
 .calendar-controls button {
     width: 40px;
     height: 40px;
@@ -455,7 +472,11 @@ button:active {
     margin: 0;
     line-height: 40px;
     border-radius: 50%;
+    
+    font-size: 1.2em;
+    font-weight: 600;
 }
+
 #current-month-display {
     font-size: 1.2em;
 }
@@ -620,8 +641,8 @@ button:active {
 
 #incomingRequestsContainer {
     background: rgba(0, 122, 255, 0.15); 
-    -webkit-backdrop-filter: blur(15px) saturate(180%);
-    backdrop-filter: blur(15px) saturate(180%);
+    -webkit-backdrop-filter: blur(10px) saturate(180%);
+    backdrop-filter: blur(10px) saturate(180%);
     
     border: 1px solid var(--primary-color);
     border-radius: 12px;
@@ -679,11 +700,44 @@ button:active {
     background-color: rgba(40, 167, 69, 0.7);
 }
 
+/* --- NEUE STILE FÜR ANGENOMMENE ANFRAGEN (Benachrichtigung) --- */
+#outgoingRequestsSuccessContainer {
+    background-color: rgba(230, 245, 230, 0.3); /* Leicht grünlich */
+    -webkit-backdrop-filter: blur(10px) saturate(180%);
+    backdrop-filter: blur(10px) saturate(180%);
+    
+    border: 1px solid var(--success-color);
+    border-radius: 12px;
+    padding: 15px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+}
+
+[data-theme="dark"] #outgoingRequestsSuccessContainer {
+     background-color: rgba(30, 60, 30, 0.3); /* Leicht grünlich dunkel */
+     border: 1px solid var(--success-color);
+}
+
+#outgoingRequestsSuccessContainer .request-item-header {
+    color: var(--success-color);
+}
+
+.request-item.accepted .request-details {
+    color: var(--success-color);
+    opacity: 0.9;
+}
+
+.request-item.accepted .request-details strong {
+    font-weight: 600; 
+}
+/* --- ENDE NEUE STILE --- */
+
+
 /* STILE FÜR ABGELEHNTE ANFRAGEN (Benachrichtigung) */
 #outgoingRequestsStatusContainer {
     background-color: rgba(252, 243, 219, 0.3); 
-    -webkit-backdrop-filter: blur(15px) saturate(180%);
-    backdrop-filter: blur(15px) saturate(180%);
+    -webkit-backdrop-filter: blur(10px) saturate(180%);
+    backdrop-filter: blur(10px) saturate(180%);
     
     border: 1px solid #f5c518;
     border-radius: 12px;
@@ -712,12 +766,12 @@ button:active {
 
 /* STILE FÜR TROCKEN-INDIKATOR */
 #weather-widget.is-dry {
-  color: var(--success-color); 
-  border-color: var(--success-color);
+  color: var(--weather-dry-color); 
+  border-color: var(--weather-dry-color);
 }
 
 #weather-widget.is-dry i {
-  color: var(--success-color); 
+  color: var(--weather-dry-color); 
 }
 
 #weather-widget.is-wet {
