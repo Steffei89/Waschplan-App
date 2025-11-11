@@ -245,7 +245,9 @@ button {
   font-size: 1em;
   font-weight: 600;
   cursor: pointer;
-  transition: background-color 0.2s, transform 0.1s;
+  
+  /* --- GEÄNDERT: Sanftere, weichere Transition --- */
+  transition: background-color 0.2s, transform 0.15s ease-out;
   
   border: 1px solid rgba(255, 255, 255, 0.1); 
 }
@@ -255,7 +257,8 @@ button:hover {
 }
 
 button:active {
-    transform: scale(0.99);
+    /* --- GEÄNDERT: Stärkerer "Pop"-Effekt --- */
+    transform: scale(0.97);
 }
 
 .button-secondary {
@@ -307,13 +310,24 @@ button:active {
   border: 1px solid var(--success-color);
 }
 
-/* Quick Navigation */
+/* --- GEÄNDERT: Quick Navigation (für "Pop"-Effekt) --- */
 .clickable {
   color: var(--primary-color);
   font-weight: 600;
   cursor: pointer;
   text-decoration: underline;
+  
+  /* NEU: Wichtig, damit transform/scale funktioniert */
+  display: inline-block; 
+  transition: transform 0.15s ease-out;
 }
+
+.clickable:active {
+    /* NEU: "Pop"-Effekt für Text-Links und Icons */
+    transform: scale(0.95);
+}
+/* --- ENDE ÄNDERUNG --- */
+
 
 /* User Info Bar */
 .user-info-bar {
@@ -371,11 +385,19 @@ button:active {
     align-items: center;
     gap: 6px;
     font-weight: 600;
+    
+    /* NEU: Transition geerbt, aber :active-State muss explizit sein */
+    transition: background-color 0.2s, transform 0.15s ease-out, text-decoration 0.2s;
 }
 
 .back-button:hover {
     background: none;
     text-decoration: underline;
+}
+
+/* NEU: Pop-Effekt für Zurück-Button */
+.back-button:active {
+    transform: scale(0.97);
 }
 
 /* Buchungsliste */
@@ -475,6 +497,14 @@ button:active {
     
     font-size: 1.2em;
     font-weight: 600;
+    
+    /* NEU: Transition geerbt, aber :active-State muss explizit sein */
+    transition: background-color 0.2s, transform 0.15s ease-out;
+}
+
+/* NEU: Pop-Effekt für Kalender-Pfeile */
+.calendar-controls button:active {
+    transform: scale(0.95);
 }
 
 #current-month-display {
@@ -509,7 +539,8 @@ button:active {
     justify-content: flex-start;
     position: relative;
     font-size: 0.9em;
-    transition: background 0.2s, border 0.2s, box-shadow 0.2s;
+    /* --- GEÄNDERT: Transition für transform hinzugefügt --- */
+    transition: background 0.2s, border 0.2s, box-shadow 0.2s, transform 0.1s ease-out;
 }
 
 .day-number {
@@ -525,6 +556,12 @@ button:active {
 .calendar-day.clickable-day:hover:not(.inactive) {
     background: var(--primary-color-light);
     box-shadow: 0 0 8px rgba(0, 122, 255, 0.2);
+}
+
+/* NEU: Pop-Effekt für Kalender-Tage */
+.calendar-day.clickable-day:active:not(.inactive) {
+    transform: scale(0.96);
+    transition-duration: 0.05s; /* Schnellerer Pop */
 }
 
 .calendar-day.selected-day {
@@ -700,7 +737,7 @@ button:active {
     background-color: rgba(40, 167, 69, 0.7);
 }
 
-/* --- NEUE STILE FÜR ANGENOMMENE ANFRAGEN (Benachrichtigung) --- */
+/* STILE FÜR ANGENOMMENE ANFRAGEN (Benachrichtigung) */
 #outgoingRequestsSuccessContainer {
     background-color: rgba(230, 245, 230, 0.3); /* Leicht grünlich */
     -webkit-backdrop-filter: blur(10px) saturate(180%);
@@ -730,8 +767,6 @@ button:active {
 .request-item.accepted .request-details strong {
     font-weight: 600; 
 }
-/* --- ENDE NEUE STILE --- */
-
 
 /* STILE FÜR ABGELEHNTE ANFRAGEN (Benachrichtigung) */
 #outgoingRequestsStatusContainer {

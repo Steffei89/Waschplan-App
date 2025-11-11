@@ -1,11 +1,11 @@
 import { 
     db, query, where, getDocs, addDoc, deleteDoc, doc, orderBy, limit,
-    // --- HIER WURDE onSnapshot HINZUGEFÜGT ---
-    onSnapshot, 
-    // --- ENDE DER KORREKTUR ---
+    onSnapshot,
     getBookingsCollectionRef
 } from '../firebase.js';
+// --- NEUER IMPORT ---
 import { getState } from '../state.js';
+// --- ENDE NEU ---
 import { showMessage } from '../ui.js';
 import { today, formatDate } from '../utils.js';
 import * as dom from '../dom.js';
@@ -20,7 +20,77 @@ export async function checkDuplicateBooking(selectedDate, partei) {
     return !snapshot.empty;
 }
 
+// --- NEUE FUNKTION ---
+/**
+ * Prüft die Verfügbarkeit aller Slots für ein bestimmtes Datum.
+ * @param {string} selectedDate - Das Datum im Format 'YYYY-MM-DD'.
+ * @returns {object|null} Ein Objekt mit dem Status für jeden Slot.
+ */
+export async function checkSlotAvailability(selectedDate) {
+    const { currentUser } = getState();
+    if (!currentUser) return null;
+
+    // 1. Finde alle Buchungen für den gewählten Tag
+    const q = query(
+        getBookingsCollectionRef(),
+        where('date', '==', selectedDate)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const bookingsOnDay = [];
+    querySnapshot.forEach(doc => {
+        bookingsOnDay.push(doc.data());
+    });
+
+    const myPartei = currentUser.userData.partei;
+    
+    // 2. Definiere den Standard-Verfügbarkeitsstatus
+    const availability = {
+        "07:00-13:00": { status: 'available', text: '07:00 - 13:00 (Verfügbar)' },
+        "13:00-19:00": { status: 'available', text: '13:00 - 19:00 (Verfügbar)' }
+    };
+
+    // 3. Prüfe, ob der Tag bereits von der eigenen Partei gebucht wurde
+    const hasMyParteiBooked = bookingsOnDay.some(b => b.partei === myPartei);
+
+    // 4. Gehe die gefundenen Buchungen durch und aktualisiere den Status
+    for (const booking of bookingsOnDay) {
+        if (availability[booking.slot]) {
+            if (booking.partei === myPartei) {
+                // Dieser Slot ist von mir gebucht
+                availability[booking.slot] = { 
+                    status: 'booked-me', 
+                    text: `${booking.slot} (Von Ihnen gebucht)` 
+                };
+            } else {
+                // Dieser Slot ist von jemand anderem gebucht
+                availability[booking.slot] = { 
+                    status: 'booked-other', 
+                    text: `${booking.slot} (Belegt - ${booking.partei})` 
+                };
+            }
+        }
+    }
+    
+    // 5. Wenn meine Partei an diesem Tag gebucht hat, deaktiviere alle anderen 'available' Slots
+    if (hasMyParteiBooked) {
+        for (const slot in availability) {
+            if (availability[slot].status === 'available') {
+                availability[slot] = {
+                    status: 'disabled-duplicate',
+                    text: `${slot} (Sie haben bereits gebucht)`
+                };
+            }
+        }
+    }
+    
+    return availability;
+}
+// --- ENDE NEUE FUNKTION ---
+
+
 export async function performBooking(date, slot, messageElementId, buttonElement = null) {
+    // ... (Diese Funktion bleibt unverändert)
     if (!date || !slot) {
         showMessage(messageElementId, "Datum und Slot müssen ausgewählt werden!", 'error');
         return false;
@@ -95,6 +165,7 @@ export async function performBooking(date, slot, messageElementId, buttonElement
 }
 
 export async function performDeletion(date, slot, messageElementId) {
+    // ... (Diese Funktion bleibt unverändert)
     const { currentUserId, currentUser, userIsAdmin } = getState();
     if (!date || !slot || !currentUserId || !currentUser) return false;
 
@@ -144,6 +215,7 @@ export async function performDeletion(date, slot, messageElementId) {
 }
 
 export function loadNextBookingsOverview(onData, onError) {
+    // ... (Diese Funktion bleibt unverändert)
     const { currentUser } = getState();
     if (!currentUser) return;
 

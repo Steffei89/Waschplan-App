@@ -7,22 +7,20 @@ import { getState, setCurrentUser, setUnsubscriber, setSelectedCalendarDate } fr
 
 // Utils & UI
 import { getFormattedDate, today, tomorrow } from './utils.js';
-import { showMessage, navigateTo, updateUserInfo, setTheme, unsubscribeAll, hideConfirmation } from './ui.js';
+import { showMessage, navigateTo, updateUserInfo, setTheme, unsubscribeAll, hideConfirmation, updateSlotDropdownUI } from './ui.js';
 
 // Services
 import { handleRegister, handleLogin, handleLogout } from './services/auth.js';
 import { loadWeather } from './services/weather.js';
 import { loadStatistics } from './services/stats.js';
-import { performBooking, performDeletion, loadNextBookingsOverview } from './services/booking.js';
+import { performBooking, performDeletion, loadNextBookingsOverview, checkSlotAvailability } from './services/booking.js';
 import { 
     loadIncomingRequests, 
     loadOutgoingRequestStatus, 
-    // --- NEU / GEÄNDERT ---
-    loadOutgoingRequestSuccess, // NEU
+    loadOutgoingRequestSuccess,
     confirmSwapTransaction, 
     rejectSwapRequest,
-    dismissRequestNotification // UM BENANNT (war dismissRejection)
-    // --- ENDE ÄNDERUNG ---
+    dismissRequestNotification
 } from './services/swap.js';
 
 // Views
@@ -52,10 +50,8 @@ onAuthStateChanged(auth, async (user) => {
                 
                 handleLoadNextBookings();
                 handleLoadIncomingRequests();
-                handleLoadOutgoingRequests(); // Für Ablehnungen
-                // --- NEU ---
-                handleLoadOutgoingSuccess(); // Für angenommene Anfragen
-                // --- ENDE NEU ---
+                handleLoadOutgoingRequests();
+                handleLoadOutgoingSuccess();
 
             } else {
                 await handleLogout(); 
@@ -156,7 +152,6 @@ function handleLoadOutgoingRequests() {
     dom.outgoingRequestsStatusContainer.innerHTML = '';
     dom.outgoingRequestsStatusContainer.style.display = 'none';
 
-    // Diese Funktion lädt (wie in swap.js definiert) nur 'rejected'
     const unsub = loadOutgoingRequestStatus(
         (rejectedRequests) => {
             dom.outgoingRequestsStatusContainer.innerHTML = '';
@@ -170,7 +165,7 @@ function handleLoadOutgoingRequests() {
             rejectedRequests.forEach(req => {
                 const dateStr = new Date(req.targetDate + "T00:00:00").toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
                 const item = document.createElement('div');
-                item.className = 'request-item rejected'; // 'rejected' Klasse bleibt
+                item.className = 'request-item rejected'; 
                 item.innerHTML = `
                     <div class="request-details">
                         <strong>${dateStr} (${req.targetSlot})</strong>
@@ -182,9 +177,7 @@ function handleLoadOutgoingRequests() {
                 `;
                 dom.outgoingRequestsStatusContainer.appendChild(item);
             });
-            // --- UM BENANNT ---
             attachRequestNotificationListeners(); 
-            // --- ENDE ÄNDERUNG ---
         },
         (error) => {
              console.error("Fehler ausgehende Anfragen:", error);
@@ -193,12 +186,10 @@ function handleLoadOutgoingRequests() {
     setUnsubscriber('outgoingRequests', unsub);
 }
 
-// --- NEUE HANDLER-FUNKTION ---
 function handleLoadOutgoingSuccess() {
     dom.outgoingRequestsSuccessContainer.innerHTML = '';
     dom.outgoingRequestsSuccessContainer.style.display = 'none';
 
-    // Diese Funktion lädt (wie in swap.js definiert) nur 'accepted'
     const unsub = loadOutgoingRequestSuccess(
         (acceptedRequests) => {
             dom.outgoingRequestsSuccessContainer.innerHTML = '';
@@ -212,7 +203,7 @@ function handleLoadOutgoingSuccess() {
             acceptedRequests.forEach(req => {
                 const dateStr = new Date(req.targetDate + "T00:00:00").toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
                 const item = document.createElement('div');
-                item.className = 'request-item accepted'; // 'accepted' Klasse
+                item.className = 'request-item accepted'; 
                 item.innerHTML = `
                     <div class="request-details">
                         <strong>${dateStr} (${req.targetSlot})</strong>
@@ -232,7 +223,6 @@ function handleLoadOutgoingSuccess() {
     );
     setUnsubscriber('outgoingRequestsSuccess', unsub);
 }
-// --- ENDE NEUE FUNKTION ---
 
 
 // --- 3. EVENT LISTENER INITIALISIERUNG ---
@@ -242,7 +232,6 @@ document.getElementById("register-btn").addEventListener("click", handleRegister
 document.getElementById("login-btn").addEventListener("click", handleLogin);
 document.getElementById('show-register').addEventListener('click', () => navigateTo(dom.registerForm));
 document.getElementById('show-login').addEventListener('click', () => navigateTo(dom.loginForm));
-
 document.getElementById('login-password').addEventListener('keyup', (e) => {
     if (e.key === 'Enter') {
         e.preventDefault(); 
@@ -262,6 +251,7 @@ document.getElementById('book-btn').addEventListener('click', () => {
     dom.dateValidationMessage.textContent = '';
     dom.bookingSlotSelect.value = '';
     navigateTo(dom.bookingSection);
+    dom.bookingDateInput.dispatchEvent(new Event('change'));
 });
 
 document.getElementById('overview-btn').addEventListener('click', () => {
@@ -307,11 +297,42 @@ dom.bookSubmitBtn.addEventListener("click", async () => {
     await performBooking(date, slot, 'booking-error', dom.bookSubmitBtn);
 });
 
-dom.bookingDateInput.addEventListener('change', () => {
-    const selectedDate = new Date(dom.bookingDateInput.value);
+dom.bookingDateInput.addEventListener('change', async () => { 
+    const selectedDateStr = dom.bookingDateInput.value;
+    const selectedDate = new Date(selectedDateStr);
     selectedDate.setHours(0, 0, 0, 0); 
-    dom.dateValidationMessage.textContent = (selectedDate < today) ? 'Buchungen können nicht für vergangene Tage vorgenommen werden.' : '';
+    
+    const isPast = selectedDate < today;
+    dom.dateValidationMessage.textContent = isPast ? 'Buchungen können nicht für vergangene Tage vorgenommen werden.' : '';
+
+    if (isPast) {
+        updateSlotDropdownUI({
+            "07:00-13:00": { status: 'disabled-duplicate', text: '07:00 - 13:00' },
+            "13:00-19:00": { status: 'disabled-duplicate', text: '13:00 - 19:00' }
+        });
+        return;
+    }
+    
+    try {
+        const options = dom.bookingSlotSelect.querySelectorAll('option');
+        options.forEach(opt => {
+            if (opt.value) {
+                opt.textContent = `${opt.value} (Prüfe...)`;
+                opt.disabled = true;
+            }
+        });
+        
+        const availability = await checkSlotAvailability(selectedDateStr);
+        
+        if (availability) {
+            updateSlotDropdownUI(availability);
+        }
+    } catch (e) {
+        console.error("Fehler bei der Slot-Prüfung:", e);
+        showMessage('booking-error', 'Fehler beim Prüfen der Verfügbarkeit.', 'error');
+    }
 });
+
 dom.bookingDateInput.setAttribute('min', getFormattedDate(today));
 dom.bookingDateInput.value = getFormattedDate(tomorrow);
 
@@ -321,7 +342,6 @@ document.getElementById('confirm-cancel').addEventListener('click', hideConfirma
 // Dynamische Listener für Tauschanfragen (im Hauptmenü)
 function attachSwapRequestListeners() {
     document.querySelectorAll('.accept-swap-btn').forEach(btn => {
-        // Verhindert doppelte Listener
         if (btn.onclick) return;
         btn.onclick = (e) => {
             e.preventDefault(); e.stopPropagation();
@@ -333,7 +353,6 @@ function attachSwapRequestListeners() {
     });
     
     document.querySelectorAll('.reject-swap-btn').forEach(btn => {
-        // Verhindert doppelte Listener
         if (btn.onclick) return;
         btn.onclick = (e) => {
             e.preventDefault(); e.stopPropagation();
@@ -345,28 +364,24 @@ function attachSwapRequestListeners() {
     });
 }
 
-// --- FUNKTION UM BENANNT ---
+// --- KORRIGIERTER FUNKTIONSNAME ---
 // (von attachDismissButtonListeners zu attachRequestNotificationListeners)
-// Diese Funktion wird jetzt von BEIDEN Handlern (Success und Reject) aufgerufen.
 function attachRequestNotificationListeners() {
     document.querySelectorAll('.dismiss-notification-btn').forEach(btn => {
-        // Verhindert doppelte Listener
         if (btn.onclick) return;
         
         btn.onclick = async (e) => {
             e.preventDefault(); e.stopPropagation();
             e.target.disabled = true;
-            // Ruft die umbenannte Funktion in swap.js auf
             await dismissRequestNotification(e.target.dataset.reqId);
         };
     });
 }
-// --- ENDE ÄNDERUNG ---
+// --- ENDE KORREKTUR ---
 
 // Dynamische Listener für QuickView-Löschen
 function attachQuickViewDeleteListeners() {
     document.querySelectorAll('.delete-my-booking-btn').forEach(btn => {
-        // Verhindert doppelte Listener
         if (btn.onclick) return;
         btn.onclick = async (e) => {
             const { date, slot } = e.target.dataset;
@@ -374,7 +389,6 @@ function attachQuickViewDeleteListeners() {
             e.target.disabled = true;
             e.target.textContent = 'Lösche...';
             await performDeletion(date, slot, 'my-upcoming-bookings');
-            // Der Snapshot-Listener aktualisiert die Ansicht automatisch
         };
     });
 }

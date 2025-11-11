@@ -1,10 +1,10 @@
 import * as dom from './dom.js';
 import { getState, setTheme as setGlobalTheme, getUnsubscribers, setUnsubscriber } from './state.js';
-// KORRIGIERTE IMPORTE: updateDoc und getUserProfileDocRef wurden hinzugefügt
 import { updatePassword, auth, updateDoc, getUserProfileDocRef } from './firebase.js';
 import { loadStatistics } from './services/stats.js';
 
 export function showMessage(elementId, message, type = 'error', duration = 5000) {
+    // ... (Diese Funktion bleibt unverändert)
     const el = document.getElementById(elementId);
     if (!el) {
         // Fallback
@@ -34,10 +34,12 @@ export function showMessage(elementId, message, type = 'error', duration = 5000)
 }
 
 export function hideConfirmation() {
+    // ... (Diese Funktion bleibt unverändert)
     dom.confirmationModal.style.display = 'none';
 }
 
 export function unsubscribeAll() {
+    // ... (Diese Funktion bleibt unverändert)
     const unsubscribers = getUnsubscribers();
     Object.values(unsubscribers).forEach(unsub => {
         if (unsub) unsub();
@@ -47,9 +49,11 @@ export function unsubscribeAll() {
     setUnsubscriber('quickView', null);
     setUnsubscriber('requests', null);
     setUnsubscriber('outgoingRequests', null);
+    setUnsubscriber('outgoingRequestsSuccess', null);
 }
 
 export function navigateTo(sectionElement) {
+    // ... (Diese Funktion bleibt unverändert)
     dom.allSections.forEach(el => {
         if (el) { 
             el.style.display = 'none';
@@ -69,13 +73,14 @@ export function navigateTo(sectionElement) {
 }
 
 export function updateUserInfo(userData) {
+    // ... (Diese Funktion bleibt unverändert)
     const { userIsAdmin } = getState();
     if (userData) {
         document.getElementById('current-username').textContent = userData.username || 'Unbekannt';
         document.getElementById('current-role').textContent = userIsAdmin ? 'Administrator' : 'Nutzer';
         dom.statisticBtn.style.display = userIsAdmin ? 'block' : 'none';
         const userTheme = userData.theme || 'light';
-        setTheme(userTheme, false); // Wende Theme an, ohne zu speichern
+        setTheme(userTheme, false);
     } else {
         dom.statisticBtn.style.display = 'none'; 
         setTheme('light', false); 
@@ -83,6 +88,7 @@ export function updateUserInfo(userData) {
 }
 
 export function setTheme(theme, save = true) {
+    // ... (Diese Funktion bleibt unverändert)
     setGlobalTheme(theme);
     document.body.setAttribute('data-theme', theme);
     
@@ -104,6 +110,7 @@ export function setTheme(theme, save = true) {
 }
 
 async function saveThemePreference() {
+    // ... (Diese Funktion bleibt unverändert)
     const { currentUserId, currentTheme } = getState();
     if (!currentUserId) return;
     try {
@@ -114,3 +121,46 @@ async function saveThemePreference() {
         console.error("Fehler beim Speichern der Theme-Präferenz:", e);
     }
 }
+
+// --- NEUE FUNKTION ---
+/**
+ * Aktualisiert das Slot-Dropdown-Menü basierend auf der Verfügbarkeit.
+ * @param {object} availability - Das von checkSlotAvailability zurückgegebene Objekt.
+ */
+export function updateSlotDropdownUI(availability) {
+    if (!dom.bookingSlotSelect) return;
+
+    // Setzt die Auswahl auf "Slot wählen" zurück
+    dom.bookingSlotSelect.value = '';
+
+    // Geht alle <option> Elemente durch (außer dem ersten "Slot wählen")
+    const options = dom.bookingSlotSelect.querySelectorAll('option');
+    
+    options.forEach(option => {
+        const slotValue = option.value;
+        if (!slotValue) return; // Überspringt "Slot wählen"
+
+        const slotInfo = availability[slotValue];
+
+        if (slotInfo) {
+            option.textContent = slotInfo.text;
+            
+            // Deaktiviert die Option, wenn sie nicht verfügbar ist
+            if (slotInfo.status === 'available') {
+                option.disabled = false;
+                option.style.color = 'var(--text-color)';
+            } else {
+                option.disabled = true;
+                // Färbt die Option basierend auf dem Status
+                if (slotInfo.status === 'booked-me') {
+                    option.style.color = 'var(--success-color)';
+                } else if (slotInfo.status === 'booked-other') {
+                    option.style.color = 'var(--error-color)';
+                } else { // 'disabled-duplicate'
+                    option.style.color = 'var(--border-color)';
+                }
+            }
+        }
+    });
+}
+// --- ENDE NEUE FUNKTION ---
