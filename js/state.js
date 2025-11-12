@@ -12,9 +12,7 @@ let calendarUnsubscribe = null;
 let quickViewUnsubscribe = null;
 let requestsUnsubscribe = null; 
 let outgoingRequestsUnsubscribe = null;
-// --- NEU ---
 let outgoingRequestsSuccessUnsubscribe = null;
-// --- ENDE NEU ---
 
 // Chart-Instanzen
 let parteiChart = null;
@@ -69,9 +67,7 @@ export const getUnsubscribers = () => ({
     quickViewUnsubscribe,
     requestsUnsubscribe,
     outgoingRequestsUnsubscribe,
-    // --- NEU ---
     outgoingRequestsSuccessUnsubscribe
-    // --- ENDE NEU ---
 });
 
 export function setUnsubscriber(type, func) {

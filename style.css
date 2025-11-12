@@ -246,7 +246,6 @@ button {
   font-weight: 600;
   cursor: pointer;
   
-  /* --- GEÄNDERT: Sanftere, weichere Transition --- */
   transition: background-color 0.2s, transform 0.15s ease-out;
   
   border: 1px solid rgba(255, 255, 255, 0.1); 
@@ -257,7 +256,6 @@ button:hover {
 }
 
 button:active {
-    /* --- GEÄNDERT: Stärkerer "Pop"-Effekt --- */
     transform: scale(0.97);
 }
 
@@ -310,23 +308,20 @@ button:active {
   border: 1px solid var(--success-color);
 }
 
-/* --- GEÄNDERT: Quick Navigation (für "Pop"-Effekt) --- */
+/* Quick Navigation */
 .clickable {
   color: var(--primary-color);
   font-weight: 600;
   cursor: pointer;
   text-decoration: underline;
   
-  /* NEU: Wichtig, damit transform/scale funktioniert */
   display: inline-block; 
   transition: transform 0.15s ease-out;
 }
 
 .clickable:active {
-    /* NEU: "Pop"-Effekt für Text-Links und Icons */
     transform: scale(0.95);
 }
-/* --- ENDE ÄNDERUNG --- */
 
 
 /* User Info Bar */
@@ -386,7 +381,6 @@ button:active {
     gap: 6px;
     font-weight: 600;
     
-    /* NEU: Transition geerbt, aber :active-State muss explizit sein */
     transition: background-color 0.2s, transform 0.15s ease-out, text-decoration 0.2s;
 }
 
@@ -395,7 +389,6 @@ button:active {
     text-decoration: underline;
 }
 
-/* NEU: Pop-Effekt für Zurück-Button */
 .back-button:active {
     transform: scale(0.97);
 }
@@ -492,17 +485,18 @@ button:active {
     height: 40px;
     padding: 0;
     margin: 0;
-    line-height: 40px;
     border-radius: 50%;
     
     font-size: 1.2em;
     font-weight: 600;
     
-    /* NEU: Transition geerbt, aber :active-State muss explizit sein */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    
     transition: background-color 0.2s, transform 0.15s ease-out;
 }
 
-/* NEU: Pop-Effekt für Kalender-Pfeile */
 .calendar-controls button:active {
     transform: scale(0.95);
 }
@@ -539,7 +533,6 @@ button:active {
     justify-content: flex-start;
     position: relative;
     font-size: 0.9em;
-    /* --- GEÄNDERT: Transition für transform hinzugefügt --- */
     transition: background 0.2s, border 0.2s, box-shadow 0.2s, transform 0.1s ease-out;
 }
 
@@ -558,7 +551,6 @@ button:active {
     box-shadow: 0 0 8px rgba(0, 122, 255, 0.2);
 }
 
-/* NEU: Pop-Effekt für Kalender-Tage */
 .calendar-day.clickable-day:active:not(.inactive) {
     transform: scale(0.96);
     transition-duration: 0.05s; /* Schnellerer Pop */
@@ -582,6 +574,8 @@ button:active {
     height: 6px;
     justify-content: center;
     gap: 3px;
+    flex-wrap: wrap;
+    padding: 0 2px;
 }
 
 .booking-indicator {
@@ -589,6 +583,7 @@ button:active {
     height: 6px;
     border-radius: 50%;
     background-color: #e0e0e0; 
+    flex-shrink: 0;
 }
 
 .legend-item {
@@ -663,13 +658,15 @@ button:active {
 }
 
 .slot-action-item #slot-status-07.booked, 
-.slot-action-item #slot-status-13.booked {
+.slot-action-item #slot-status-13.booked,
+.slot-action-item span.booked {
     font-weight: bold;
     color: var(--error-color);
 }
 
 .slot-action-item #slot-status-07.booked-me, 
-.slot-action-item #slot-status-13.booked-me {
+.slot-action-item #slot-status-13.booked-me,
+.slot-action-item span.booked-me {
     font-weight: bold;
     color: var(--success-color);
 }
@@ -821,4 +818,14 @@ button:active {
 /* Stellt sicher, dass das Lade-Icon die primäre Farbe behält */
 #weather-widget i.fa-spinner {
     color: var(--primary-color);
+}
+
+/* STIL FÜR VERSIONSNUMMER */
+.app-version {
+    font-size: 0.8em;
+    color: var(--text-color); 
+    opacity: 0.6; 
+    text-align: center;
+    margin-top: 15px;
+    margin-bottom: -10px; 
 }
