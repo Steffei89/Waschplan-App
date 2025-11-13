@@ -4,14 +4,16 @@ import {
     signInWithEmailAndPassword, 
     signOut,
     updatePassword,
-    // --- NEUER IMPORT ---
     sendPasswordResetEmail,
-    // --- ENDE NEU ---
+    sendEmailVerification,
     collection, query, where, getDocs, setDoc, doc,
     getUserProfileDocRef
 } from '../firebase.js';
 import { showMessage, navigateTo } from '../ui.js';
 import * as dom from '../dom.js';
+// --- NEUER IMPORT ---
+import { setIsRegistering } from '../state.js';
+// --- ENDE NEU ---
 
 export async function handleRegister() {
     const username = document.getElementById("register-username").value.trim();
@@ -28,17 +30,27 @@ export async function handleRegister() {
         return;
     }
 
+    // --- NEU: Flag setzen ---
+    setIsRegistering(true);
+    // --- ENDE NEU ---
+
     try {
         const usersCol = collection(db, "users");
         const qUsername = query(usersCol, where("username", "==", username));
         const usernameSnap = await getDocs(qUsername);
         if (!usernameSnap.empty) {
             showMessage('register-error', "Benutzername ist bereits vergeben!");
-            return;
+            return; // WICHTIG: finally wird trotzdem ausgeführt
         }
 
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const uid = userCredential.user.uid;
+        
+        try {
+            await sendEmailVerification(userCredential.user);
+        } catch (e) {
+            console.error("Fehler beim Senden der Verifizierungs-E-Mail:", e);
+        }
         
         await setDoc(getUserProfileDocRef(uid), {
             uid: uid,
@@ -48,17 +60,27 @@ export async function handleRegister() {
             isAdmin: false,
             theme: 'light' 
         });
+        
+        // Benutzer direkt wieder ausloggen
+        await signOut(auth);
 
-        showMessage('register-error', "Registrierung erfolgreich! Bitte melden Sie sich an.", 'success');
-        navigateTo(dom.loginForm);
-        document.getElementById("login-identifier").value = email;
-        document.getElementById("login-password").value = '';
+        const emailDisplay = document.getElementById('verify-email-address');
+        if (emailDisplay) emailDisplay.textContent = email;
+        
+        showMessage('verify-email-success', 'Registrierung erfolgreich!', 'success');
+        
+        navigateTo(dom.verifyEmailMessage);
+        
     } catch (err) {
         let errorMessage = `Registrierungsfehler: ${err.message}`;
         if (err.code === 'auth/email-already-in-use') {
             errorMessage = 'Diese E-Mail-Adresse ist bereits registriert.';
         }
         showMessage('register-error', errorMessage);
+    } finally {
+        // --- NEU: Flag zurücksetzen, egal was passiert ---
+        setIsRegistering(false);
+        // --- ENDE NEU ---
     }
 }
 
@@ -72,7 +94,21 @@ export async function handleLogin() {
     }
     
     try {
-        await signInWithEmailAndPassword(auth, email, password);
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        
+        if (!userCredential.user.emailVerified) {
+            try {
+                await sendEmailVerification(userCredential.user);
+            } catch(e) {
+                console.error("Fehler beim erneuten Senden der E-Mail:", e);
+            }
+            
+            showMessage('login-error', 'Login fehlgeschlagen: E-Mail-Adresse ist nicht bestätigt. Wir haben eine neue E-Mail gesendet (bitte Spam prüfen).', 'error', 8000);
+            
+            await signOut(auth); 
+            return; 
+        }
+
     } catch (err) {
         let errorMessage = "Login fehlgeschlagen: E-Mail oder Passwort ist falsch.";
         if (err.code === 'auth/invalid-email') {
@@ -113,7 +149,6 @@ export async function handleChangePassword() {
     }
 }
 
-// --- NEUE FUNKTION HINZUGEFÜGT ---
 export async function handlePasswordReset() {
     const emailInput = document.getElementById('reset-email');
     const email = emailInput.value.trim();
@@ -144,4 +179,3 @@ export async function handlePasswordReset() {
         button.textContent = 'Link anfordern';
     }
 }
-// --- ENDE NEUE FUNKTION ---

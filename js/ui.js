@@ -49,6 +49,7 @@ export function unsubscribeAll() {
     setUnsubscriber('outgoingRequestsSuccess', null);
 }
 
+// --- GEÄNDERTE FUNKTION ---
 export function navigateTo(sectionElement) {
     dom.allSections.forEach(el => {
         if (el) { 
@@ -60,13 +61,20 @@ export function navigateTo(sectionElement) {
     document.querySelectorAll('.message-box').forEach(el => el.style.display = 'none');
     
     const { currentUser } = getState();
-    dom.userInfo.style.display = (currentUser && sectionElement !== dom.loginForm && sectionElement !== dom.registerForm && sectionElement !== dom.resetPasswordForm) ? 'flex' : 'none';
+    // NEU: dom.resetPasswordForm und dom.verifyEmailMessage hinzugefügt
+    const isAuthPage = sectionElement === dom.loginForm || 
+                       sectionElement === dom.registerForm || 
+                       sectionElement === dom.resetPasswordForm ||
+                       sectionElement === dom.verifyEmailMessage;
+                       
+    dom.userInfo.style.display = (currentUser && !isAuthPage) ? 'flex' : 'none';
 
     if(sectionElement) {
         sectionElement.style.display = 'block';
         setTimeout(() => sectionElement.classList.add('active'), 50);
     }
 }
+// --- ENDE ÄNDERUNG ---
 
 export function updateUserInfo(userData) {
     const { userIsAdmin } = getState();

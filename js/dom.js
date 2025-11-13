@@ -11,6 +11,9 @@ export const calendarSection = document.getElementById("calendarSection");
 export const profileSection = document.getElementById("profileSection");
 export const statisticSection = document.getElementById("statisticSection");
 export const resetPasswordForm = document.getElementById("resetPasswordForm");
+// --- NEU ---
+export const verifyEmailMessage = document.getElementById("verifyEmailMessage");
+// --- ENDE NEU ---
 
 // UI-Elemente
 export const userInfo = document.getElementById("userInfo");
@@ -60,5 +63,8 @@ export const allSections = [
     overviewSection, calendarSection, profileSection, statisticSection, 
     incomingRequestsContainer, outgoingRequestsStatusContainer,
     outgoingRequestsSuccessContainer,
-    resetPasswordForm
+    resetPasswordForm,
+    // --- NEU ---
+    verifyEmailMessage
+    // --- ENDE NEU ---
 ];

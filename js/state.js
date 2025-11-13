@@ -5,6 +5,9 @@ let userIsAdmin = false;
 let currentTheme = 'light';
 let selectedCalendarDate = null; 
 let allBookingsForMonth = {}; 
+// --- NEU ---
+let isRegistering = false; // Flag für den Registrierungsprozess
+// --- ENDE NEU ---
 
 // Listener-Unsubscriber
 let overviewUnsubscribe = null; 
@@ -37,6 +40,11 @@ export const getState = () => ({
     parteiChart,
     slotChart
 });
+
+// --- NEUE GETTER/SETTER ---
+export const getIsRegistering = () => isRegistering;
+export const setIsRegistering = (value) => { isRegistering = value; };
+// --- ENDE NEU ---
 
 export function setCurrentUser(user) {
     currentUser = user;

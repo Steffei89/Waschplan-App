@@ -3,7 +3,9 @@ import { auth, onAuthStateChanged, getDoc, getUserProfileDocRef } from './fireba
 
 // DOM & State
 import * as dom from './dom.js';
-import { getState, setCurrentUser, setUnsubscriber, setSelectedCalendarDate } from './state.js';
+// --- NEUER IMPORT ---
+import { getState, setCurrentUser, setUnsubscriber, setSelectedCalendarDate, getIsRegistering } from './state.js';
+// --- ENDE NEU ---
 
 // Utils & UI
 import { getFormattedDate, today, tomorrow } from './utils.js';
@@ -31,11 +33,28 @@ import { initProfileView, loadProfileData } from './views/profile.js';
 // --- 1. AUTHENTIFIZIERUNGS-FLOW (Der "Motor" der App) ---
 
 onAuthStateChanged(auth, async (user) => {
+    
+    // --- NEUE PRÜFUNG ---
+    // Wenn wir gerade registrieren (Flag ist true), soll dieser Listener nichts tun,
+    // da auth.js die Navigation zur "verifyEmailMessage"-Seite übernimmt.
+    if (getIsRegistering()) {
+        return; 
+    }
+    // --- ENDE NEUE PRÜFUNG ---
+
     dom.loadingOverlay.style.display = 'none';
     dom.appContainer.style.display = 'block';
     
     if (user) { 
         try {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            await user.reload(); 
+            
+            if (!user.emailVerified) {
+                await signOut(auth);
+                return;
+            }
+
             const userDocSnap = await getDoc(getUserProfileDocRef(user.uid));
             
             if (userDocSnap.exists()) {
@@ -70,7 +89,7 @@ onAuthStateChanged(auth, async (user) => {
 });
 
 // --- 2. DATENLADE-HANDLER (fürs Hauptmenü) ---
-
+// ... (Dieser Abschnitt bleibt unverändert) ...
 function handleLoadNextBookings() {
     dom.myBookingsList.innerHTML = '<p class="small-text">Lade die nächsten Buchungen...</p>';
     const unsub = loadNextBookingsOverview(
@@ -242,10 +261,13 @@ document.getElementById('login-password').addEventListener('keyup', (e) => {
 // Passwort Reset
 document.getElementById('show-reset-password').addEventListener('click', () => {
     navigateTo(dom.resetPasswordForm);
-    document.getElementById('reset-email').value = ''; // Feld leeren
+    document.getElementById('reset-email').value = ''; 
 });
 document.getElementById('back-to-login-btn').addEventListener('click', () => navigateTo(dom.loginForm));
 document.getElementById('reset-password-btn').addEventListener('click', handlePasswordReset);
+
+// E-Mail Bestätigung
+document.getElementById('back-to-login-from-verify-btn').addEventListener('click', () => navigateTo(dom.loginForm));
 
 // Hauptnavigation
 document.getElementById('logout-btn').addEventListener('click', handleLogout);

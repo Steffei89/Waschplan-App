@@ -7,7 +7,10 @@ import {
     onAuthStateChanged, 
     signOut,
     updatePassword,
-    sendPasswordResetEmail
+    // --- NEUE IMPORTE ---
+    sendPasswordResetEmail,
+    sendEmailVerification
+    // --- ENDE NEU ---
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { 
     getFirestore, 
@@ -53,7 +56,10 @@ export {
     onAuthStateChanged, 
     signOut,
     updatePassword,
-    sendPasswordResetEmail
+    // --- NEUE EXPORTE ---
+    sendPasswordResetEmail,
+    sendEmailVerification
+    // --- ENDE NEU ---
 };
 
 // Exportiere alle Firestore-Funktionen
@@ -87,6 +93,8 @@ export function getSwapRequestsCollectionRef() {
     return collection(db, "swap_requests");
 }
 
+// --- NEUE FUNKTION HINZUGEFÜGT ---
 export function getSettingsDocRef() {
     return doc(db, 'app_settings', 'config');
 }
+// --- ENDE NEU ---
