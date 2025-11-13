@@ -52,7 +52,7 @@ export function unsubscribeAll() {
 // --- GEÄNDERTE FUNKTION ---
 export function navigateTo(sectionElement) {
     dom.allSections.forEach(el => {
-        if (el) { 
+        if (el && el.classList.contains('card')) { // Nur Sektionen ausblenden, Modals ignorieren
             el.style.display = 'none';
             el.classList.remove('active');
         } 
@@ -79,7 +79,9 @@ export function navigateTo(sectionElement) {
 export function updateUserInfo(userData) {
     const { userIsAdmin } = getState();
     if (userData) {
-        document.getElementById('current-username').textContent = userData.username || 'Unbekannt';
+        // --- GEÄNDERT: Verwendet E-Mail statt Benutzername ---
+        document.getElementById('current-username').textContent = userData.email || 'Unbekannt';
+        // --- ENDE ÄNDERUNG ---
         document.getElementById('current-role').textContent = userIsAdmin ? 'Administrator' : 'Nutzer';
         dom.statisticBtn.style.display = userIsAdmin ? 'block' : 'none';
         const userTheme = userData.theme || 'light';

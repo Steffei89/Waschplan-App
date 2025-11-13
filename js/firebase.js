@@ -9,7 +9,10 @@ import {
     updatePassword,
     // --- NEUE IMPORTE ---
     sendPasswordResetEmail,
-    sendEmailVerification
+    sendEmailVerification,
+    EmailAuthProvider,
+    reauthenticateWithCredential,
+    deleteUser
     // --- ENDE NEU ---
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { 
@@ -58,7 +61,10 @@ export {
     updatePassword,
     // --- NEUE EXPORTE ---
     sendPasswordResetEmail,
-    sendEmailVerification
+    sendEmailVerification,
+    EmailAuthProvider,
+    reauthenticateWithCredential,
+    deleteUser
     // --- ENDE NEU ---
 };
 
@@ -93,8 +99,6 @@ export function getSwapRequestsCollectionRef() {
     return collection(db, "swap_requests");
 }
 
-// --- NEUE FUNKTION HINZUGEFÜGT ---
 export function getSettingsDocRef() {
     return doc(db, 'app_settings', 'config');
 }
-// --- ENDE NEU ---

@@ -72,7 +72,6 @@
     <div id="register-error" class="message-box error" style="display:none;"></div>
     <h2>Registrierung</h2>
     <div class="input-group">
-      <input type="text" id="register-username" placeholder="Benutzername" required>
       <input type="email" id="register-email" placeholder="E-Mail" required>
       <input type="password" id="register-password" minlength="6" placeholder="Passwort" required>
       <select id="register-partei" required>
@@ -102,6 +101,7 @@
     </p>
     <button id="back-to-login-from-verify-btn">Zurück zum Login</button>
   </div>
+
   <div id="resetPasswordForm" class="card" style="display:none;">
     <button id="back-to-login-btn" class="back-button"><i class="fa-solid fa-chevron-left"></i> Zurück zum Login</button>
     <h2>Passwort zurücksetzen</h2>
@@ -215,7 +215,6 @@
     <button id="back-to-menu-btn-4" class="back-button"><i class="fa-solid fa-chevron-left"></i> Zurück</button>
     <h2>Profil bearbeiten</h2>
     <div id="profile-message" class="message-box" style="display:none;"></div>
-    <p><strong>Benutzer:</strong> <span id="profile-username"></span></p>
     <p><strong>E-Mail:</strong> <span id="profile-email"></span></p>
     <p><strong>Partei:</strong> <span id="profile-partei"></span></p> 
     <h3>Passwort ändern</h3>
@@ -230,6 +229,9 @@
         <button id="save-weather-plz-btn">Wetter-Standort speichern</button>
     </div>
 
+    <hr style="margin-top: 25px;">
+    <button id="delete-account-btn" class="button-danger">Konto löschen</button>
+
   </div>
 
   <div id="confirmationModal" class="modal" style="display:none;">
@@ -242,7 +244,20 @@
       </div>
     </div>
   </div>
-
-</div>
+  
+  <div id="deleteAccountModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h3>Konto löschen</h3>
+      <div id="delete-account-message" class="message-box" style="display:none;"></div>
+      <p>Um Ihr Konto unwiderruflich zu löschen, geben Sie bitte zur Bestätigung Ihr Passwort ein.</p>
+      <p class="small-text">(Ihre Buchungen für Ihre Partei bleiben bestehen.)</p>
+      <input type="password" id="delete-account-password" placeholder="Ihr aktuelles Passwort" required>
+      <div class="modal-actions">
+        <button id="cancel-delete-account-btn" class="button-secondary">Abbrechen</button>
+        <button id="confirm-delete-account-btn" class="button-danger">Konto endgültig löschen</button>
+      </div>
+    </div>
+  </div>
+  </div>
 </body>
 </html>

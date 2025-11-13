@@ -6,6 +6,10 @@ import {
     updatePassword,
     sendPasswordResetEmail,
     sendEmailVerification,
+    EmailAuthProvider,
+    reauthenticateWithCredential,
+    deleteUser,
+    deleteDoc,
     collection, query, where, getDocs, setDoc, doc,
     getUserProfileDocRef
 } from '../firebase.js';
@@ -16,12 +20,12 @@ import { setIsRegistering } from '../state.js';
 // --- ENDE NEU ---
 
 export async function handleRegister() {
-    const username = document.getElementById("register-username").value.trim();
+    // BENUTZERNAME ENTFERNT
     const email = document.getElementById("register-email").value.trim();
     const password = document.getElementById("register-password").value;
     const partei = document.getElementById("register-partei").value;
 
-    if(!username || !email || !password || !partei){
+    if(!email || !password || !partei){
         showMessage('register-error', "Bitte alle Felder ausfüllen!");
         return;
     }
@@ -35,13 +39,7 @@ export async function handleRegister() {
     // --- ENDE NEU ---
 
     try {
-        const usersCol = collection(db, "users");
-        const qUsername = query(usersCol, where("username", "==", username));
-        const usernameSnap = await getDocs(qUsername);
-        if (!usernameSnap.empty) {
-            showMessage('register-error', "Benutzername ist bereits vergeben!");
-            return; // WICHTIG: finally wird trotzdem ausgeführt
-        }
+        // BENUTZERNAME-PRÜFUNG ENTFERNT
 
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const uid = userCredential.user.uid;
@@ -54,7 +52,7 @@ export async function handleRegister() {
         
         await setDoc(getUserProfileDocRef(uid), {
             uid: uid,
-            username: username,
+            // username: username, // ENTFERNT
             email: email,
             partei: partei,
             isAdmin: false,
@@ -177,5 +175,50 @@ export async function handlePasswordReset() {
     } finally {
         button.disabled = false;
         button.textContent = 'Link anfordern';
+    }
+}
+
+export async function handleDeleteAccount(password) {
+    const user = auth.currentUser;
+    if (!user) {
+        showMessage('delete-account-message', 'Fehler: Nicht angemeldet.', 'error');
+        return;
+    }
+    
+    if (!password) {
+        showMessage('delete-account-message', 'Bitte geben Sie Ihr Passwort ein.', 'error');
+        return;
+    }
+
+    const button = dom.confirmDeleteAccountBtn;
+    button.disabled = true;
+    button.textContent = 'Lösche...';
+
+    try {
+        // 1. Re-Authentifizierung (Sicherheitsprüfung)
+        const credential = EmailAuthProvider.credential(user.email, password);
+        await reauthenticateWithCredential(user, credential);
+
+        // 2. Firestore-Dokument löschen (User-Profil)
+        await deleteDoc(getUserProfileDocRef(user.uid));
+
+        // 3. Auth-Konto löschen
+        await deleteUser(user);
+        
+        dom.deleteAccountModal.style.display = 'none';
+
+    } catch (error) {
+        let msg = 'Ein Fehler ist aufgetreten.';
+        if (error.code === 'auth/wrong-password') {
+            msg = 'Falsches Passwort. Das Konto wurde nicht gelöscht.';
+        } else if (error.code === 'auth/requires-recent-login') {
+            msg = 'Sitzung abgelaufen. Bitte loggen Sie sich neu an und versuchen Sie es erneut.';
+        } else {
+            msg = `Fehler: ${error.message}`;
+        }
+        showMessage('delete-account-message', msg, 'error');
+    } finally {
+        button.disabled = false;
+        button.textContent = 'Konto endgültig löschen';
     }
 }

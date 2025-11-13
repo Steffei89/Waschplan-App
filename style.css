@@ -472,6 +472,12 @@ button:active {
     flex: 1;
 }
 
+/* --- NEUER STIL FÜR PASSWORTFELD IM MODAL --- */
+.modal-content input[type="password"] {
+    margin-bottom: 5px; /* Weniger Abstand im Modal */
+}
+/* --- ENDE NEU --- */
+
 /* Kalender Styles */
 .calendar-controls {
     display: flex;

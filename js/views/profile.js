@@ -21,24 +21,32 @@ export function initProfileView() {
         try {
             await setDoc(getSettingsDocRef(), { 
                 plz: newPlz 
-            }, { merge: true }); // merge: true stellt sicher, dass wir nur dieses Feld überschreiben
+            }, { merge: true }); 
             showMessage('profile-message', 'Wetter-Standort gespeichert!', 'success');
         } catch (e) {
             showMessage('profile-message', `Fehler beim Speichern: ${e.message}`, 'error');
         }
     });
+
+    // --- NEUER LISTENER FÜR KONTO LÖSCHEN ---
+    document.getElementById('delete-account-btn').addEventListener('click', () => {
+        // Zeigt das neue Modal an
+        dom.deleteAccountModal.style.display = 'flex';
+        dom.deleteAccountPasswordInput.value = '';
+        showMessage('delete-account-message', '', 'error'); // Meldung zurücksetzen
+    });
+    // --- ENDE NEU ---
 }
 
 export async function loadProfileData() {
     const { currentUser, userIsAdmin } = getState();
     if (currentUser) {
-        dom.profileUsername.textContent = currentUser.userData.username;
+        // dom.profileUsername.textContent = currentUser.userData.username; // ENTFERNT
         dom.profileEmail.textContent = currentUser.userData.email;
         dom.profilePartei.textContent = currentUser.userData.partei;
         dom.newPasswordInput.value = '';
     }
 
-    // Lade die aktuell gespeicherte PLZ (nur wenn Admin)
     if (userIsAdmin) {
         try {
             const settingsSnap = await getDoc(getSettingsDocRef());
@@ -49,7 +57,7 @@ export async function loadProfileData() {
             }
         } catch (e) {
             console.error("Fehler beim Laden der Settings-PLZ:", e);
-            dom.weatherPlzInput.value = ''; // Im Fehlerfall leer lassen
+            dom.weatherPlzInput.value = ''; 
         }
     }
 }

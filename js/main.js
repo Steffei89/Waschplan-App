@@ -12,7 +12,7 @@ import { getFormattedDate, today, tomorrow } from './utils.js';
 import { showMessage, navigateTo, updateUserInfo, setTheme, unsubscribeAll, hideConfirmation, updateSlotDropdownUI } from './ui.js';
 
 // Services
-import { handleRegister, handleLogin, handleLogout, handlePasswordReset } from './services/auth.js';
+import { handleRegister, handleLogin, handleLogout, handlePasswordReset, handleDeleteAccount } from './services/auth.js';
 import { loadWeather } from './services/weather.js';
 import { loadStatistics } from './services/stats.js';
 import { performBooking, performDeletion, loadNextBookingsOverview, checkSlotAvailability } from './services/booking.js';
@@ -83,7 +83,10 @@ onAuthStateChanged(auth, async (user) => {
         unsubscribeAll();
         setCurrentUser(null);
         updateUserInfo(null);
-        dom.weatherWidget.style.display = 'none'; 
+        dom.weatherWidget.style.display = 'none';
+        if (dom.deleteAccountModal.style.display === 'flex') {
+            dom.deleteAccountModal.style.display = 'none';
+        }
         navigateTo(dom.loginForm);
     }
 });
@@ -368,6 +371,19 @@ dom.bookingDateInput.value = getFormattedDate(tomorrow);
 
 // Modal-Buttons
 document.getElementById('confirm-cancel').addEventListener('click', hideConfirmation);
+
+// --- NEUE LISTENER FÜR KONTO LÖSCHEN MODAL ---
+dom.cancelDeleteAccountBtn.addEventListener('click', () => {
+    dom.deleteAccountModal.style.display = 'none';
+    dom.deleteAccountPasswordInput.value = '';
+    showMessage('delete-account-message', '', 'error'); // Meldung zurücksetzen
+});
+
+dom.confirmDeleteAccountBtn.addEventListener('click', async () => {
+    const password = dom.deleteAccountPasswordInput.value;
+    await handleDeleteAccount(password);
+});
+// --- ENDE NEU ---
 
 // Dynamische Listener
 function attachSwapRequestListeners() {

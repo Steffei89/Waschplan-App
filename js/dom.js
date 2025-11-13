@@ -11,9 +11,7 @@ export const calendarSection = document.getElementById("calendarSection");
 export const profileSection = document.getElementById("profileSection");
 export const statisticSection = document.getElementById("statisticSection");
 export const resetPasswordForm = document.getElementById("resetPasswordForm");
-// --- NEU ---
 export const verifyEmailMessage = document.getElementById("verifyEmailMessage");
-// --- ENDE NEU ---
 
 // UI-Elemente
 export const userInfo = document.getElementById("userInfo");
@@ -46,7 +44,7 @@ export const bookingsList = document.getElementById("bookingsList");
 export const myBookingsList = document.getElementById('my-bookings-list');
 
 // Profil
-export const profileUsername = document.getElementById('profile-username');
+// export const profileUsername = document.getElementById('profile-username'); // ENTFERNT
 export const profileEmail = document.getElementById('profile-email');
 export const profilePartei = document.getElementById('profile-partei');
 export const newPasswordInput = document.getElementById('new-password');
@@ -56,6 +54,12 @@ export const weatherPlzInput = document.getElementById('weather-plz-input');
 // Modal
 export const confirmationModal = document.getElementById('confirmationModal');
 export const confirmText = document.getElementById('confirm-text');
+// --- NEUE MODAL-ELEMENTE ---
+export const deleteAccountModal = document.getElementById('deleteAccountModal');
+export const deleteAccountPasswordInput = document.getElementById('delete-account-password');
+export const confirmDeleteAccountBtn = document.getElementById('confirm-delete-account-btn');
+export const cancelDeleteAccountBtn = document.getElementById('cancel-delete-account-btn');
+// --- ENDE NEU ---
 
 // Alle Sektionen für die Navigation
 export const allSections = [
@@ -64,7 +68,6 @@ export const allSections = [
     incomingRequestsContainer, outgoingRequestsStatusContainer,
     outgoingRequestsSuccessContainer,
     resetPasswordForm,
-    // --- NEU ---
     verifyEmailMessage
-    // --- ENDE NEU ---
+    // HINWEIS: Modals (deleteAccountModal) müssen hier nicht rein, da sie über `display: flex` gesteuert werden.
 ];
