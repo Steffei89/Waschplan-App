@@ -4,7 +4,6 @@ import { updatePassword, auth, updateDoc, getUserProfileDocRef } from './firebas
 import { loadStatistics } from './services/stats.js';
 
 export function showMessage(elementId, message, type = 'error', duration = 5000) {
-    // ... (Diese Funktion bleibt unverändert)
     const el = document.getElementById(elementId);
     if (!el) {
         // Fallback
@@ -34,12 +33,10 @@ export function showMessage(elementId, message, type = 'error', duration = 5000)
 }
 
 export function hideConfirmation() {
-    // ... (Diese Funktion bleibt unverändert)
     dom.confirmationModal.style.display = 'none';
 }
 
 export function unsubscribeAll() {
-    // ... (Diese Funktion bleibt unverändert)
     const unsubscribers = getUnsubscribers();
     Object.values(unsubscribers).forEach(unsub => {
         if (unsub) unsub();
@@ -53,7 +50,6 @@ export function unsubscribeAll() {
 }
 
 export function navigateTo(sectionElement) {
-    // ... (Diese Funktion bleibt unverändert)
     dom.allSections.forEach(el => {
         if (el) { 
             el.style.display = 'none';
@@ -64,7 +60,7 @@ export function navigateTo(sectionElement) {
     document.querySelectorAll('.message-box').forEach(el => el.style.display = 'none');
     
     const { currentUser } = getState();
-    dom.userInfo.style.display = (currentUser && sectionElement !== dom.loginForm && sectionElement !== dom.registerForm) ? 'flex' : 'none';
+    dom.userInfo.style.display = (currentUser && sectionElement !== dom.loginForm && sectionElement !== dom.registerForm && sectionElement !== dom.resetPasswordForm) ? 'flex' : 'none';
 
     if(sectionElement) {
         sectionElement.style.display = 'block';
@@ -73,7 +69,6 @@ export function navigateTo(sectionElement) {
 }
 
 export function updateUserInfo(userData) {
-    // ... (Diese Funktion bleibt unverändert)
     const { userIsAdmin } = getState();
     if (userData) {
         document.getElementById('current-username').textContent = userData.username || 'Unbekannt';
@@ -88,7 +83,6 @@ export function updateUserInfo(userData) {
 }
 
 export function setTheme(theme, save = true) {
-    // ... (Diese Funktion bleibt unverändert)
     setGlobalTheme(theme);
     document.body.setAttribute('data-theme', theme);
     
@@ -110,7 +104,6 @@ export function setTheme(theme, save = true) {
 }
 
 async function saveThemePreference() {
-    // ... (Diese Funktion bleibt unverändert)
     const { currentUserId, currentTheme } = getState();
     if (!currentUserId) return;
     try {
@@ -122,7 +115,6 @@ async function saveThemePreference() {
     }
 }
 
-// --- NEUE FUNKTION ---
 /**
  * Aktualisiert das Slot-Dropdown-Menü basierend auf der Verfügbarkeit.
  * @param {object} availability - Das von checkSlotAvailability zurückgegebene Objekt.
@@ -130,10 +122,7 @@ async function saveThemePreference() {
 export function updateSlotDropdownUI(availability) {
     if (!dom.bookingSlotSelect) return;
 
-    // Setzt die Auswahl auf "Slot wählen" zurück
     dom.bookingSlotSelect.value = '';
-
-    // Geht alle <option> Elemente durch (außer dem ersten "Slot wählen")
     const options = dom.bookingSlotSelect.querySelectorAll('option');
     
     options.forEach(option => {
@@ -145,13 +134,11 @@ export function updateSlotDropdownUI(availability) {
         if (slotInfo) {
             option.textContent = slotInfo.text;
             
-            // Deaktiviert die Option, wenn sie nicht verfügbar ist
             if (slotInfo.status === 'available') {
                 option.disabled = false;
                 option.style.color = 'var(--text-color)';
             } else {
                 option.disabled = true;
-                // Färbt die Option basierend auf dem Status
                 if (slotInfo.status === 'booked-me') {
                     option.style.color = 'var(--success-color)';
                 } else if (slotInfo.status === 'booked-other') {
@@ -163,4 +150,3 @@ export function updateSlotDropdownUI(availability) {
         }
     });
 }
-// --- ENDE NEUE FUNKTION ---

@@ -1,5 +1,5 @@
 // Firebase
-import { auth, onAuthStateChanged, getDoc, getUserProfileDocRef, deleteDoc, doc, getSwapRequestsCollectionRef } from './firebase.js';
+import { auth, onAuthStateChanged, getDoc, getUserProfileDocRef } from './firebase.js';
 
 // DOM & State
 import * as dom from './dom.js';
@@ -10,7 +10,7 @@ import { getFormattedDate, today, tomorrow } from './utils.js';
 import { showMessage, navigateTo, updateUserInfo, setTheme, unsubscribeAll, hideConfirmation, updateSlotDropdownUI } from './ui.js';
 
 // Services
-import { handleRegister, handleLogin, handleLogout } from './services/auth.js';
+import { handleRegister, handleLogin, handleLogout, handlePasswordReset } from './services/auth.js';
 import { loadWeather } from './services/weather.js';
 import { loadStatistics } from './services/stats.js';
 import { performBooking, performDeletion, loadNextBookingsOverview, checkSlotAvailability } from './services/booking.js';
@@ -239,6 +239,14 @@ document.getElementById('login-password').addEventListener('keyup', (e) => {
     }
 });
 
+// Passwort Reset
+document.getElementById('show-reset-password').addEventListener('click', () => {
+    navigateTo(dom.resetPasswordForm);
+    document.getElementById('reset-email').value = ''; // Feld leeren
+});
+document.getElementById('back-to-login-btn').addEventListener('click', () => navigateTo(dom.loginForm));
+document.getElementById('reset-password-btn').addEventListener('click', handlePasswordReset);
+
 // Hauptnavigation
 document.getElementById('logout-btn').addEventListener('click', handleLogout);
 dom.themeIcon.addEventListener('click', () => {
@@ -339,7 +347,7 @@ dom.bookingDateInput.value = getFormattedDate(tomorrow);
 // Modal-Buttons
 document.getElementById('confirm-cancel').addEventListener('click', hideConfirmation);
 
-// Dynamische Listener für Tauschanfragen (im Hauptmenü)
+// Dynamische Listener
 function attachSwapRequestListeners() {
     document.querySelectorAll('.accept-swap-btn').forEach(btn => {
         if (btn.onclick) return;
@@ -364,8 +372,6 @@ function attachSwapRequestListeners() {
     });
 }
 
-// --- KORRIGIERTER FUNKTIONSNAME ---
-// (von attachDismissButtonListeners zu attachRequestNotificationListeners)
 function attachRequestNotificationListeners() {
     document.querySelectorAll('.dismiss-notification-btn').forEach(btn => {
         if (btn.onclick) return;
@@ -377,9 +383,7 @@ function attachRequestNotificationListeners() {
         };
     });
 }
-// --- ENDE KORREKTUR ---
 
-// Dynamische Listener für QuickView-Löschen
 function attachQuickViewDeleteListeners() {
     document.querySelectorAll('.delete-my-booking-btn').forEach(btn => {
         if (btn.onclick) return;
@@ -395,9 +399,7 @@ function attachQuickViewDeleteListeners() {
 
 
 // Initialisiere die View-spezifischen Listener
-function setupMainMenuListeners() {
-}
-
+function setupMainMenuListeners() {}
 initCalendarView(setUnsubscriber);
 initOverviewView(setUnsubscriber);
 initProfileView();

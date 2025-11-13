@@ -10,6 +10,7 @@ export const overviewSection = document.getElementById("overviewSection");
 export const calendarSection = document.getElementById("calendarSection"); 
 export const profileSection = document.getElementById("profileSection");
 export const statisticSection = document.getElementById("statisticSection");
+export const resetPasswordForm = document.getElementById("resetPasswordForm");
 
 // UI-Elemente
 export const userInfo = document.getElementById("userInfo");
@@ -20,9 +21,7 @@ export const weatherWidget = document.getElementById('weather-widget');
 // Container
 export const incomingRequestsContainer = document.getElementById("incomingRequestsContainer"); 
 export const outgoingRequestsStatusContainer = document.getElementById("outgoingRequestsStatusContainer");
-// --- NEU ---
 export const outgoingRequestsSuccessContainer = document.getElementById("outgoingRequestsSuccessContainer");
-// --- ENDE NEU ---
 
 // Kalender
 export const calendarGrid = document.getElementById("calendar-grid");
@@ -60,5 +59,6 @@ export const allSections = [
     loginForm, registerForm, mainMenu, bookingSection, 
     overviewSection, calendarSection, profileSection, statisticSection, 
     incomingRequestsContainer, outgoingRequestsStatusContainer,
-    outgoingRequestsSuccessContainer
+    outgoingRequestsSuccessContainer,
+    resetPasswordForm
 ];

@@ -3,8 +3,7 @@ import {
     getBookingsCollectionRef
 } from '../firebase.js';
 import * as dom from '../dom.js';
-// KORRIGIERTER IMPORT: getUnsubscribers hinzugefügt
-import { getState, getUnsubscribers } from '../state.js';
+import { getState } from '../state.js';
 import { formatDate, getWeekNumber, getMonday } from '../utils.js';
 import { performDeletion } from '../services/booking.js';
 import { handleSwapRequest } from '../services/swap.js';
@@ -39,8 +38,7 @@ export function setupWeekDropdown() {
 }
 
 export async function loadBookingsForWeek(kwString, unsubscriberSetter) {
-    // KORRIGIERTER AUFRUF: getUnsubscribers() statt getState().unsubscribers
-    const unsubscribers = getUnsubscribers();
+    const unsubscribers = getState().unsubscribers;
     if (unsubscribers && unsubscribers.overview) {
         unsubscribers.overview();
     }

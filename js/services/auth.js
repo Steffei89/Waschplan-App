@@ -4,6 +4,9 @@ import {
     signInWithEmailAndPassword, 
     signOut,
     updatePassword,
+    // --- NEUER IMPORT ---
+    sendPasswordResetEmail,
+    // --- ENDE NEU ---
     collection, query, where, getDocs, setDoc, doc,
     getUserProfileDocRef
 } from '../firebase.js';
@@ -60,25 +63,17 @@ export async function handleRegister() {
 }
 
 export async function handleLogin() {
-    // 1. "identifier" wurde in "email" umbenannt
     const email = document.getElementById("login-identifier").value.trim();
     const password = document.getElementById("login-password").value;
 
-    // 2. Fehlermeldung angepasst
     if(!email || !password){
         showMessage('login-error', "Bitte E-Mail und Passwort ausfüllen!");
         return;
     }
     
     try {
-        // 3. Die Logik zur Überprüfung von "isEmail" und die Datenbankabfrage
-        //    für den Benutzernamen wurden komplett entfernt.
-        
-        // 4. Direkter Login-Versuch nur mit E-Mail.
         await signInWithEmailAndPassword(auth, email, password);
-
     } catch (err) {
-        // 5. Angepasste Fehlermeldung
         let errorMessage = "Login fehlgeschlagen: E-Mail oder Passwort ist falsch.";
         if (err.code === 'auth/invalid-email') {
             errorMessage = "Ungültiges E-Mail-Format.";
@@ -117,3 +112,36 @@ export async function handleChangePassword() {
          showMessage('profile-message', msg, 'error');
     }
 }
+
+// --- NEUE FUNKTION HINZUGEFÜGT ---
+export async function handlePasswordReset() {
+    const emailInput = document.getElementById('reset-email');
+    const email = emailInput.value.trim();
+
+    if (!email) {
+        showMessage('reset-message', 'Bitte geben Sie Ihre E-Mail-Adresse ein.', 'error');
+        return;
+    }
+
+    const button = document.getElementById('reset-password-btn');
+    button.disabled = true;
+    button.textContent = 'Sende...';
+
+    try {
+        await sendPasswordResetEmail(auth, email);
+        showMessage('reset-message', 'Link gesendet! Bitte überprüfen Sie Ihr E-Mail-Postfach (auch Spam).', 'success', 10000);
+        emailInput.value = '';
+    } catch (error) {
+        let msg = 'Fehler beim Senden der E-Mail.';
+        if (error.code === 'auth/user-not-found') {
+            msg = 'Diese E-Mail-Adresse ist nicht in unserem System registriert.';
+        } else if (error.code === 'auth/invalid-email') {
+            msg = 'Ungültiges E-Mail-Format.';
+        }
+        showMessage('reset-message', msg, 'error');
+    } finally {
+        button.disabled = false;
+        button.textContent = 'Link anfordern';
+    }
+}
+// --- ENDE NEUE FUNKTION ---

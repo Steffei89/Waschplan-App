@@ -3,11 +3,11 @@ import {
     getBookingsCollectionRef
 } from '../firebase.js';
 import * as dom from '../dom.js';
-// KORRIGIERTER IMPORT: getUnsubscribers hinzugefügt
 import { getState, setAllBookingsForMonth, setSelectedCalendarDate, ALL_PARTEIEN, PARTEI_COLORS, getUnsubscribers } from '../state.js';
 import { formatDate, today } from '../utils.js';
 import { performBooking, performDeletion } from '../services/booking.js';
 import { handleSwapRequest } from '../services/swap.js';
+import { showMessage } from '../ui.js'; 
 
 let currentCalendarDate = new Date(); 
 
@@ -26,14 +26,14 @@ export function initCalendarView(unsubscriberSetter) {
         loadBookingsForMonth(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth(), unsubscriberSetter);
     });
 
-    // Listener für Action-Buttons
     document.querySelectorAll('.calendar-action-btn').forEach(btn => {
-        btn.addEventListener('click', onCalendarActionClick);
+        btn.addEventListener('click', async (e) => {
+            await onCalendarActionClick(e);
+        });
     });
 }
 
 export function loadBookingsForMonth(year, monthIndex, unsubscriberSetter) {
-    // KORRIGIERTER AUFRUF: getUnsubscribers() statt getState().unsubscribers
     const unsubscribers = getUnsubscribers();
     if (unsubscribers && unsubscribers.calendar) {
         unsubscribers.calendar();
@@ -124,23 +124,26 @@ function renderCalendar(year, monthIndex) {
         dayEl.innerHTML = `<span class="day-number">${day}</span>`;
 
         const bookings = allBookingsForMonth[dateString] || [];
-        if (bookings.length > 0) {
-            const indicatorContainer = document.createElement('div');
-            indicatorContainer.className = 'booking-indicator-container';
-            const slots = { '07:00-13:00': null, '13:00-19:00': null };
-            bookings.forEach(b => slots[b.slot] = b.partei);
-            
-            Object.values(slots).forEach(partei => {
-                const indicator = document.createElement('div');
-                indicator.className = 'booking-indicator';
-                indicator.style.backgroundColor = PARTEI_COLORS[partei] || 'transparent';
-                indicatorContainer.appendChild(indicator);
-            });
-            dayEl.appendChild(indicatorContainer);
-        }
+        const indicatorContainer = document.createElement('div');
+        indicatorContainer.className = 'booking-indicator-container';
+        
+        const slots = { '07:00-13:00': null, '13:00-19:00': null };
+        bookings.forEach(b => {
+            if (slots.hasOwnProperty(b.slot)) {
+                slots[b.slot] = b.partei;
+            }
+        });
+        
+        Object.values(slots).forEach(partei => {
+            const indicator = document.createElement('div');
+            indicator.className = 'booking-indicator';
+            indicator.style.backgroundColor = PARTEI_COLORS[partei] || 'transparent';
+            indicatorContainer.appendChild(indicator);
+        });
+        dayEl.appendChild(indicatorContainer);
+
         dom.calendarGrid.appendChild(dayEl);
 
-        // Event Listener hinzufügen
         if (dateNoTime >= todayNoTime) { 
             dayEl.addEventListener('click', () => {
                 document.querySelectorAll('.calendar-day.selected-day').forEach(el => el.classList.remove('selected-day'));
@@ -180,7 +183,10 @@ function updateCalendarDayActions(dateString) {
     const todayFormatted = formatDate(new Date());
     const hasDuplicateOnThisDay = bookingsOnDay.some(b => b.partei === currentUser.userData.partei);
 
-    const slots = [ { id: '07', slot: '07:00-13:00' }, { id: '13', slot: '13:00-19:00' } ];
+    const slots = [
+        { id: '07', slot: '07:00-13:00' },
+        { id: '13', slot: '13:00-19:00' }
+    ];
 
     slots.forEach(slotInfo => {
         const statusEl = document.getElementById(`slot-status-${slotInfo.id}`);
@@ -220,9 +226,13 @@ function updateCalendarDayActions(dateString) {
                 }
             }
         } else {
-            statusEl.textContent = hasDuplicateOnThisDay ? `Verfügbar (Sie haben bereits gebucht)` : `Verfügbar`;
-            if (hasDuplicateOnThisDay) statusEl.classList.add('booked-me');
-            else bookBtn.style.display = 'block'; 
+            if (hasDuplicateOnThisDay) {
+                statusEl.textContent = `Verfügbar (Sie haben bereits gebucht)`;
+                statusEl.classList.add('booked-me');
+            } else {
+                statusEl.textContent = `Verfügbar`;
+                bookBtn.style.display = 'block'; 
+            }
         }
         
         if (dateString < todayFormatted) {
@@ -255,6 +265,7 @@ async function onCalendarActionClick(e) {
         success = await performDeletion(dateString, slot, 'calendar-action-message');
     } else if (action === 'request') {
         e.target.textContent = 'Angefragt...';
+        
         const bookingId = e.target.dataset.id; 
         const booking = (allBookingsForMonth[dateString] || []).find(b => b.id === bookingId);
         
@@ -276,5 +287,11 @@ async function onCalendarActionClick(e) {
                 e.target.textContent = originalText;
             }
          }, 3000);
+    }
+    
+    if (success && (action === 'book' || action === 'delete')) {
+        setTimeout(() => {
+            updateCalendarDayActions(dateString);
+        }, 300);
     }
 }

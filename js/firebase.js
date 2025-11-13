@@ -6,7 +6,8 @@ import {
     signInWithEmailAndPassword, 
     onAuthStateChanged, 
     signOut,
-    updatePassword 
+    updatePassword,
+    sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { 
     getFirestore, 
@@ -51,7 +52,8 @@ export {
     signInWithEmailAndPassword, 
     onAuthStateChanged, 
     signOut,
-    updatePassword
+    updatePassword,
+    sendPasswordResetEmail
 };
 
 // Exportiere alle Firestore-Funktionen
@@ -83,4 +85,8 @@ export function getUserProfileDocRef(uid) {
 
 export function getSwapRequestsCollectionRef() {
     return collection(db, "swap_requests");
+}
+
+export function getSettingsDocRef() {
+    return doc(db, 'app_settings', 'config');
 }

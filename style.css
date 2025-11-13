@@ -323,6 +323,7 @@ button:active {
     transform: scale(0.95);
 }
 
+
 /* User Info Bar */
 .user-info-bar {
     display: flex;
@@ -479,7 +480,6 @@ button:active {
     margin-bottom: 15px;
 }
 
-/* --- GEÄNDERT: Kalender-Button Styling (Zentrierung) --- */
 .calendar-controls button {
     width: 40px;
     height: 40px;
@@ -490,14 +490,12 @@ button:active {
     font-size: 1.2em;
     font-weight: 600;
     
-    /* NEU: Flexbox-Zentrierung (ersetzt line-height) */
     display: flex;
     align-items: center;
     justify-content: center;
     
     transition: background-color 0.2s, transform 0.15s ease-out;
 }
-/* --- ENDE ÄNDERUNG --- */
 
 .calendar-controls button:active {
     transform: scale(0.95);
@@ -576,6 +574,8 @@ button:active {
     height: 6px;
     justify-content: center;
     gap: 3px;
+    flex-wrap: wrap;
+    padding: 0 2px;
 }
 
 .booking-indicator {
@@ -583,6 +583,7 @@ button:active {
     height: 6px;
     border-radius: 50%;
     background-color: #e0e0e0; 
+    flex-shrink: 0;
 }
 
 .legend-item {
@@ -657,13 +658,15 @@ button:active {
 }
 
 .slot-action-item #slot-status-07.booked, 
-.slot-action-item #slot-status-13.booked {
+.slot-action-item #slot-status-13.booked,
+.slot-action-item span.booked {
     font-weight: bold;
     color: var(--error-color);
 }
 
 .slot-action-item #slot-status-07.booked-me, 
-.slot-action-item #slot-status-13.booked-me {
+.slot-action-item #slot-status-13.booked-me,
+.slot-action-item span.booked-me {
     font-weight: bold;
     color: var(--success-color);
 }
@@ -815,4 +818,14 @@ button:active {
 /* Stellt sicher, dass das Lade-Icon die primäre Farbe behält */
 #weather-widget i.fa-spinner {
     color: var(--primary-color);
+}
+
+/* STIL FÜR VERSIONSNUMMER */
+.app-version {
+    font-size: 0.8em;
+    color: var(--text-color); 
+    opacity: 0.6; 
+    text-align: center;
+    margin-top: 15px;
+    margin-bottom: -10px; 
 }

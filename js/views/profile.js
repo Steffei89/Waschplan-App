@@ -1,12 +1,9 @@
 import * as dom from '../dom.js';
 import { getState } from '../state.js';
 import { handleChangePassword } from '../services/auth.js';
-// --- NEUE IMPORTE ---
 import { db, getDoc, setDoc, doc } from '../firebase.js';
 import { showMessage } from '../ui.js';
-// --- ENDE NEUE IMPORTE ---
 
-// Helper-Funktion für die zentrale Einstellungs-Referenz
 function getSettingsDocRef() {
     return doc(db, 'app_settings', 'config');
 }
@@ -14,7 +11,6 @@ function getSettingsDocRef() {
 export function initProfileView() {
     document.getElementById('change-password-btn').addEventListener('click', handleChangePassword);
     
-    // --- NEUER LISTENER ---
     document.getElementById('save-weather-plz-btn').addEventListener('click', async () => {
         const newPlz = dom.weatherPlzInput.value.trim();
         if (!newPlz || newPlz.length < 4 || !/^\d+$/.test(newPlz)) {
@@ -31,11 +27,10 @@ export function initProfileView() {
             showMessage('profile-message', `Fehler beim Speichern: ${e.message}`, 'error');
         }
     });
-    // --- ENDE NEUER LISTENER ---
 }
 
 export async function loadProfileData() {
-    const { currentUser } = getState();
+    const { currentUser, userIsAdmin } = getState();
     if (currentUser) {
         dom.profileUsername.textContent = currentUser.userData.username;
         dom.profileEmail.textContent = currentUser.userData.email;
@@ -43,16 +38,18 @@ export async function loadProfileData() {
         dom.newPasswordInput.value = '';
     }
 
-    // Lade die aktuell gespeicherte PLZ
-    try {
-        const settingsSnap = await getDoc(getSettingsDocRef());
-        if (settingsSnap.exists() && settingsSnap.data().plz) {
-            dom.weatherPlzInput.value = settingsSnap.data().plz;
-        } else {
-            dom.weatherPlzInput.value = '';
+    // Lade die aktuell gespeicherte PLZ (nur wenn Admin)
+    if (userIsAdmin) {
+        try {
+            const settingsSnap = await getDoc(getSettingsDocRef());
+            if (settingsSnap.exists() && settingsSnap.data().plz) {
+                dom.weatherPlzInput.value = settingsSnap.data().plz;
+            } else {
+                dom.weatherPlzInput.value = '';
+            }
+        } catch (e) {
+            console.error("Fehler beim Laden der Settings-PLZ:", e);
+            dom.weatherPlzInput.value = ''; // Im Fehlerfall leer lassen
         }
-    } catch (e) {
-        console.error("Fehler beim Laden der Settings-PLZ:", e);
-        dom.weatherPlzInput.value = ''; // Im Fehlerfall leer lassen
     }
 }
