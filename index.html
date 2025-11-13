@@ -60,12 +60,6 @@
     <p id="switch-register">Noch nicht registriert? 
       <span id="show-register" class="clickable">Registrieren</span>
     </p>
-    
-    <p style="text-align: center; margin-top: 10px;" class="small-text">
-      <span id="show-reset-password" class="clickable">Passwort vergessen?</span>
-    </p>
-    
-    <div class="app-version">Version 1.0.0</div>
   </div>
 
   <div id="registerForm" class="card" style="display:none;">
@@ -86,19 +80,6 @@
     <p id="switch-login">Bereits registriert? 
       <span id="show-login" class="clickable">Login</span>
     </p>
-    
-    <div class="app-version">Version 1.0.0</div>
-  </div>
-
-  <div id="resetPasswordForm" class="card" style="display:none;">
-    <button id="back-to-login-btn" class="back-button"><i class="fa-solid fa-chevron-left"></i> Zurück zum Login</button>
-    <h2>Passwort zurücksetzen</h2>
-    <div id="reset-message" class="message-box" style="display:none;"></div>
-    <p class="small-text" style="margin-bottom: 15px;">Bitte geben Sie Ihre E-Mail-Adresse ein. Wir senden Ihnen einen Link, um Ihr Passwort zurückzusetzen.</p>
-    <div class="input-group">
-      <input type="email" id="reset-email" placeholder="E-Mail" required>
-    </div>
-    <button id="reset-password-btn">Link anfordern</button>
   </div>
 
   <div id="mainMenu" class="card" style="display:none;">
@@ -213,7 +194,10 @@
     <div id="admin-settings-section" style="display:none;">
         <hr>
         <h3>Admin-Einstellungen</h3>
-        </div>
+        <label for="weather-plz-input">PLZ für Wetter</label>
+        <input type="text" id="weather-plz-input" placeholder="z.B. 83471">
+        <button id="save-weather-plz-btn">Wetter-Standort speichern</button>
+    </div>
 
   </div>
 

@@ -6,8 +6,7 @@ import {
     signInWithEmailAndPassword, 
     onAuthStateChanged, 
     signOut,
-    updatePassword,
-    sendPasswordResetEmail
+    updatePassword 
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
 import { 
     getFirestore, 
@@ -24,7 +23,7 @@ import {
     updateDoc, 
     orderBy, 
     limit,
-    runTransaction
+    runTransaction 
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
 // --- 1. FIREBASE KONFIGURATION ---
@@ -52,8 +51,7 @@ export {
     signInWithEmailAndPassword, 
     onAuthStateChanged, 
     signOut,
-    updatePassword,
-    sendPasswordResetEmail
+    updatePassword
 };
 
 // Exportiere alle Firestore-Funktionen
@@ -85,8 +83,4 @@ export function getUserProfileDocRef(uid) {
 
 export function getSwapRequestsCollectionRef() {
     return collection(db, "swap_requests");
-}
-
-export function getSettingsDocRef() {
-    return doc(db, 'app_settings', 'config');
 }
