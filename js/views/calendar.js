@@ -244,6 +244,7 @@ function updateCalendarDayActions(dateString) {
     });
 }
 
+// --- FUNKTION MODIFIZIERT ---
 async function onCalendarActionClick(e) {
     const { selectedCalendarDate, currentUserId, allBookingsForMonth } = getState();
     if (!selectedCalendarDate || !currentUserId) return;
@@ -252,46 +253,77 @@ async function onCalendarActionClick(e) {
     const slot = e.target.dataset.slot;
     const dateString = formatDate(selectedCalendarDate);
 
-    e.target.disabled = true;
-    const originalText = e.target.textContent;
+    const button = e.target; // Das Button-Element
+    button.disabled = true;
+    const originalText = button.textContent;
     
     let success = false;
     
     if (action === 'book') {
-        e.target.textContent = 'Buche...';
+        button.textContent = 'Buche...';
         success = await performBooking(dateString, slot, 'calendar-action-message');
     } else if (action === 'delete') {
-        e.target.textContent = 'Lösche...';
+        button.textContent = 'Lösche...';
         success = await performDeletion(dateString, slot, 'calendar-action-message');
     } else if (action === 'request') {
-        e.target.textContent = 'Angefragt...';
+        button.textContent = 'Angefragt...';
         
-        const bookingId = e.target.dataset.id; 
+        const bookingId = button.dataset.id; 
         const booking = (allBookingsForMonth[dateString] || []).find(b => b.id === bookingId);
         
         if (booking) {
             await handleSwapRequest(booking, 'calendar-action-message');
-            success = true; 
+            success = true; // 'handleSwapRequest' zeigt eigene Meldungen
         } else {
             showMessage('calendar-action-message', 'Fehler: Buchung nicht gefunden.', 'error');
+            success = false;
         }
     }
     
-    if (action !== 'delete' && !success) {
-         e.target.disabled = false;
-         e.target.textContent = originalText;
+    // --- NEUE, ROBUSTE RESET-LOGIK ---
+
+    if (action === 'book' || action === 'delete') {
+        
+        if (success) {
+            // Bei Erfolg: Zeige temporär Erfolgs-Text.
+            // Der onSnapshot-Listener aktualisiert die UI (blendet den Button aus/ein).
+            // Wir setzen den Button-Zustand nach 2s zurück,
+            // falls der Nutzer auf dem Tag bleibt.
+            const successText = (action === 'book') ? 'Gebucht!' : 'Gelöscht!';
+            button.textContent = successText;
+
+            setTimeout(() => {
+                if (button) { // Prüfen, ob Button noch existiert
+                    button.disabled = false;
+                    button.textContent = originalText;
+                }
+            }, 2000); // 2 Sekunden "Erfolg"-Anzeige
+
+        } else {
+            // Bei FEHLER: Button sofort zurücksetzen
+            button.disabled = false;
+            button.textContent = originalText;
+        }
+
     } else if (action === 'request') {
-         setTimeout(() => {
-            if(e.target) {
-                e.target.disabled = false;
-                e.target.textContent = originalText;
-            }
-         }, 3000);
+        
+        if (success) {
+            // Bei Erfolg: "Angefragt..." für 3s stehen lassen, dann zurücksetzen
+            setTimeout(() => {
+                if(button) {
+                    button.disabled = false;
+                    button.textContent = originalText;
+                }
+            }, 3000);
+        } else {
+            // Bei FEHLER: Button sofort zurücksetzen
+            button.disabled = false;
+            button.textContent = originalText;
+        }
     }
     
-    if (success && (action === 'book' || action === 'delete')) {
-        setTimeout(() => {
-            updateCalendarDayActions(dateString);
-        }, 300);
-    }
+    // Der alte 300ms Timer-Block wurde entfernt,
+    // da der onSnapshot-Listener die UI-Aktualisierung
+    // (updateCalendarDayActions) zuverlässig übernimmt.
 }
+// --- ENDE MODIFIKATION ---

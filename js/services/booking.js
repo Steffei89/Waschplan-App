@@ -89,8 +89,9 @@ export async function checkSlotAvailability(selectedDate) {
 // --- ENDE NEUE FUNKTION ---
 
 
-export async function performBooking(date, slot, messageElementId, buttonElement = null) {
-    // ... (Diese Funktion bleibt unverändert)
+// --- MODIFIZIERTE FUNKTION ---
+// export async function performBooking(date, slot, messageElementId, buttonElement = null) { // ALT
+export async function performBooking(date, slot, messageElementId) { // NEU
     if (!date || !slot) {
         showMessage(messageElementId, "Datum und Slot müssen ausgewählt werden!", 'error');
         return false;
@@ -136,19 +137,7 @@ export async function performBooking(date, slot, messageElementId, buttonElement
             isSwap: false 
         });
 
-        if (buttonElement) {
-             const bookText = document.getElementById("book-text"); 
-             const bookIcon = document.getElementById("book-success-icon"); 
-             buttonElement.classList.add('booking-success');
-             if(bookText) bookText.style.display = 'none';
-             if(bookIcon) bookIcon.style.display = 'block';
-
-             setTimeout(() => {
-                buttonElement.classList.remove('booking-success');
-                if(bookText) bookText.style.display = 'block';
-                if(bookIcon) bookIcon.style.display = 'none';
-             }, 2000);
-        }
+        // --- BUTTON-LOGIK WURDE HIER ENTFERNT ---
 
         showMessage(messageElementId, "Buchung erfolgreich!", 'success');
         
@@ -156,13 +145,14 @@ export async function performBooking(date, slot, messageElementId, buttonElement
             document.getElementById("booking-slot").value = ''; 
         }
 
-        return true;
+        return true; // <<< WICHTIG: Erfolg melden
 
     } catch (e) {
         showMessage(messageElementId, `Fehler beim Speichern der Buchung: ${e.message}`, 'error');
-        return false;
+        return false; // <<< WICHTIG: Fehler melden
     }
 }
+// --- ENDE MODIFIKATION ---
 
 export async function performDeletion(date, slot, messageElementId) {
     // ... (Diese Funktion bleibt unverändert)

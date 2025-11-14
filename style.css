@@ -140,6 +140,34 @@ body {
   transition: all 0.3s ease; 
 }
 
+/* --- NEUE STILE FÜR THEME ICON IM HEADER --- */
+.header-container #theme-icon {
+  font-size: 1.4em; /* Icon-Größe anpassen */
+  
+  /* Hintergrund (passend zum Rest der UI) */
+  background: var(--card-background);
+  -webkit-backdrop-filter: blur(15px) saturate(180%);
+  backdrop-filter: blur(15px) saturate(180%);
+  border: 1px solid var(--card-border);
+  
+  /* Höhe und Breite an das App-Icon anpassen */
+  width: 44px;
+  height: 44px;
+  border-radius: 50%; /* Rund machen */
+  
+  /* Zentrierung des Font-Awesome-Icons im Kreis */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  
+  transition: all 0.3s ease;
+}
+
+.header-container #theme-icon:active {
+    transform: scale(0.95);
+}
+/* --- ENDE NEUE STILE --- */
+
 #weather-widget i {
   color: var(--primary-color);
   transition: color 0.3s ease;

@@ -323,12 +323,63 @@ document.getElementById('back-to-menu-btn-3').addEventListener('click', () => na
 document.getElementById('back-to-menu-btn-4').addEventListener('click', () => navigateTo(dom.mainMenu));
 document.getElementById('back-to-menu-btn-5').addEventListener('click', () => navigateTo(dom.mainMenu));
 
-// Buchungs-Formular
+
+// --- Buchungs-Formular (KOMPLETT ÜBERARBEITET) ---
 dom.bookSubmitBtn.addEventListener("click", async () => {
     const date = dom.bookingDateInput.value;
     const slot = dom.bookingSlotSelect.value;
-    await performBooking(date, slot, 'booking-error', dom.bookSubmitBtn);
+
+    const button = dom.bookSubmitBtn;
+    const bookText = document.getElementById("book-text"); 
+    const bookIcon = document.getElementById("book-success-icon");
+    const originalText = "Buchen";
+    
+    // 1. Ladezustand setzen
+    button.disabled = true;
+    if (bookText) bookText.textContent = "Buche...";
+    if (bookIcon) bookIcon.style.display = 'none'; // Sicherstellen, dass Icon aus ist
+
+    let success = false;
+    try {
+        // 2. Aktion ausführen (OHNE UI-Parameter)
+        success = await performBooking(date, slot, 'booking-error');
+
+    } catch (e) {
+        // 3. Unerwarteten Fehler abfangen
+        console.error("Schwerer Fehler bei performBooking:", e);
+        showMessage('booking-error', 'Ein unerwarteter Fehler ist aufgetreten.', 'error');
+        success = false;
+    } finally {
+        // 4. UI basierend auf Erfolg oder Fehler aktualisieren
+        if (success) {
+            // --- ERFOLGS-ANIMATION ---
+            button.classList.add('booking-success');
+            if(bookText) bookText.style.display = 'none';
+            if(bookIcon) bookIcon.style.display = 'block';
+
+            // Nach 2 Sek. Animation alles zurücksetzen
+            setTimeout(() => {
+                button.classList.remove('booking-success');
+                if(bookIcon) bookIcon.style.display = 'none';
+                if(bookText) {
+                    bookText.style.display = 'block';
+                    bookText.textContent = originalText; // Text zurücksetzen
+                }
+                button.disabled = false; // Button freigeben
+                // UI für Slots aktualisieren, falls der User auf der Seite bleibt
+                dom.bookingDateInput.dispatchEvent(new Event('change'));
+            }, 2000); 
+            
+        } else {
+            // --- FEHLER-RESET ---
+            // Bei Fehler (z.B. "Slot belegt") Button sofort zurücksetzen
+            if(bookText) bookText.textContent = originalText;
+            button.disabled = false;
+        }
+    }
 });
+// --- ENDE MODIFIKATION ---
+
 
 dom.bookingDateInput.addEventListener('change', async () => { 
     const selectedDateStr = dom.bookingDateInput.value;
@@ -422,6 +473,7 @@ function attachRequestNotificationListeners() {
     });
 }
 
+// --- QuickViewDeleteListeners (MODIFIZIERT) ---
 function attachQuickViewDeleteListeners() {
     document.querySelectorAll('.delete-my-booking-btn').forEach(btn => {
         if (btn.onclick) return;
@@ -430,10 +482,26 @@ function attachQuickViewDeleteListeners() {
             if (!date || !slot) return;
             e.target.disabled = true;
             e.target.textContent = 'Lösche...';
-            await performDeletion(date, slot, 'my-upcoming-bookings');
+            
+            // --- NEUE STABILITÄTS-ÄNDERUNG (FIX 2) ---
+            // 1. Ergebnis der Löschung abwarten
+            const success = await performDeletion(date, slot, 'my-upcoming-bookings');
+
+            // 2. Wenn das Löschen erfolgreich war, Formular-UI aktualisieren
+            if (success) {
+                // 3. Prüfen, ob das gelöschte Datum dem im Formular entspricht
+                if (dom.bookingDateInput.value === date) {
+                    // 4. 'change'-Event auslösen, um die Slot-Verfügbarkeit neu zu laden
+                    dom.bookingDateInput.dispatchEvent(new Event('change'));
+                }
+            }
+            // HINWEIS: Der "Lösche..."-Button wird automatisch durch den 
+            // onSnapshot-Listener von handleLoadNextBookings() entfernt.
+            // --- ENDE STABILITÄTS-ÄNDERUNG ---
         };
     });
 }
+// --- ENDE MODIFIKATION ---
 
 
 // Initialisiere die View-spezifischen Listener

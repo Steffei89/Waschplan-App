@@ -23,20 +23,22 @@
 
   <div class="header-container">
     <img src="img/icon-192.png" alt="Waschplan App Icon" id="app-icon">
+    
+    <i id="theme-icon" class="fa-solid fa-sun clickable"></i> 
+    
     <div id="weather-widget" style="display:none;" title="Wetter & Trocken-Prognose">
       <i id="weather-icon" class="fa-solid fa-spinner fa-spin"></i>
       <span id="weather-temp">--</span>°C
       <span id="weather-label">Lade...</span>
     </div>
   </div>
+  
   <div id="userInfo" class="user-info-bar" style="display:none;">
     <div> 
       <span id="current-username" class="font-semibold"></span> 
       <span id="current-role" class="user-role-label"></span> 
     </div>
-    <div class="theme-switch-container">
-      <i id="theme-icon" class="fa-solid fa-sun clickable"></i> 
-    </div>
+    
     <button id="logout-btn" class="button-small">Abmelden</button>
   </div>
 
