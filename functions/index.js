@@ -1,32 +1,94 @@
 /**
- * Import function triggers from their respective submodules:
- *
- * const {onCall} = require("firebase-functions/v2/https");
- * const {onDocumentWritten} = require("firebase-functions/v2/firestore");
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
+ * Automatische Timer-Überprüfung und Push-Benachrichtigung.
+ * Läuft jede Minute.
  */
 
-const {setGlobalOptions} = require("firebase-functions");
-const {onRequest} = require("firebase-functions/https");
-const logger = require("firebase-functions/logger");
+const {onSchedule} = require("firebase-functions/v2/scheduler");
+const {getFirestore} = require("firebase-admin/firestore");
+const {getMessaging} = require("firebase-admin/messaging");
+const admin = require("firebase-admin");
 
-// For cost control, you can set the maximum number of containers that can be
-// running at the same time. This helps mitigate the impact of unexpected
-// traffic spikes by instead downgrading performance. This limit is a
-// per-function limit. You can override the limit for each function using the
-// `maxInstances` option in the function's options, e.g.
-// `onRequest({ maxInstances: 5 }, (req, res) => { ... })`.
-// NOTE: setGlobalOptions does not apply to functions using the v1 API. V1
-// functions should each use functions.runWith({ maxInstances: 10 }) instead.
-// In the v1 API, each function can only serve one request per container, so
-// this will be the maximum concurrent request count.
-setGlobalOptions({ maxInstances: 10 });
+// Initialisiere Admin SDK
+admin.initializeApp();
+const db = getFirestore();
+const messaging = getMessaging();
 
-// Create and deploy your first functions
-// https://firebase.google.com/docs/functions/get-started
+// Dieser "Cronjob" läuft jede Minute
+exports.checkTimerDone = onSchedule("every 1 minutes", async (event) => {
+    const now = admin.firestore.Timestamp.now();
 
-// exports.helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
+    console.log("Prüfe auf abgelaufene Timer...", now.toDate());
+
+    // 1. Suche Timer, die abgelaufen sind (endTime <= jetzt) UND noch nicht benachrichtigt wurden
+    const query = db.collection('active_timers')
+        .where('endTime', '<=', now)
+        .where('notified', '!=', true); // Damit wir nicht doppelt senden
+
+    const snapshot = await query.get();
+
+    if (snapshot.empty) {
+        return; // Nichts zu tun
+    }
+
+    const promises = [];
+
+    snapshot.forEach(doc => {
+        const timerData = doc.data();
+        const parteiName = doc.id; // Die ID des Dokuments ist der Parteiname
+
+        // Wir verarbeiten diesen Timer
+        const p = (async () => {
+            console.log(`Timer für ${parteiName} ist abgelaufen!`);
+
+            // 2. Alle User dieser Partei finden, die einen Push-Token haben
+            const userQuery = await db.collection('users')
+                .where('partei', '==', parteiName)
+                .get();
+
+            let tokens = [];
+            userQuery.forEach(userDoc => {
+                const userData = userDoc.data();
+                if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
+                    // Neue Struktur: Array von Tokens
+                    tokens = tokens.concat(userData.fcmTokens);
+                } else if (userData.fcmToken) {
+                    // Alte Struktur: Einzelner Token (Fallback)
+                    tokens.push(userData.fcmToken);
+                }
+            });
+
+            // Duplikate entfernen
+            tokens = [...new Set(tokens)];
+
+            if (tokens.length > 0) {
+                // 3. Nachricht senden
+                try {
+                    const response = await messaging.sendEachForMulticast({
+                        tokens: tokens,
+                        notification: {
+                            title: 'Wäsche fertig! 🧺',
+                            body: `Das Programm "${timerData.programName}" ist durch. Bitte auschecken!`
+                        },
+                        webpush: {
+                            fcm_options: {
+                                link: 'https://waschplanapp.web.app' // Öffnet die App bei Klick
+                            }
+                        }
+                    });
+                    console.log(`Nachricht an ${tokens.length} Geräte gesendet. Erfolgreich: ${response.successCount}`);
+                } catch (err) {
+                    console.error("Fehler beim Senden der Push-Nachricht:", err);
+                }
+            } else {
+                console.log(`Keine Tokens für Partei ${parteiName} gefunden.`);
+            }
+
+            // 4. Timer markieren, damit wir ihn nicht nochmal senden
+            await doc.ref.update({ notified: true });
+        })();
+        
+        promises.push(p);
+    });
+
+    await Promise.all(promises);
+});

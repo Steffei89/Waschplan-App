@@ -17,29 +17,50 @@ const messaging = firebase.messaging();
 // Empfängt Nachrichten im Hintergrund
 messaging.onBackgroundMessage((payload) => {
   console.log('[sw.js] Background message: ', payload);
+  
   const title = payload.notification.title;
   const options = {
     body: payload.notification.body,
     icon: '/img/icon-192.png',
-    badge: '/img/icon-maskable-192.png'
+    badge: '/img/icon-maskable-192.png',
+    vibrate: [200, 100, 200],
+    data: {
+        url: 'https://waschplanapp.web.app' // URL zum Öffnen
+    }
   };
+  
   self.registration.showNotification(title, options);
 });
 
 self.addEventListener('install', (event) => {
+    console.log('Service Worker installing.');
     event.waitUntil(self.skipWaiting()); 
 });
 
 self.addEventListener('activate', (event) => {
+    console.log('Service Worker activating.');
     event.waitUntil(self.clients.claim());
 });
 
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
+    
+    // Versuche, die URL aus den Daten zu holen, sonst nimm Root
+    const urlToOpen = (event.notification.data && event.notification.data.url) ? event.notification.data.url : '/';
+
     event.waitUntil(
-        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-            // Wenn ein Tab offen ist, fokussiere ihn, sonst öffne neuen
-            return list.length > 0 ? list[0].focus() : clients.openWindow('/');
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+            // Prüfen, ob App bereits offen ist
+            for (let i = 0; i < windowClients.length; i++) {
+                const client = windowClients[i];
+                if (client.url.includes(urlToOpen) && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            // Wenn nicht offen, neu öffnen
+            if (clients.openWindow) {
+                return clients.openWindow(urlToOpen);
+            }
         })
     );
 });
