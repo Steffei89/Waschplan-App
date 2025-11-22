@@ -9,8 +9,9 @@ import { KARMA_START } from '../config.js';
 import { updateKarma, getPartyKarma } from '../services/karma.js';
 import { getSystemStatus, setSystemStatus, subscribeToTickets, toggleTicketStatus } from '../services/maintenance.js';
 import { loadWashPrograms, addWashProgram, deleteWashProgram } from '../services/timers.js';
-// NEU: Stats laden
 import { loadStatistics } from '../services/stats.js';
+// NEU: Minigame Funktionen
+import { deleteMinigameScore, resetMinigameLeaderboard } from '../services/minigame.js';
 
 const MESSAGE_ID = 'admin-message';
 
@@ -47,17 +48,13 @@ export async function loadAdminUserData() {
         }
     }
 
-    // 2. Tickets laden
     loadAdminTickets();
-
-    // 3. Programme laden
     loadPrograms();
-
-    // 4. Config laden (PLZ, QR)
     loadConfig();
-
-    // 5. Statistiken laden (NEU)
     loadStatistics(false);
+    
+    // NEU: Minigame Leaderboard laden
+    loadMinigameAdmin();
 }
 
 function loadConfig() {
@@ -142,6 +139,76 @@ function loadAdminTickets() {
             ticketContainer.appendChild(div);
         });
     });
+}
+
+// NEU: Minigame Admin Funktion
+async function loadMinigameAdmin() {
+    const container = document.getElementById('minigame-admin-list');
+    if (!container) return;
+
+    const resetAllBtn = document.getElementById('reset-minigame-btn');
+    if(resetAllBtn) {
+        // Event Listener nur einmal anhängen (einfachster Weg: onclick überschreiben)
+        resetAllBtn.onclick = async () => {
+            if(confirm("WARNUNG: Wirklich ALLE Highscores unwiderruflich löschen?")) {
+                const success = await resetMinigameLeaderboard();
+                if(success) {
+                    showMessage(MESSAGE_ID, "Rangliste zurückgesetzt!", "success");
+                    loadMinigameAdmin(); // Reload List
+                } else {
+                    showMessage(MESSAGE_ID, "Fehler beim Reset.", "error");
+                }
+            }
+        };
+    }
+
+    container.innerHTML = '<div class="skeleton-item"><div class="skeleton skeleton-line"></div></div>';
+
+    try {
+        const q = query(collection(db, "minigame_scores"), orderBy("score", "desc"));
+        const snapshot = await getDocs(q);
+        
+        container.innerHTML = '';
+        
+        if (snapshot.empty) {
+            container.innerHTML = '<p class="small-text">Keine Scores vorhanden.</p>';
+            return;
+        }
+
+        snapshot.forEach(docSnap => {
+            const data = docSnap.data();
+            const item = document.createElement('div');
+            item.className = 'program-list-item'; // Recycle CSS
+            
+            let nameDisplay = data.partei;
+            if(data.username) nameDisplay += ` (${data.username})`;
+
+            item.innerHTML = `
+                <span><strong>${data.score}</strong> - ${nameDisplay}</span>
+                <button class="button-small button-danger delete-score-btn" data-partei="${docSnap.id}"><i class="fa-solid fa-trash"></i></button>
+            `;
+            container.appendChild(item);
+        });
+
+        container.querySelectorAll('.delete-score-btn').forEach(btn => {
+            btn.onclick = async (e) => {
+                // Finde den Button (falls Icon geklickt wurde)
+                const target = e.target.closest('button');
+                const partei = target.dataset.partei;
+                if(confirm(`Score von ${partei} löschen?`)) {
+                    const success = await deleteMinigameScore(partei);
+                    if(success) {
+                        showMessage(MESSAGE_ID, "Score gelöscht.", "success");
+                        loadMinigameAdmin();
+                    }
+                }
+            };
+        });
+
+    } catch(e) {
+        console.error(e);
+        container.innerHTML = '<p class="small-text error">Fehler beim Laden.</p>';
+    }
 }
 
 function renderUserList(users, karmaMap) {

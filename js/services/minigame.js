@@ -1,5 +1,5 @@
 import * as dom from '../dom.js';
-import { db, collection, addDoc, query, orderBy, limit, getDocs, setDoc, doc, getDoc, serverTimestamp } from '../firebase.js';
+import { db, collection, addDoc, query, orderBy, limit, getDocs, setDoc, doc, getDoc, serverTimestamp, deleteDoc, writeBatch } from '../firebase.js';
 import { getState } from '../state.js';
 import { processMinigameReward } from './karma.js'; 
 import { 
@@ -158,7 +158,6 @@ export async function initMinigame() {
     if(startBtn) startBtn.addEventListener('click', () => initAudioAndStart());
     if(restartBtn) restartBtn.addEventListener('click', () => initAudioAndStart());
 
-    // NEU: Listener für den Beenden-Button im Game Over Screen
     const quitGameOverBtn = document.getElementById('quit-game-over-btn');
     if(quitGameOverBtn) quitGameOverBtn.addEventListener('click', quitToMenu);
 
@@ -339,7 +338,6 @@ function vibrate(pattern) {
 function resizeCanvas() {
     dom.gameCanvas.width = window.innerWidth;
     dom.gameCanvas.height = window.innerHeight;
-    // Korb höher setzen für iPhone Safe Area
     basket.y = dom.gameCanvas.height - 160; 
 }
 
@@ -462,7 +460,6 @@ function quitToMenu() {
     isGameRunning = false;
     isPaused = false;
     if(dom.gamePauseMenu) dom.gamePauseMenu.style.display = 'none';
-    // Auch Game Over Screen ausblenden, falls offen
     if(dom.gameOverScreen) dom.gameOverScreen.style.display = 'none';
     
     dom.gameContainer.style.display = 'none';
@@ -1237,4 +1234,35 @@ async function loadLeaderboard() {
         if (querySnapshot.empty) html = "<p class='small-text'>Noch keine Spieler.</p>";
         dom.leaderboardList.innerHTML = html;
     } catch (e) { dom.leaderboardList.innerHTML = "Fehler."; }
+}
+
+// NEUE FUNKTIONEN FÜR ADMIN-VERWALTUNG
+
+export async function deleteMinigameScore(partei) {
+    if(!partei) return;
+    try {
+        await deleteDoc(doc(db, "minigame_scores", partei));
+        return true;
+    } catch(e) {
+        console.error(e);
+        return false;
+    }
+}
+
+export async function resetMinigameLeaderboard() {
+    try {
+        const q = query(collection(db, "minigame_scores"));
+        const snapshot = await getDocs(q);
+        
+        const batch = writeBatch(db);
+        snapshot.forEach(docSnap => {
+            batch.delete(docSnap.ref);
+        });
+        
+        await batch.commit();
+        return true;
+    } catch(e) {
+        console.error(e);
+        return false;
+    }
 }
