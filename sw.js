@@ -1,4 +1,4 @@
-// sw.js - Service Worker
+// sw.js
 importScripts('https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.1/firebase-messaging-compat.js');
 
@@ -14,6 +14,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
+// Empfängt Nachrichten im Hintergrund
 messaging.onBackgroundMessage((payload) => {
   console.log('[sw.js] Background message: ', payload);
   const title = payload.notification.title;
@@ -25,13 +26,20 @@ messaging.onBackgroundMessage((payload) => {
   self.registration.showNotification(title, options);
 });
 
-self.addEventListener('install', (event) => { event.waitUntil(self.skipWaiting()); });
-self.addEventListener('activate', (event) => { event.waitUntil(self.clients.claim()); });
+self.addEventListener('install', (event) => {
+    event.waitUntil(self.skipWaiting()); 
+});
+
+self.addEventListener('activate', (event) => {
+    event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-        return list.length > 0 ? list[0].focus() : clients.openWindow('/');
-    })
-  );
+    event.notification.close();
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+            // Wenn ein Tab offen ist, fokussiere ihn, sonst öffne neuen
+            return list.length > 0 ? list[0].focus() : clients.openWindow('/');
+        })
+    );
 });

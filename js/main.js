@@ -1,4 +1,15 @@
-// 1. IMPORTS (Müssen IMMER ganz oben stehen!)
+// ===== WICHTIG: SERVICE WORKER STARTEN =====
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+    .then((registration) => {
+      console.log('Service Worker registriert mit Scope:', registration.scope);
+    })
+    .catch((err) => {
+      console.error('Service Worker Fehler:', err);
+    });
+}
+// ===========================================
+
 import { auth, onAuthStateChanged, getDoc, getUserProfileDocRef, Timestamp, doc, onSnapshot, db } from './firebase.js';
 import * as dom from './dom.js';
 import { getState, setCurrentUser, setUnsubscriber, setSelectedCalendarDate, getIsRegistering } from './state.js';
@@ -11,11 +22,7 @@ import {
 import { handleRegister, handleLogin, handleLogout, handlePasswordReset, handleDeleteAccount } from './services/auth.js';
 import { loadWeather } from './services/weather.js';
 import { loadStatistics, initStatsView, trackMenuClick } from './services/stats.js';
-// WICHTIG: Hier fehlten performCheckIn, performCheckOut und checkAndAutoCheckoutOldBookings
-import { 
-    performBooking, performDeletion, loadNextBookingsOverview, checkSlotAvailability, 
-    performCheckIn, performCheckOut, checkAndAutoCheckoutOldBookings 
-} from './services/booking.js';
+import { performBooking, performDeletion, loadNextBookingsOverview, checkSlotAvailability, performCheckIn, performCheckOut, checkAndAutoCheckoutOldBookings } from './services/booking.js';
 import { 
     loadIncomingRequests, loadOutgoingRequestStatus, loadOutgoingRequestSuccess,
     confirmSwapTransaction, rejectSwapRequest, dismissRequestNotification
@@ -29,31 +36,20 @@ import { loadWashPrograms, listenToActiveTimer, startWashTimer, stopWashTimer } 
 import { initKarmaForParty } from './services/karma.js';
 import { initMinigame } from './services/minigame.js'; 
 import { startSession, updateSession } from './services/analytics.js';
-// Diese Imports fehlten in deiner Datei:
 import { reportIssue } from './services/maintenance.js'; 
 import { startScanner } from './services/scanner.js';
 import { initPushNotifications } from './services/push.js';
 
-// 2. SERVICE WORKER REGISTRIERUNG (Direkt nach den Imports)
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js')
-      .then((registration) => {
-        console.log('Service Worker registriert mit Scope:', registration.scope);
-      })
-      .catch((err) => {
-        console.error('Service Worker Fehler:', err);
-      });
-}
-
-// 3. GLOBALE VARIABLEN
 let allPrograms = []; 
 let currentTimerData = null; 
 let activeTimerInterval = null; 
 let karmaUnsubscribe = null; 
 let myCurrentBooking = null;
+// NEU: Intervall für Auto-Checkout
 let autoCheckoutInterval = null;
 
-// 4. AUTH LOGIK
+// --- AUTH FLOW ---
+
 onAuthStateChanged(auth, async (user) => {
     
     if (getIsRegistering()) {
@@ -81,12 +77,11 @@ onAuthStateChanged(auth, async (user) => {
                 
                 startSession();
                 
-                // Auto-Checkout Logik starten
+                // NEU: Sofort prüfen UND Intervall starten (jede Minute)
                 checkAndAutoCheckoutOldBookings();
                 if (autoCheckoutInterval) clearInterval(autoCheckoutInterval);
                 autoCheckoutInterval = setInterval(checkAndAutoCheckoutOldBookings, 60000);
 
-                // Push Notifications starten
                 initPushNotifications();
 
                 if (userData.partei) {
@@ -126,6 +121,7 @@ onAuthStateChanged(auth, async (user) => {
         unsubscribeAll();
         if(karmaUnsubscribe) karmaUnsubscribe();
         
+        // NEU: Intervall stoppen beim Logout
         if (autoCheckoutInterval) clearInterval(autoCheckoutInterval);
         
         setCurrentUser(null);
@@ -152,6 +148,7 @@ document.addEventListener("visibilitychange", () => {
     }
 });
 
+// ===== KARMA HEADER LISTENER =====
 function setupKarmaHeaderListener(parteiName) {
     if(karmaUnsubscribe) karmaUnsubscribe();
     const headerDisplay = document.getElementById('header-karma-display');
@@ -187,10 +184,12 @@ function handleLoadNextBookings() {
             dom.myBookingsList.innerHTML = '';
             const todayStr = getFormattedDate(new Date());
             
+            // Wir suchen nach einer aktiven Buchung für HEUTE
+            // Wichtig: Wir zeigen sie nur an, wenn sie noch NICHT freigegeben (released) ist.
             const myActive = bookings.find(b => 
                 b.partei === currentUser.userData.partei && 
                 b.date === todayStr && 
-                !b.isReleased
+                !b.isReleased 
             );
             
             myCurrentBooking = myActive || null;
@@ -261,6 +260,7 @@ function handleLoadNextBookings() {
     setUnsubscriber('quickView', unsub);
 }
 
+// ... (Restliche Load-Funktionen unverändert) ...
 function handleLoadIncomingRequests() {
     dom.incomingRequestsContainer.innerHTML = '<p class="small-text">Lade Tauschanfragen...</p>';
     dom.incomingRequestsContainer.style.display = 'none';

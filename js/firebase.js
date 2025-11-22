@@ -1,4 +1,4 @@
-// Firebase SDK - Version 10.13.1 (Einheitlich!)
+// js/firebase.js
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
 import { 
     getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut,

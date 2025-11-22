@@ -1,6 +1,7 @@
+// scripts/scheduler.js
 const admin = require("firebase-admin");
 
-// Wir lesen die Zugangsdaten aus den Umgebungsvariablen (GitHub Secrets)
+// Wir lesen die Zugangsdaten aus den Umgebungsvariablen
 const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 
 admin.initializeApp({
@@ -14,7 +15,7 @@ async function checkTimers() {
   console.log("Starte Timer-Check...");
   const now = admin.firestore.Timestamp.now();
 
-  // 1. Suche abgelaufene Timer
+  // Suche abgelaufene Timer
   const query = db.collection('active_timers')
     .where('endTime', '<=', now)
     .where('notified', '!=', true);
@@ -35,29 +36,23 @@ async function checkTimers() {
     const p = (async () => {
       console.log(`Timer fertig für: ${parteiName}`);
 
-      // User der Partei finden
+      // Alle Token der Partei finden
       const userQuery = await db.collection('users')
         .where('partei', '==', parteiName)
         .get();
 
       let tokens = [];
-      
       userQuery.forEach(u => {
         const d = u.data();
-        
-        // Prüfe auf Liste (neu) ODER Einzelwert (alt/fallback)
         if (d.fcmTokens && Array.isArray(d.fcmTokens)) {
             tokens = tokens.concat(d.fcmTokens);
         } else if (d.fcmToken) {
             tokens.push(d.fcmToken);
         }
       });
-
-      // Duplikate entfernen
-      tokens = [...new Set(tokens)];
+      tokens = [...new Set(tokens)]; // Duplikate entfernen
 
       if (tokens.length > 0) {
-        // Push an ALLE Geräte senden
         const response = await messaging.sendEachForMulticast({
           tokens: tokens,
           notification: {
@@ -69,11 +64,9 @@ async function checkTimers() {
           }
         });
         console.log(`-> Push an ${tokens.length} Geräte gesendet. Erfolge: ${response.successCount}`);
-      } else {
-          console.log("Keine Tokens für diese Partei gefunden.");
       }
 
-      // Timer als erledigt markieren
+      // Markieren als erledigt
       await doc.ref.update({ notified: true });
     })();
     promises.push(p);

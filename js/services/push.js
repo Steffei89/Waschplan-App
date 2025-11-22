@@ -1,3 +1,4 @@
+// js/services/push.js
 import { messaging, getToken, onMessage, doc, updateDoc, db, arrayUnion } from '../firebase.js';
 import { getState } from '../state.js';
 import { showMessage } from '../ui.js';
@@ -6,13 +7,20 @@ const VAPID_KEY = "BDYYVt3HarS6Ex9rnRVEalXjYvPbKZLCxFppym90rlnugDh4CS4lpk1ENW_b3
 
 export async function initPushNotifications() {
     const { currentUser } = getState();
-    if (!currentUser) return; // Silent return (kein Alert mehr, um User nicht zu nerven)
+    if (!currentUser) return;
 
-    if (!('Notification' in window)) return;
+    // Check ob Browser das überhaupt kann
+    if (!('Notification' in window)) {
+        console.log("Dieser Browser unterstützt keine Notifications.");
+        return;
+    }
 
     try {
         const permission = await Notification.requestPermission();
-        if (permission !== 'granted') return;
+        if (permission !== 'granted') {
+            console.warn("Push-Berechtigung verweigert.");
+            return;
+        }
 
         const registration = await navigator.serviceWorker.ready;
         if (!registration) return;
@@ -27,7 +35,9 @@ export async function initPushNotifications() {
             await saveTokenToDatabase(currentToken);
         }
 
+        // Listener für Nachrichten bei OFFENER App
         onMessage(messaging, (payload) => {
+            console.log('Nachricht im Vordergrund:', payload);
             const title = payload.notification.title;
             const body = payload.notification.body;
             showMessage('main-menu-message', `🔔 ${title}: ${body}`, 'success', 8000);
@@ -44,9 +54,9 @@ async function saveTokenToDatabase(token) {
 
     const userRef = doc(db, "users", currentUser.uid);
     try {
-        // HIER IST DER TRICK: arrayUnion fügt hinzu, statt zu überschreiben!
+        // Fügt den Token zur Liste hinzu (arrayUnion verhindert Duplikate)
         await updateDoc(userRef, {
-            fcmTokens: arrayUnion(token), 
+            fcmTokens: arrayUnion(token),
             lastTokenUpdate: new Date().toISOString()
         });
     } catch(e) {
