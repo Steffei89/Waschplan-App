@@ -14,7 +14,7 @@ async function checkTimers() {
   console.log("Starte Timer-Check...");
   const now = admin.firestore.Timestamp.now();
 
-  // 1. Suche abgelaufene Timer, die noch nicht benachrichtigt wurden
+  // 1. Suche abgelaufene Timer
   const query = db.collection('active_timers')
     .where('endTime', '<=', now)
     .where('notified', '!=', true);
@@ -45,22 +45,19 @@ async function checkTimers() {
       userQuery.forEach(u => {
         const d = u.data();
         
-        // NEU: Wir schauen nach der Liste 'fcmTokens'
+        // Prüfe auf Liste (neu) ODER Einzelwert (alt/fallback)
         if (d.fcmTokens && Array.isArray(d.fcmTokens)) {
             tokens = tokens.concat(d.fcmTokens);
-        } 
-        // Fallback für alte Daten: einzelner 'fcmToken'
-        else if (d.fcmToken) {
+        } else if (d.fcmToken) {
             tokens.push(d.fcmToken);
         }
       });
 
-      // Duplikate entfernen (zur Sicherheit)
+      // Duplikate entfernen
       tokens = [...new Set(tokens)];
 
       if (tokens.length > 0) {
-        // Push senden
-        // Achtung: sendEachForMulticast erlaubt max 500 Tokens, das reicht hier locker
+        // Push an ALLE Geräte senden
         const response = await messaging.sendEachForMulticast({
           tokens: tokens,
           notification: {
@@ -71,15 +68,12 @@ async function checkTimers() {
             fcm_options: { link: 'https://waschplanapp.web.app' }
           }
         });
-        console.log(`-> Push an ${tokens.length} Geräte gesendet.`);
-        if (response.failureCount > 0) {
-            console.log("Einige Tokens waren ungültig, aber das ist okay.");
-        }
+        console.log(`-> Push an ${tokens.length} Geräte gesendet. Erfolge: ${response.successCount}`);
       } else {
           console.log("Keine Tokens für diese Partei gefunden.");
       }
 
-      // Timer markieren als "erledigt"
+      // Timer als erledigt markieren
       await doc.ref.update({ notified: true });
     })();
     promises.push(p);

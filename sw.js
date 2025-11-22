@@ -1,9 +1,7 @@
-// sw.js - Service Worker für Push Notifications
+// sw.js - Service Worker
+importScripts('https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js');
+importScripts('https://www.gstatic.com/firebasejs/10.13.1/firebase-messaging-compat.js');
 
-importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/10.8.0/firebase-messaging-compat.js');
-
-// DEINE FIREBASE CONFIG:
 const firebaseConfig = {
     apiKey: "AIzaSyCvKdQa7No5TMehgIBS9Nh34kg8EqFJap0",
     authDomain: "waschplanapp.firebaseapp.com",
@@ -14,45 +12,26 @@ const firebaseConfig = {
 };
 
 firebase.initializeApp(firebaseConfig);
-
 const messaging = firebase.messaging();
 
-// Empfängt Nachrichten, wenn die App im HINTERGRUND ist
 messaging.onBackgroundMessage((payload) => {
-  console.log('[firebase-messaging-sw.js] Received background message ', payload);
-  
-  const notificationTitle = payload.notification.title;
-  const notificationOptions = {
+  console.log('[sw.js] Background message: ', payload);
+  const title = payload.notification.title;
+  const options = {
     body: payload.notification.body,
-    icon: '/img/icon-192.png', 
-    badge: '/img/icon-maskable-192.png' // Falls vorhanden, sonst nimm icon-192
+    icon: '/img/icon-192.png',
+    badge: '/img/icon-maskable-192.png'
   };
-
-  self.registration.showNotification(notificationTitle, notificationOptions);
+  self.registration.showNotification(title, options);
 });
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(self.skipWaiting()); 
-});
-
-self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
-});
-
+self.addEventListener('install', (event) => { event.waitUntil(self.skipWaiting()); });
+self.addEventListener('activate', (event) => { event.waitUntil(self.clients.claim()); });
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      if (clientList.length > 0) {
-        let client = clientList[0];
-        for (let i = 0; i < clientList.length; i++) {
-          if (clientList[i].focused) {
-            client = clientList[i];
-          }
-        }
-        return client.focus();
-      }
-      return clients.openWindow('/');
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+        return list.length > 0 ? list[0].focus() : clients.openWindow('/');
     })
   );
 });

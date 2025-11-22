@@ -6,38 +6,16 @@ const VAPID_KEY = "BDYYVt3HarS6Ex9rnRVEalXjYvPbKZLCxFppym90rlnugDh4CS4lpk1ENW_b3
 
 export async function initPushNotifications() {
     const { currentUser } = getState();
-    if (!currentUser) {
-        alert("Fehler: Nicht eingeloggt.");
-        return;
-    }
+    if (!currentUser) return; // Silent return (kein Alert mehr, um User nicht zu nerven)
 
-    // SICHERHEITS-CHECK 1: Unterstützt der Browser überhaupt Notifications?
-    if (!('Notification' in window)) {
-        alert("⚠️ Dein iPhone unterstützt Push in diesem Modus nicht.\n\nLÖSUNG:\n1. Tippe unten auf 'Teilen'.\n2. Wähle 'Zum Home-Bildschirm'.\n3. Öffne die App über das neue Icon.");
-        return;
-    }
+    if (!('Notification' in window)) return;
 
     try {
-        // DEBUG: Permission Status vorher prüfen
-        // alert("Status: " + Notification.permission);
-
         const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-            alert("Fehler: Berechtigung verweigert. Bitte in iOS Einstellungen -> Waschplan -> Mitteilungen aktivieren.");
-            return;
-        }
-
-        // SICHERHEITS-CHECK 2: Service Worker
-        if (!('serviceWorker' in navigator)) {
-            alert("Fehler: Service Worker nicht unterstützt.");
-            return;
-        }
+        if (permission !== 'granted') return;
 
         const registration = await navigator.serviceWorker.ready;
-        if (!registration) {
-            alert("Fehler: Service Worker nicht bereit.");
-            return;
-        }
+        if (!registration) return;
 
         const currentToken = await getToken(messaging, { 
             vapidKey: VAPID_KEY, 
@@ -47,9 +25,6 @@ export async function initPushNotifications() {
         if (currentToken) {
             console.log("FCM Token:", currentToken);
             await saveTokenToDatabase(currentToken);
-            alert("✅ ERFOLG! Dein iPhone ist registriert.\nJetzt App schließen und GitHub-Test starten.");
-        } else {
-            alert("Fehler: Kein Token erhalten.");
         }
 
         onMessage(messaging, (payload) => {
@@ -59,7 +34,6 @@ export async function initPushNotifications() {
         });
 
     } catch (err) {
-        alert("CRASH: " + err.message);
         console.error('Push Error:', err);
     }
 }
@@ -70,8 +44,9 @@ async function saveTokenToDatabase(token) {
 
     const userRef = doc(db, "users", currentUser.uid);
     try {
+        // HIER IST DER TRICK: arrayUnion fügt hinzu, statt zu überschreiben!
         await updateDoc(userRef, {
-            fcmTokens: arrayUnion(token),
+            fcmTokens: arrayUnion(token), 
             lastTokenUpdate: new Date().toISOString()
         });
     } catch(e) {

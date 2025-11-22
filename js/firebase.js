@@ -1,14 +1,14 @@
-// Firebase SDK - Version 10.13.0 (Einheitlich!)
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+// Firebase SDK - Version 10.13.1 (Einheitlich!)
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
 import { 
     getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut,
     updatePassword, sendPasswordResetEmail, sendEmailVerification, EmailAuthProvider, reauthenticateWithCredential, deleteUser
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-auth.js";
+} from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
 import { 
     getFirestore, doc, setDoc, collection, getDocs, query, where, getDoc, onSnapshot, addDoc, deleteDoc, updateDoc, 
     orderBy, limit, runTransaction, writeBatch, Timestamp, increment, serverTimestamp, deleteField, arrayUnion
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-messaging.js";
+} from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
+import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-messaging.js";
 
 const firebaseConfig = {
     apiKey: "AIzaSyCvKdQa7No5TMehgIBS9Nh34kg8EqFJap0",
