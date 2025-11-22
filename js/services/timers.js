@@ -70,14 +70,17 @@ export async function deleteWashProgram(docId) {
  * Erstellt einen Live-Listener für den Timer der EIGENEN Partei.
  */
 export function listenToActiveTimer(partei, onData) {
-    if (!partei) return () => {}; // Leere Unsubscribe-Funktion
+    if (!partei) {
+        // Falls keine Partei da ist, können wir auch nichts hören
+        onData(null);
+        return () => {}; 
+    }
     
-    // Dies hört auf ein EINZIGES Dokument
     return onSnapshot(getActiveTimerDocRef(partei), (docSnap) => {
         if (docSnap.exists()) {
             onData(docSnap.data());
         } else {
-            onData(null); // Kein Timer aktiv
+            onData(null); 
         }
     }, (error) => {
         console.error("Fehler beim Hören auf den Timer:", error);
@@ -89,6 +92,12 @@ export function listenToActiveTimer(partei, onData) {
  * Nutzer: Startet einen Timer für die eigene Partei.
  */
 export async function startWashTimer(partei, program) {
+    // WICHTIG: Sicherheitscheck, damit die App nicht abstürzt
+    if (!partei) {
+        alert("Fehler: Deinem Benutzer ist keine 'Partei' zugeordnet. Bitte prüfe dein Profil oder die Admin-Konsole.");
+        return;
+    }
+
     try {
         const now = Timestamp.now();
         const endTime = new Timestamp(now.seconds + program.durationMinutes * 60, now.nanoseconds);
@@ -96,11 +105,13 @@ export async function startWashTimer(partei, program) {
         await setDoc(getActiveTimerDocRef(partei), {
             programName: program.name,
             endTime: endTime,
-            startTime: now, // Nützlich für die %-Berechnung
-            durationMinutes: program.durationMinutes
+            startTime: now, 
+            durationMinutes: program.durationMinutes,
+            notified: false // WICHTIG für Push-Nachrichten!
         });
     } catch (e) {
         console.error("Fehler beim Starten des Timers:", e);
+        alert("Fehler: " + e.message);
     }
 }
 
@@ -108,6 +119,7 @@ export async function startWashTimer(partei, program) {
  * Nutzer: Stoppt (löscht) den Timer für die eigene Partei.
  */
 export async function stopWashTimer(partei) {
+    if (!partei) return;
     try {
         await deleteDoc(getActiveTimerDocRef(partei));
     } catch (e) {

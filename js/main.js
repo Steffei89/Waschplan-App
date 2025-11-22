@@ -1,6 +1,5 @@
 // ===== WICHTIG: SERVICE WORKER STARTEN =====
 if ('serviceWorker' in navigator) {
-  // Wir registrieren den Service Worker sofort, damit Push und Offline funktionieren
   navigator.serviceWorker.register('/sw.js')
     .then((registration) => {
       console.log('Service Worker registriert mit Scope:', registration.scope);
@@ -46,6 +45,8 @@ let currentTimerData = null;
 let activeTimerInterval = null; 
 let karmaUnsubscribe = null; 
 let myCurrentBooking = null;
+// NEU: Intervall für Auto-Checkout
+let autoCheckoutInterval = null;
 
 // --- AUTH FLOW ---
 
@@ -75,9 +76,12 @@ onAuthStateChanged(auth, async (user) => {
                 setCurrentUser({ uid: user.uid, ...user, userData });
                 
                 startSession();
+                
+                // NEU: Sofort prüfen UND Intervall starten (jede Minute)
                 checkAndAutoCheckoutOldBookings();
+                if (autoCheckoutInterval) clearInterval(autoCheckoutInterval);
+                autoCheckoutInterval = setInterval(checkAndAutoCheckoutOldBookings, 60000);
 
-                // WICHTIG: Push erst starten, wenn SW bereit ist (passiert in push.js automatisch)
                 initPushNotifications();
 
                 if (userData.partei) {
@@ -116,6 +120,9 @@ onAuthStateChanged(auth, async (user) => {
     } else {
         unsubscribeAll();
         if(karmaUnsubscribe) karmaUnsubscribe();
+        
+        // NEU: Intervall stoppen beim Logout
+        if (autoCheckoutInterval) clearInterval(autoCheckoutInterval);
         
         setCurrentUser(null);
         updateUserInfo(null);
@@ -176,10 +183,13 @@ function handleLoadNextBookings() {
         (bookings, currentUser, userIsAdmin) => {
             dom.myBookingsList.innerHTML = '';
             const todayStr = getFormattedDate(new Date());
+            
+            // Wir suchen nach einer aktiven Buchung für HEUTE
+            // Wichtig: Wir zeigen sie nur an, wenn sie noch NICHT freigegeben (released) ist.
             const myActive = bookings.find(b => 
                 b.partei === currentUser.userData.partei && 
                 b.date === todayStr && 
-                !b.isReleased
+                !b.isReleased 
             );
             
             myCurrentBooking = myActive || null;
@@ -250,6 +260,7 @@ function handleLoadNextBookings() {
     setUnsubscriber('quickView', unsub);
 }
 
+// ... (Restliche Load-Funktionen unverändert) ...
 function handleLoadIncomingRequests() {
     dom.incomingRequestsContainer.innerHTML = '<p class="small-text">Lade Tauschanfragen...</p>';
     dom.incomingRequestsContainer.style.display = 'none';

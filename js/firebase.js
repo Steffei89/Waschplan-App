@@ -32,9 +32,9 @@ import {
     writeBatch, 
     Timestamp,
     increment,
-    serverTimestamp
+    serverTimestamp,
+    deleteField // <--- WICHTIG: Das hat gefehlt!
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-// NEU: Messaging Import
 import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-messaging.js";
 
 // --- 1. FIREBASE KONFIGURATION ---
@@ -51,10 +51,10 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const messaging = getMessaging(app); // NEU
+const messaging = getMessaging(app);
 
 // --- 3. EXPORTE ---
-export { auth, db, messaging }; // NEU: messaging exportieren
+export { auth, db, messaging };
 
 export {
     createUserWithEmailAndPassword, 
@@ -69,7 +69,6 @@ export {
     deleteUser
 };
 
-// NEU: Messaging Funktionen exportieren
 export { getToken, onMessage }; 
 
 export {
@@ -90,7 +89,8 @@ export {
     writeBatch, 
     Timestamp,
     increment,
-    serverTimestamp
+    serverTimestamp,
+    deleteField // <--- Auch hier muss es stehen!
 };
 
 export function getBookingsCollectionRef() {

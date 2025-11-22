@@ -66,7 +66,7 @@
     <button id="login-btn">Einloggen</button>
     <p id="switch-register">Noch nicht registriert? <span id="show-register" class="clickable">Registrieren</span></p>
     <p style="text-align: center; margin-top: 10px;" class="small-text"><span id="show-reset-password" class="clickable">Passwort vergessen?</span></p>
-    <div class="app-version">Version 2.8.0</div>
+    <div class="app-version">Version 2.8.1</div>
   </div>
 
   <div id="registerForm" class="card" style="display:none;">
@@ -89,7 +89,7 @@
     </div>
     <button id="register-btn">Registrieren</button>
     <p id="switch-login">Bereits registriert? <span id="show-login" class="clickable">Login</span></p>
-    <div class="app-version">Version 2.8.0</div>
+    <div class="app-version">Version 2.8.1</div>
   </div>
 
   <div id="verifyEmailMessage" class="card" style="display:none;">
@@ -247,6 +247,19 @@
     <h2>Admin-Konsole</h2>
     <div id="admin-message" class="message-box" style="display:none;"></div>
     
+    <details class="admin-group">
+        <summary>🧪 Test-Labor & Debug</summary>
+        <div class="admin-content">
+            <p class="small-text">Simulation von Zuständen für dich (Admin).</p>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <button id="debug-create-booking-btn" class="button-secondary">📅 Buchung für HEUTE erzwingen</button>
+                <button id="debug-force-checkin-btn" class="button-secondary">📱 Check-in erzwingen (ohne Scan)</button>
+                <button id="debug-kill-timer-btn" class="button-danger">⏱️ Timer Killen (Löschen)</button>
+                <button id="debug-reset-status-btn" class="button-danger">🔄 Status komplett Reset (Auschecken)</button>
+            </div>
+        </div>
+    </details>
+
     <details class="admin-group" open>
         <summary>Status & Meldungen</summary>
         <div class="admin-content">
@@ -404,7 +417,7 @@
     <button id="show-changelog-btn" class="button-secondary"><i class="fa-solid fa-gift"></i> Letzte Änderungen anzeigen</button>
     <hr style="margin-top: 25px;">
     <button id="delete-account-btn" class="button-danger">Konto löschen</button>
-    <div class="app-version">Version 2.8.0</div>
+    <div class="app-version">Version 2.8.1</div>
   </div>
 
   <div id="confirmationModal" class="modal" style="display:none;">

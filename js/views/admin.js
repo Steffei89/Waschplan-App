@@ -1,4 +1,7 @@
-import { db, collection, getDocs, query, orderBy, doc, updateDoc, getUserProfileDocRef, writeBatch, setDoc, getDoc, deleteDoc } from '../firebase.js';
+import { 
+    db, collection, getDocs, query, orderBy, doc, updateDoc, getUserProfileDocRef, 
+    writeBatch, setDoc, getDoc, deleteDoc, where, addDoc, deleteField 
+} from '../firebase.js';
 import * as dom from '../dom.js';
 import { navigateTo } from '../ui.js';
 import { getState, setUnsubscriber } from '../state.js';
@@ -10,8 +13,8 @@ import { updateKarma, getPartyKarma } from '../services/karma.js';
 import { getSystemStatus, setSystemStatus, subscribeToTickets, toggleTicketStatus } from '../services/maintenance.js';
 import { loadWashPrograms, addWashProgram, deleteWashProgram } from '../services/timers.js';
 import { loadStatistics } from '../services/stats.js';
-// NEU: Minigame Funktionen
 import { deleteMinigameScore, resetMinigameLeaderboard } from '../services/minigame.js';
+import { formatDate } from '../utils.js'; 
 
 const MESSAGE_ID = 'admin-message';
 
@@ -26,7 +29,6 @@ export async function loadAdminUserData() {
         return;
     }
 
-    // 1. Nutzer laden
     const userListContainer = document.getElementById('user-list-container');
     if (userListContainer) {
         userListContainer.innerHTML = `
@@ -52,10 +54,125 @@ export async function loadAdminUserData() {
     loadPrograms();
     loadConfig();
     loadStatistics(false);
-    
-    // NEU: Minigame Leaderboard laden
     loadMinigameAdmin();
+    
+    setupTestLab();
 }
+
+// ==================== TEST LABOR LOGIK ====================
+function setupTestLab() {
+    const createBookingBtn = document.getElementById('debug-create-booking-btn');
+    const forceCheckinBtn = document.getElementById('debug-force-checkin-btn');
+    const resetStatusBtn = document.getElementById('debug-reset-status-btn');
+    const killTimerBtn = document.getElementById('debug-kill-timer-btn');
+
+    if (createBookingBtn) createBookingBtn.onclick = debugCreateBooking;
+    if (forceCheckinBtn) forceCheckinBtn.onclick = debugForceCheckin;
+    if (resetStatusBtn) resetStatusBtn.onclick = debugResetStatus;
+    if (killTimerBtn) killTimerBtn.onclick = debugKillTimer;
+}
+
+async function getMyTodaysBookingDoc() {
+    const { currentUser } = getState();
+    if(!currentUser) return null;
+    
+    const todayStr = formatDate(new Date());
+    // Wir suchen nach Buchungen von heute, die noch nicht freigegeben sind
+    const q = query(
+        collection(db, "bookings"),
+        where("date", "==", todayStr),
+        where("partei", "==", currentUser.userData.partei),
+        where("isReleased", "==", false) 
+    );
+    const snap = await getDocs(q);
+    if(snap.empty) return null;
+    return snap.docs[0]; 
+}
+
+async function debugCreateBooking() {
+    const { currentUser } = getState();
+    if(!currentUser) return;
+    
+    const todayStr = formatDate(new Date());
+    
+    // Prüfen ob schon eine aktive Buchung existiert
+    const existing = await getMyTodaysBookingDoc();
+    if(existing) {
+        showMessage(MESSAGE_ID, "Du hast heute schon eine aktive Buchung! Bitte erst resetten.", "error");
+        return;
+    }
+    
+    try {
+        await addDoc(collection(db, "bookings"), {
+            date: todayStr,
+            // TRICK: Wir buchen einen "Ganztages-Slot", damit der Auto-Checkout nicht greift!
+            slot: "00:00-23:59", 
+            partei: currentUser.userData.partei,
+            userId: currentUser.uid,
+            bookedAt: new Date().toISOString(),
+            isSwap: false,
+            checkInTime: null,
+            checkOutTime: null,
+            isReleased: false
+        });
+        showMessage(MESSAGE_ID, "Test-Buchung (Ganztags) erstellt! Gehe ins Hauptmenü.", "success");
+    } catch(e) {
+        showMessage(MESSAGE_ID, e.message, "error");
+    }
+}
+
+async function debugForceCheckin() {
+    const docSnap = await getMyTodaysBookingDoc();
+    if(!docSnap) {
+        showMessage(MESSAGE_ID, "Keine aktive Buchung für heute gefunden. Erst erstellen!", "error");
+        return;
+    }
+    try {
+        await updateDoc(docSnap.ref, {
+            checkInTime: new Date().toISOString()
+        });
+        showMessage(MESSAGE_ID, "Erzwungener Check-in erfolgreich!", "success");
+    } catch(e) { showMessage(MESSAGE_ID, e.message, "error"); }
+}
+
+async function debugResetStatus() {
+    // Wir suchen ALLE Buchungen von heute (auch die releasten), um aufzuräumen
+    const { currentUser } = getState();
+    const todayStr = formatDate(new Date());
+    const q = query(collection(db, "bookings"), where("date", "==", todayStr), where("partei", "==", currentUser.userData.partei));
+    const snap = await getDocs(q);
+
+    if(snap.empty) {
+        showMessage(MESSAGE_ID, "Nichts zum Zurücksetzen da.", "error");
+        return;
+    }
+
+    try {
+        const batch = writeBatch(db);
+        snap.forEach(d => {
+             // Wir löschen die Test-Buchungen einfach komplett, das ist sauberer für Tests
+             batch.delete(d.ref);
+        });
+        await batch.commit();
+
+        // Auch Timer löschen
+        await debugKillTimer(true); 
+        
+        showMessage(MESSAGE_ID, "Alles bereinigt (Buchung gelöscht).", "success");
+    } catch(e) { showMessage(MESSAGE_ID, e.message, "error"); }
+}
+
+async function debugKillTimer(silent = false) {
+    const { currentUser } = getState();
+    if(!currentUser) return;
+    try {
+        await deleteDoc(doc(db, "active_timers", currentUser.userData.partei));
+        if(!silent) showMessage(MESSAGE_ID, "Aktiver Timer gelöscht.", "success");
+    } catch(e) {
+        if(!silent) showMessage(MESSAGE_ID, e.message, "error");
+    }
+}
+// ==========================================================
 
 function loadConfig() {
     getDoc(getSettingsDocRef()).then(snap => {
@@ -141,20 +258,18 @@ function loadAdminTickets() {
     });
 }
 
-// NEU: Minigame Admin Funktion
 async function loadMinigameAdmin() {
     const container = document.getElementById('minigame-admin-list');
     if (!container) return;
 
     const resetAllBtn = document.getElementById('reset-minigame-btn');
     if(resetAllBtn) {
-        // Event Listener nur einmal anhängen (einfachster Weg: onclick überschreiben)
         resetAllBtn.onclick = async () => {
             if(confirm("WARNUNG: Wirklich ALLE Highscores unwiderruflich löschen?")) {
                 const success = await resetMinigameLeaderboard();
                 if(success) {
                     showMessage(MESSAGE_ID, "Rangliste zurückgesetzt!", "success");
-                    loadMinigameAdmin(); // Reload List
+                    loadMinigameAdmin(); 
                 } else {
                     showMessage(MESSAGE_ID, "Fehler beim Reset.", "error");
                 }
@@ -178,7 +293,7 @@ async function loadMinigameAdmin() {
         snapshot.forEach(docSnap => {
             const data = docSnap.data();
             const item = document.createElement('div');
-            item.className = 'program-list-item'; // Recycle CSS
+            item.className = 'program-list-item'; 
             
             let nameDisplay = data.partei;
             if(data.username) nameDisplay += ` (${data.username})`;
@@ -192,7 +307,6 @@ async function loadMinigameAdmin() {
 
         container.querySelectorAll('.delete-score-btn').forEach(btn => {
             btn.onclick = async (e) => {
-                // Finde den Button (falls Icon geklickt wurde)
                 const target = e.target.closest('button');
                 const partei = target.dataset.partei;
                 if(confirm(`Score von ${partei} löschen?`)) {

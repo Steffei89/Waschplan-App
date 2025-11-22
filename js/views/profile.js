@@ -6,7 +6,6 @@ import { showMessage, navigateTo, showChangelog, checkNotificationPermission } f
 import { loadWashPrograms, addWashProgram, deleteWashProgram } from '../services/timers.js';
 import { getKarmaStatus, getPartyKarma } from '../services/karma.js';
 import { KARMA_START } from '../config.js';
-// NEU: Import der echten Push-Funktion
 import { initPushNotifications } from '../services/push.js';
 
 function getSettingsDocRef() {
@@ -98,17 +97,27 @@ export function initProfileView() {
         }
     });
 
-    // WICHTIG: Hier rufen wir jetzt die echte Init-Funktion auf!
-    document.getElementById('enable-notifications-btn').addEventListener('click', async () => {
-        // Wir versuchen direkt die Initialisierung, die die Permission abfragt
-        await initPushNotifications();
-        
-        // UI Update prüfen
+    // NEU: Kombinierter Button (Erlauben ODER Testen)
+    const notifBtn = document.getElementById('enable-notifications-btn');
+    notifBtn.addEventListener('click', async () => {
         if (Notification.permission === 'granted') {
-            showMessage('profile-message', 'Benachrichtigungen aktiviert!', 'success');
-            document.getElementById('enable-notifications-btn').style.display = 'none';
+            // TEST-MODUS
+            try {
+                const reg = await navigator.serviceWorker.ready;
+                await reg.showNotification('Waschplan Test 🔔', {
+                    body: 'Dies ist eine Test-Nachricht vom System.',
+                    icon: 'img/icon-192.png',
+                    vibrate: [200, 100, 200]
+                });
+                // Fallback für Foreground
+                new Notification('Waschplan Test (Lokal)');
+            } catch(e) {
+                alert("Fehler beim Senden: " + e.message);
+            }
         } else {
-            showMessage('profile-message', 'Bitte Benachrichtigungen im Browser erlauben.', 'error');
+            // ERLAUBEN-MODUS
+            await initPushNotifications();
+            loadProfileData(); // UI aktualisieren
         }
     });
 
@@ -162,12 +171,21 @@ export async function loadProfileData() {
             confirmField.classList.remove('input-valid', 'input-invalid');
         }
 
-        // Button nur anzeigen, wenn noch nicht erlaubt
+        // NEU: Smarter Button
         const notifBtn = document.getElementById('enable-notifications-btn');
-        if (Notification.permission === 'default' || Notification.permission === 'denied') { 
-            notifBtn.style.display = 'block';
+        notifBtn.style.display = 'block'; // Immer anzeigen!
+        
+        if (Notification.permission === 'granted') {
+            notifBtn.innerHTML = '<i class="fa-solid fa-bell"></i> Test-Benachrichtigung senden';
+            notifBtn.classList.remove('button-secondary');
+            notifBtn.classList.add('button-primary'); // Blau für Test
+        } else if (Notification.permission === 'denied') {
+            notifBtn.innerHTML = '⚠️ Benachrichtigungen blockiert (in Einstellungen ändern)';
+            notifBtn.disabled = true;
+            notifBtn.classList.add('button-secondary');
         } else {
-            notifBtn.style.display = 'none'; 
+            notifBtn.innerHTML = '<i class="fa-solid fa-bell"></i> Benachrichtigungen erlauben';
+            notifBtn.classList.add('button-secondary');
         }
     }
 
