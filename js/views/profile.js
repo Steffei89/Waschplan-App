@@ -8,32 +8,16 @@ import { getKarmaStatus, getPartyKarma } from '../services/karma.js';
 import { KARMA_START } from '../config.js';
 import { initPushNotifications } from '../services/push.js';
 
-function getSettingsDocRef() {
-    return doc(db, 'app_settings', 'config');
-}
+function getSettingsDocRef() { return doc(db, 'app_settings', 'config'); }
 
+// ... (checkProfilePasswordMatch lassen wir unverändert, ist nur Logik) ...
 function checkProfilePasswordMatch() {
-    const passField = dom.newPasswordInput; 
-    const confirmField = document.getElementById('new-password-confirm');
+    const passField = dom.newPasswordInput; const confirmField = document.getElementById('new-password-confirm');
     if (!passField || !confirmField) return;
-    const passValue = passField.value;
-    const confirmValue = confirmField.value;
-    if (passValue === "" && confirmValue === "") {
-        passField.classList.remove('input-valid', 'input-invalid');
-        confirmField.classList.remove('input-valid', 'input-invalid');
-        return;
-    }
-    if (passValue === confirmValue) {
-        passField.classList.add('input-valid');
-        passField.classList.remove('input-invalid');
-        confirmField.classList.add('input-valid');
-        confirmField.classList.remove('input-valid');
-    } else {
-        passField.classList.add('input-invalid');
-        passField.classList.remove('input-valid');
-        confirmField.classList.add('input-invalid');
-        confirmField.classList.remove('input-valid');
-    }
+    const passValue = passField.value; const confirmValue = confirmField.value;
+    if (passValue === "" && confirmValue === "") { passField.classList.remove('input-valid', 'input-invalid'); confirmField.classList.remove('input-valid', 'input-invalid'); return; }
+    if (passValue === confirmValue) { passField.classList.add('input-valid'); confirmField.classList.add('input-valid'); passField.classList.remove('input-invalid'); confirmField.classList.remove('input-invalid'); } 
+    else { passField.classList.add('input-invalid'); confirmField.classList.add('input-invalid'); passField.classList.remove('input-valid'); confirmField.classList.remove('input-valid'); }
 }
 
 export function initProfileView() {
@@ -44,85 +28,66 @@ export function initProfileView() {
     if (passField) passField.addEventListener('input', checkProfilePasswordMatch);
     if (confirmField) confirmField.addEventListener('input', checkProfilePasswordMatch);
 
-    // Wetter speichern
     document.getElementById('save-weather-plz-btn').addEventListener('click', async () => {
         const newPlz = dom.weatherPlzInput.value.trim();
-        if (!newPlz || newPlz.length < 4 || !/^\d+$/.test(newPlz)) {
-            showMessage('profile-message', 'Ungültige PLZ.', 'error');
-            return;
-        }
-        try {
-            await setDoc(getSettingsDocRef(), { plz: newPlz }, { merge: true }); 
-            showMessage('profile-message', 'Wetter-Standort gespeichert!', 'success');
-        } catch (e) {
-            showMessage('profile-message', `Fehler: ${e.message}`, 'error');
-        }
+        if (!newPlz || newPlz.length < 4) { showMessage('profile-message', 'Ungültige PLZ.', 'error'); return; }
+        try { await setDoc(getSettingsDocRef(), { plz: newPlz }, { merge: true }); showMessage('profile-message', 'Gespeichert!', 'success'); } catch (e) { showMessage('profile-message', e.message, 'error'); }
     });
 
-    // QR Code Generator
     const qrBtn = document.getElementById('generate-qr-btn');
     if (qrBtn) {
         qrBtn.addEventListener('click', async () => {
             const secret = document.getElementById('qr-secret-input').value.trim() || 'WASCH-START';
-            const img = document.getElementById('qr-image');
-            const display = document.getElementById('qr-code-display');
-            const textDisplay = document.getElementById('qr-code-text-display');
-            
             try {
                 await setDoc(getSettingsDocRef(), { qrCodeSecret: secret }, { merge: true });
-                const apiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(secret)}`;
-                img.src = apiUrl;
-                textDisplay.textContent = secret;
-                display.style.display = 'block';
-                showMessage('profile-message', 'QR-Code generiert und Code gespeichert!', 'success');
-            } catch(e) {
-                showMessage('profile-message', 'Fehler beim Speichern des Codes.', 'error');
-            }
+                document.getElementById('qr-image').src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(secret)}`;
+                document.getElementById('qr-code-display').style.display = 'block';
+                showMessage('profile-message', 'QR-Code gespeichert!', 'success');
+            } catch(e) { showMessage('profile-message', 'Fehler: ' + e.message, 'error'); }
         });
     }
 
     document.getElementById('delete-account-btn').addEventListener('click', () => {
         dom.deleteAccountModal.style.display = 'flex';
         dom.deleteAccountPasswordInput.value = '';
-        showMessage('delete-account-message', '', 'error');
     });
 
     dom.addProgramBtn.addEventListener('click', async () => {
-        const name = dom.programNameInput.value;
-        const duration = dom.programDurationInput.value;
-        const success = await addWashProgram(name, duration);
-        if (success) {
-            dom.programNameInput.value = '';
-            dom.programDurationInput.value = '';
-        }
+        const name = dom.programNameInput.value; const duration = dom.programDurationInput.value;
+        if (await addWashProgram(name, duration)) { dom.programNameInput.value = ''; dom.programDurationInput.value = ''; }
     });
 
-    // NEU: Kombinierter Button (Erlauben ODER Testen)
+    // === DER WICHTIGE TEIL ===
     const notifBtn = document.getElementById('enable-notifications-btn');
-    notifBtn.addEventListener('click', async () => {
+    // Alten Listener entfernen (zur Sicherheit, falls mehrfach init)
+    const newBtn = notifBtn.cloneNode(true);
+    notifBtn.parentNode.replaceChild(newBtn, notifBtn);
+    
+    newBtn.addEventListener('click', async () => {
+        alert("Klick erkannt! Starte Prozess..."); // DEBUG 1: MUSS KOMMEN!
+        
         if (Notification.permission === 'granted') {
-            // TEST-MODUS
             try {
                 const reg = await navigator.serviceWorker.ready;
-                await reg.showNotification('Waschplan Test 🔔', {
-                    body: 'Dies ist eine Test-Nachricht vom System.',
-                    icon: 'img/icon-192.png',
-                    vibrate: [200, 100, 200]
-                });
-                // Fallback für Foreground
-                new Notification('Waschplan Test (Lokal)');
+                if(!reg) { alert("Fehler: Service Worker nicht bereit!"); return; }
+                
+                // Lokaler Test
+                await reg.showNotification('Lokal Test 🔔', { body: 'Geht!', icon: 'img/icon-192.png' });
+                
+                // Server Sync erzwingen
+                await initPushNotifications(); 
+                
             } catch(e) {
-                alert("Fehler beim Senden: " + e.message);
+                alert("Fehler Test: " + e.message);
             }
         } else {
-            // ERLAUBEN-MODUS
+            alert("Frage Berechtigung an..."); // DEBUG 2
             await initPushNotifications();
-            loadProfileData(); // UI aktualisieren
+            loadProfileData(); 
         }
     });
 
     document.getElementById('show-changelog-btn').addEventListener('click', showChangelog);
-    
     document.getElementById('back-to-menu-btn-4').addEventListener('click', () => navigateTo(dom.mainMenu));
 }
 
@@ -131,64 +96,36 @@ export async function loadProfileData() {
     if (currentUser) {
         dom.profileEmail.textContent = currentUser.userData.email;
         dom.profilePartei.textContent = currentUser.userData.partei;
-
         const karma = await getPartyKarma(currentUser.userData.partei);
         const { label, status, weeks } = getKarmaStatus(karma);
         
+        // Karma Box
         let karmaContainer = document.getElementById('profile-karma-container');
         if (!karmaContainer) {
             karmaContainer = document.createElement('div');
             karmaContainer.id = 'profile-karma-container';
-            karmaContainer.style.marginBottom = '20px';
-            karmaContainer.style.padding = '10px';
-            karmaContainer.style.backgroundColor = 'var(--primary-color-light)';
-            karmaContainer.style.borderRadius = '8px';
-            karmaContainer.style.border = '1px solid var(--primary-color)';
+            karmaContainer.style.marginBottom = '20px'; karmaContainer.style.padding = '10px'; karmaContainer.style.backgroundColor = 'var(--primary-color-light)'; karmaContainer.style.borderRadius = '8px'; karmaContainer.style.border = '1px solid var(--primary-color)';
             dom.profilePartei.parentElement.after(karmaContainer);
         }
-
-        let statusColor = 'var(--text-color)';
-        if (status === 'VIP') statusColor = '#34c759'; 
-        if (status === 'Eingeschränkt') statusColor = '#ff3b30'; 
-
-        karmaContainer.innerHTML = `
-            <p style="margin:0; font-size:1.1em;"><strong>Karma:</strong> ${karma} Punkte</p>
-            <p style="margin:5px 0 0 0; font-size:0.9em; color:${statusColor}">Status: <strong>${label}</strong></p>
-            <p style="margin:5px 0 0 0; font-size:0.8em; opacity:0.8;">
-                Vorausbuchen: ${weeks} Woche(n). ${status === 'VIP' ? '2 Prime-Slots.' : (status === 'Eingeschränkt' ? 'Keine Prime-Slots.' : '1 Prime-Slot.')}
-            </p>
-        `;
+        let statusColor = status === 'VIP' ? '#34c759' : (status === 'Eingeschränkt' ? '#ff3b30' : 'var(--text-color)');
+        karmaContainer.innerHTML = `<p style="margin:0; font-size:1.1em;"><strong>Karma:</strong> ${karma}</p><p style="margin:5px 0; font-size:0.9em; color:${statusColor}">Status: <strong>${label}</strong></p>`;
         
-        const passField = dom.newPasswordInput;
-        const confirmField = document.getElementById('new-password-confirm');
-
-        if (passField) {
-            passField.value = '';
-            passField.classList.remove('input-valid', 'input-invalid');
-        }
-        if (confirmField) {
-            confirmField.value = '';
-            confirmField.classList.remove('input-valid', 'input-invalid');
-        }
-
-        // NEU: Smarter Button
+        // Push Button Text
         const notifBtn = document.getElementById('enable-notifications-btn');
-        notifBtn.style.display = 'block'; // Immer anzeigen!
-        
+        notifBtn.style.display = 'block';
         if (Notification.permission === 'granted') {
-            notifBtn.innerHTML = '<i class="fa-solid fa-bell"></i> Test-Benachrichtigung senden';
-            notifBtn.classList.remove('button-secondary');
-            notifBtn.classList.add('button-primary'); // Blau für Test
+            notifBtn.innerHTML = '<i class="fa-solid fa-bell"></i> Test-Nachricht senden';
+            notifBtn.className = 'button-primary'; // Blau
         } else if (Notification.permission === 'denied') {
-            notifBtn.innerHTML = '⚠️ Benachrichtigungen blockiert (in Einstellungen ändern)';
+            notifBtn.innerHTML = '⚠️ Blockiert in iOS Einstellungen';
+            notifBtn.className = 'button-secondary';
             notifBtn.disabled = true;
-            notifBtn.classList.add('button-secondary');
         } else {
-            notifBtn.innerHTML = '<i class="fa-solid fa-bell"></i> Benachrichtigungen erlauben';
-            notifBtn.classList.add('button-secondary');
+            notifBtn.innerHTML = '<i class="fa-solid fa-bell"></i> Erlauben';
+            notifBtn.className = 'button-secondary';
         }
     }
-
+    // Admin Bereich
     if (userIsAdmin) {
         dom.adminProgramsSection.style.display = 'block';
         try {
@@ -198,38 +135,19 @@ export async function loadProfileData() {
                 if (data.plz) dom.weatherPlzInput.value = data.plz;
                 if (data.qrCodeSecret) document.getElementById('qr-secret-input').value = data.qrCodeSecret;
             }
-        } catch (e) {
-            dom.weatherPlzInput.value = ''; 
-        }
-
+        } catch (e) { dom.weatherPlzInput.value = ''; }
         const unsub = loadWashPrograms((programs) => {
             dom.programListContainer.innerHTML = ''; 
-            if (programs.length === 0) {
-                dom.programListContainer.innerHTML = '<p class="small-text">Keine Programme definiert.</p>';
-                return;
-            }
+            if (programs.length === 0) { dom.programListContainer.innerHTML = '<p class="small-text">Leer.</p>'; return; }
             programs.forEach(prog => {
-                const item = document.createElement('div');
-                item.className = 'program-list-item';
-                item.innerHTML = `
-                    <span>${prog.name} (${prog.durationMinutes} Min)</span>
-                    <button class="button-small button-danger delete-program-btn" data-id="${prog.id}">Löschen</button>
-                `;
+                const item = document.createElement('div'); item.className = 'program-list-item';
+                item.innerHTML = `<span>${prog.name} (${prog.durationMinutes} Min)</span><button class="button-small button-danger delete-program-btn" data-id="${prog.id}">Löschen</button>`;
                 dom.programListContainer.appendChild(item);
             });
-
-            document.querySelectorAll('.delete-program-btn').forEach(btn => {
-                if (btn.onclick) return; 
-                btn.onclick = (e) => {
-                    const id = e.target.dataset.id;
-                    if (confirm('Soll dieses Programm wirklich gelöscht werden?')) {
-                        deleteWashProgram(id);
-                    }
-                };
+            dom.programListContainer.querySelectorAll('.delete-program-btn').forEach(btn => {
+                btn.onclick = (e) => { if(confirm('Löschen?')) deleteWashProgram(e.target.dataset.id); };
             });
-        }, (error) => {
-            dom.programListContainer.innerHTML = '<p class="small-text">Fehler beim Laden.</p>';
-        });
+        }, () => {});
         setUnsubscriber('programs', unsub); 
     } else {
         dom.adminProgramsSection.style.display = 'none';

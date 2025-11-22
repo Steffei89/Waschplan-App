@@ -11,28 +11,33 @@ export async function initPushNotifications() {
         return;
     }
 
+    // SICHERHEITS-CHECK 1: Unterstützt der Browser überhaupt Notifications?
+    if (!('Notification' in window)) {
+        alert("⚠️ Dein iPhone unterstützt Push in diesem Modus nicht.\n\nLÖSUNG:\n1. Tippe unten auf 'Teilen'.\n2. Wähle 'Zum Home-Bildschirm'.\n3. Öffne die App über das neue Icon.");
+        return;
+    }
+
     try {
-        // DEBUG 1
-        // alert("Schritt 1: Frage Berechtigung...");
-        
+        // DEBUG: Permission Status vorher prüfen
+        // alert("Status: " + Notification.permission);
+
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') {
-            alert("Fehler: Berechtigung wurde verweigert (Status: " + permission + ")");
+            alert("Fehler: Berechtigung verweigert. Bitte in iOS Einstellungen -> Waschplan -> Mitteilungen aktivieren.");
             return;
         }
 
-        // DEBUG 2
-        // alert("Schritt 2: Berechtigung OK. Suche Service Worker...");
+        // SICHERHEITS-CHECK 2: Service Worker
+        if (!('serviceWorker' in navigator)) {
+            alert("Fehler: Service Worker nicht unterstützt.");
+            return;
+        }
 
         const registration = await navigator.serviceWorker.ready;
-        
         if (!registration) {
-            alert("Fehler: Kein Service Worker gefunden!");
+            alert("Fehler: Service Worker nicht bereit.");
             return;
         }
-
-        // DEBUG 3
-        // alert("Schritt 3: Hole Token von Firebase...");
 
         const currentToken = await getToken(messaging, { 
             vapidKey: VAPID_KEY, 
@@ -40,13 +45,11 @@ export async function initPushNotifications() {
         });
         
         if (currentToken) {
-            // DEBUG 4
-            // alert("Schritt 4: Token erhalten! Speichere in DB...");
-            console.log("FCM Token erhalten:", currentToken);
+            console.log("FCM Token:", currentToken);
             await saveTokenToDatabase(currentToken);
-            alert("ERFOLG! Token gespeichert. Jetzt sollte es klappen.");
+            alert("✅ ERFOLG! Dein iPhone ist registriert.\nJetzt App schließen und GitHub-Test starten.");
         } else {
-            alert("Fehler: Kein Token von Google erhalten.");
+            alert("Fehler: Kein Token erhalten.");
         }
 
         onMessage(messaging, (payload) => {
@@ -56,9 +59,8 @@ export async function initPushNotifications() {
         });
 
     } catch (err) {
-        // WICHTIG: Hier sehen wir den echten Fehler auf dem Handy
-        alert("CRASH FEHLER: " + err.message + " | " + err.name);
-        console.error('Fehler bei Push-Init:', err);
+        alert("CRASH: " + err.message);
+        console.error('Push Error:', err);
     }
 }
 
@@ -67,13 +69,12 @@ async function saveTokenToDatabase(token) {
     if (!currentUser) return;
 
     const userRef = doc(db, "users", currentUser.uid);
-    
     try {
         await updateDoc(userRef, {
             fcmTokens: arrayUnion(token),
             lastTokenUpdate: new Date().toISOString()
         });
     } catch(e) {
-        alert("DB Fehler beim Speichern: " + e.message);
+        console.error("DB Save Error", e);
     }
 }
