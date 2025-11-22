@@ -33,7 +33,8 @@ import {
     Timestamp,
     increment,
     serverTimestamp,
-    deleteField // <--- WICHTIG: Das hat gefehlt!
+    deleteField,
+    arrayUnion // <--- NEU
 } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 import { getMessaging, getToken, onMessage } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-messaging.js";
 
@@ -90,7 +91,8 @@ export {
     Timestamp,
     increment,
     serverTimestamp,
-    deleteField // <--- Auch hier muss es stehen!
+    deleteField,
+    arrayUnion // <--- NEU
 };
 
 export function getBookingsCollectionRef() {

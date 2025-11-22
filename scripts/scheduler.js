@@ -40,15 +40,28 @@ async function checkTimers() {
         .where('partei', '==', parteiName)
         .get();
 
-      const tokens = [];
+      let tokens = [];
+      
       userQuery.forEach(u => {
         const d = u.data();
-        if (d.fcmToken) tokens.push(d.fcmToken);
+        
+        // NEU: Wir schauen nach der Liste 'fcmTokens'
+        if (d.fcmTokens && Array.isArray(d.fcmTokens)) {
+            tokens = tokens.concat(d.fcmTokens);
+        } 
+        // Fallback für alte Daten: einzelner 'fcmToken'
+        else if (d.fcmToken) {
+            tokens.push(d.fcmToken);
+        }
       });
+
+      // Duplikate entfernen (zur Sicherheit)
+      tokens = [...new Set(tokens)];
 
       if (tokens.length > 0) {
         // Push senden
-        await messaging.sendEachForMulticast({
+        // Achtung: sendEachForMulticast erlaubt max 500 Tokens, das reicht hier locker
+        const response = await messaging.sendEachForMulticast({
           tokens: tokens,
           notification: {
             title: 'Wäsche fertig! 🧺',
@@ -59,6 +72,11 @@ async function checkTimers() {
           }
         });
         console.log(`-> Push an ${tokens.length} Geräte gesendet.`);
+        if (response.failureCount > 0) {
+            console.log("Einige Tokens waren ungültig, aber das ist okay.");
+        }
+      } else {
+          console.log("Keine Tokens für diese Partei gefunden.");
       }
 
       // Timer markieren als "erledigt"
