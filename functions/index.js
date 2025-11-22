@@ -22,7 +22,7 @@ exports.checkTimerDone = onSchedule("every 1 minutes", async (event) => {
     // 1. Suche Timer, die abgelaufen sind (endTime <= jetzt) UND noch nicht benachrichtigt wurden
     const query = db.collection('active_timers')
         .where('endTime', '<=', now)
-        .where('notified', '!=', true); // Damit wir nicht doppelt senden
+        .where('notified', '!=', true);
 
     const snapshot = await query.get();
 
@@ -34,44 +34,55 @@ exports.checkTimerDone = onSchedule("every 1 minutes", async (event) => {
 
     snapshot.forEach(doc => {
         const timerData = doc.data();
-        const parteiName = doc.id; // Die ID des Dokuments ist der Parteiname
+        const parteiName = doc.id;
+        const starterUid = timerData.startedBy; // <--- NEU: Die ID des Starters
 
-        // Wir verarbeiten diesen Timer
         const p = (async () => {
-            console.log(`Timer für ${parteiName} ist abgelaufen!`);
-
-            // 2. Alle User dieser Partei finden, die einen Push-Token haben
-            const userQuery = await db.collection('users')
-                .where('partei', '==', parteiName)
-                .get();
+            console.log(`Timer für ${parteiName} (User: ${starterUid || 'Alle'}) ist abgelaufen!`);
 
             let tokens = [];
-            userQuery.forEach(userDoc => {
-                const userData = userDoc.data();
-                if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
-                    // Neue Struktur: Array von Tokens
-                    tokens = tokens.concat(userData.fcmTokens);
-                } else if (userData.fcmToken) {
-                    // Alte Struktur: Einzelner Token (Fallback)
-                    tokens.push(userData.fcmToken);
+
+            // Logik: Wenn ein Starter bekannt ist, hole nur diesen User. Sonst alle der Partei.
+            if (starterUid) {
+                const userDoc = await db.collection('users').doc(starterUid).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
+                        tokens = tokens.concat(userData.fcmTokens);
+                    } else if (userData.fcmToken) {
+                        tokens.push(userData.fcmToken);
+                    }
                 }
-            });
+            } else {
+                // Fallback (alte Methode): Alle User der Partei
+                const userQuery = await db.collection('users')
+                    .where('partei', '==', parteiName)
+                    .get();
+                
+                userQuery.forEach(userDoc => {
+                    const userData = userDoc.data();
+                    if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
+                        tokens = tokens.concat(userData.fcmTokens);
+                    } else if (userData.fcmToken) {
+                        tokens.push(userData.fcmToken);
+                    }
+                });
+            }
 
             // Duplikate entfernen
             tokens = [...new Set(tokens)];
 
             if (tokens.length > 0) {
-                // 3. Nachricht senden
                 try {
                     const response = await messaging.sendEachForMulticast({
                         tokens: tokens,
                         notification: {
                             title: 'Wäsche fertig! 🧺',
-                            body: `Das Programm "${timerData.programName}" ist durch. Bitte auschecken!`
+                            body: `Dein Programm "${timerData.programName}" ist durch. Bitte auschecken!`
                         },
                         webpush: {
                             fcm_options: {
-                                link: 'https://waschplanapp.web.app' // Öffnet die App bei Klick
+                                link: 'https://waschplanapp.web.app'
                             }
                         }
                     });
@@ -80,10 +91,10 @@ exports.checkTimerDone = onSchedule("every 1 minutes", async (event) => {
                     console.error("Fehler beim Senden der Push-Nachricht:", err);
                 }
             } else {
-                console.log(`Keine Tokens für Partei ${parteiName} gefunden.`);
+                console.log(`Keine Tokens gefunden.`);
             }
 
-            // 4. Timer markieren, damit wir ihn nicht nochmal senden
+            // 4. Timer markieren
             await doc.ref.update({ notified: true });
         })();
         

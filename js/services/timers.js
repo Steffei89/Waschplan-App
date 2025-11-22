@@ -12,10 +12,10 @@ import {
     getActiveTimerDocRef
 } from '../firebase.js';
 import { showMessage } from '../ui.js';
+import { getState } from '../state.js'; // <--- NEU: Import für User-ID
 
-/**
- * Erstellt einen Live-Listener für die Waschprogramm-Vorlagen (Admin).
- */
+// ... (loadWashPrograms, addWashProgram, deleteWashProgram, listenToActiveTimer bleiben unverändert) ...
+
 export function loadWashPrograms(onData, onError) {
     const q = query(getWashProgramsCollectionRef(), orderBy("name"));
     return onSnapshot(q, (querySnapshot) => {
@@ -27,9 +27,6 @@ export function loadWashPrograms(onData, onError) {
     }, onError);
 }
 
-/**
- * Admin: Fügt ein neues Waschprogramm hinzu.
- */
 export async function addWashProgram(name, duration) {
     if (!name || !duration) {
         showMessage('profile-message', 'Name und Dauer sind erforderlich.', 'error');
@@ -54,9 +51,6 @@ export async function addWashProgram(name, duration) {
     }
 }
 
-/**
- * Admin: Löscht ein Waschprogramm.
- */
 export async function deleteWashProgram(docId) {
     try {
         await deleteDoc(getWashProgramDocRef(docId));
@@ -66,12 +60,8 @@ export async function deleteWashProgram(docId) {
     }
 }
 
-/**
- * Erstellt einen Live-Listener für den Timer der EIGENEN Partei.
- */
 export function listenToActiveTimer(partei, onData) {
     if (!partei) {
-        // Falls keine Partei da ist, können wir auch nichts hören
         onData(null);
         return () => {}; 
     }
@@ -92,9 +82,15 @@ export function listenToActiveTimer(partei, onData) {
  * Nutzer: Startet einen Timer für die eigene Partei.
  */
 export async function startWashTimer(partei, program) {
-    // WICHTIG: Sicherheitscheck, damit die App nicht abstürzt
     if (!partei) {
-        alert("Fehler: Deinem Benutzer ist keine 'Partei' zugeordnet. Bitte prüfe dein Profil oder die Admin-Konsole.");
+        alert("Fehler: Deinem Benutzer ist keine 'Partei' zugeordnet.");
+        return;
+    }
+
+    // NEU: Wir holen den aktuellen User
+    const { currentUser } = getState();
+    if (!currentUser) {
+        alert("Fehler: Nicht eingeloggt.");
         return;
     }
 
@@ -107,7 +103,8 @@ export async function startWashTimer(partei, program) {
             endTime: endTime,
             startTime: now, 
             durationMinutes: program.durationMinutes,
-            notified: false // WICHTIG für Push-Nachrichten!
+            startedBy: currentUser.uid, // <--- WICHTIG: Wir speichern WER es war
+            notified: false 
         });
     } catch (e) {
         console.error("Fehler beim Starten des Timers:", e);
@@ -115,9 +112,6 @@ export async function startWashTimer(partei, program) {
     }
 }
 
-/**
- * Nutzer: Stoppt (löscht) den Timer für die eigene Partei.
- */
 export async function stopWashTimer(partei) {
     if (!partei) return;
     try {
