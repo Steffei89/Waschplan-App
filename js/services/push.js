@@ -2,21 +2,37 @@ import { messaging, getToken, onMessage, doc, updateDoc, db, arrayUnion } from '
 import { getState } from '../state.js';
 import { showMessage } from '../ui.js';
 
-// DEIN KEY
 const VAPID_KEY = "BDYYVt3HarS6Ex9rnRVEalXjYvPbKZLCxFppym90rlnugDh4CS4lpk1ENW_b3Pr9YecmVrDJTzpuQVSQq42PzFs"; 
 
 export async function initPushNotifications() {
     const { currentUser } = getState();
-    if (!currentUser) return;
+    if (!currentUser) {
+        alert("Fehler: Nicht eingeloggt.");
+        return;
+    }
 
     try {
+        // DEBUG 1
+        // alert("Schritt 1: Frage Berechtigung...");
+        
         const permission = await Notification.requestPermission();
         if (permission !== 'granted') {
-            console.warn("Push-Berechtigung verweigert.");
+            alert("Fehler: Berechtigung wurde verweigert (Status: " + permission + ")");
             return;
         }
 
+        // DEBUG 2
+        // alert("Schritt 2: Berechtigung OK. Suche Service Worker...");
+
         const registration = await navigator.serviceWorker.ready;
+        
+        if (!registration) {
+            alert("Fehler: Kein Service Worker gefunden!");
+            return;
+        }
+
+        // DEBUG 3
+        // alert("Schritt 3: Hole Token von Firebase...");
 
         const currentToken = await getToken(messaging, { 
             vapidKey: VAPID_KEY, 
@@ -24,20 +40,24 @@ export async function initPushNotifications() {
         });
         
         if (currentToken) {
+            // DEBUG 4
+            // alert("Schritt 4: Token erhalten! Speichere in DB...");
             console.log("FCM Token erhalten:", currentToken);
             await saveTokenToDatabase(currentToken);
+            alert("ERFOLG! Token gespeichert. Jetzt sollte es klappen.");
         } else {
-            console.log('Kein Registration Token verfügbar.');
+            alert("Fehler: Kein Token von Google erhalten.");
         }
 
         onMessage(messaging, (payload) => {
-            console.log('Nachricht im Vordergrund:', payload);
             const title = payload.notification.title;
             const body = payload.notification.body;
             showMessage('main-menu-message', `🔔 ${title}: ${body}`, 'success', 8000);
         });
 
     } catch (err) {
+        // WICHTIG: Hier sehen wir den echten Fehler auf dem Handy
+        alert("CRASH FEHLER: " + err.message + " | " + err.name);
         console.error('Fehler bei Push-Init:', err);
     }
 }
@@ -48,10 +68,12 @@ async function saveTokenToDatabase(token) {
 
     const userRef = doc(db, "users", currentUser.uid);
     
-    // WICHTIG: Wir nutzen arrayUnion, um den Token zur Liste hinzuzufügen,
-    // ohne die Tokens anderer Geräte zu löschen.
-    await updateDoc(userRef, {
-        fcmTokens: arrayUnion(token),
-        lastTokenUpdate: new Date().toISOString()
-    });
+    try {
+        await updateDoc(userRef, {
+            fcmTokens: arrayUnion(token),
+            lastTokenUpdate: new Date().toISOString()
+        });
+    } catch(e) {
+        alert("DB Fehler beim Speichern: " + e.message);
+    }
 }
