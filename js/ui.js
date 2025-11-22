@@ -39,13 +39,35 @@ export function hideConfirmation() {
     dom.confirmationModal.style.display = 'none';
 }
 
+// ===== WICHTIG: Nur Seiten-Listener stoppen, Globale (Timer) behalten! =====
+export function unsubscribeForNavigation() {
+    const unsubscribers = getUnsubscribers();
+    
+    // Wir stoppen NUR Listener, die spezifisch für eine Unterseite sind.
+    // Die 'quickView' (Meine Buchungen) und 'timer' müssen weiterlaufen!
+    
+    if (unsubscribers.overview) { 
+        unsubscribers.overview(); 
+        setUnsubscriber('overview', null); 
+    }
+    if (unsubscribers.calendar) { 
+        unsubscribers.calendar(); 
+        setUnsubscriber('calendar', null); 
+    }
+}
+
+// Wird nur beim LOGOUT aufgerufen -> Killt alles
 export function unsubscribeAll() {
     const unsubscribers = getUnsubscribers();
     Object.values(unsubscribers).forEach(unsub => { if (unsub) unsub(); });
-    setUnsubscriber('overview', null); setUnsubscriber('calendar', null);
-    setUnsubscriber('quickView', null); setUnsubscriber('requests', null);
-    setUnsubscriber('outgoingRequests', null); setUnsubscriber('outgoingRequestsSuccess', null);
-    setUnsubscriber('programs', null); setUnsubscriber('timer', null);
+    setUnsubscriber('overview', null); 
+    setUnsubscriber('calendar', null);
+    setUnsubscriber('quickView', null); 
+    setUnsubscriber('requests', null);
+    setUnsubscriber('outgoingRequests', null); 
+    setUnsubscriber('outgoingRequestsSuccess', null);
+    setUnsubscriber('programs', null); 
+    setUnsubscriber('timer', null);
 }
 
 export const allSections = [

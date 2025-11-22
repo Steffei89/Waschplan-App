@@ -59,13 +59,14 @@ export async function loadAdminUserData() {
     setupTestLab();
 }
 
-// ==================== TEST LABOR LOGIK ====================
+// ==================== TEST LABOR LOGIK (FINAL & GEPRÜFT) ====================
 function setupTestLab() {
     const createBookingBtn = document.getElementById('debug-create-booking-btn');
     const forceCheckinBtn = document.getElementById('debug-force-checkin-btn');
     const resetStatusBtn = document.getElementById('debug-reset-status-btn');
     const killTimerBtn = document.getElementById('debug-kill-timer-btn');
 
+    // .onclick verhindert doppelte Ausführung, falls Funktion mehrfach aufgerufen wird
     if (createBookingBtn) createBookingBtn.onclick = debugCreateBooking;
     if (forceCheckinBtn) forceCheckinBtn.onclick = debugForceCheckin;
     if (resetStatusBtn) resetStatusBtn.onclick = debugResetStatus;
@@ -77,32 +78,51 @@ async function getMyTodaysBookingDoc() {
     if(!currentUser) return null;
     
     const todayStr = formatDate(new Date());
-    // Wir suchen nach Buchungen von heute, die noch nicht freigegeben sind
-    const q = query(
-        collection(db, "bookings"),
-        where("date", "==", todayStr),
-        where("partei", "==", currentUser.userData.partei),
-        where("isReleased", "==", false) 
-    );
-    const snap = await getDocs(q);
-    if(snap.empty) return null;
-    return snap.docs[0]; 
+    
+    try {
+        // Wir nutzen simple Gleichheits-Filter, das benötigt KEINEN komplexen Index
+        const q = query(
+            collection(db, "bookings"),
+            where("date", "==", todayStr),
+            where("partei", "==", currentUser.userData.partei)
+        );
+        
+        const snap = await getDocs(q);
+        if(snap.empty) return null;
+
+        // Lokale Suche nach der aktiven Buchung (nicht released)
+        const activeBooking = snap.docs.find(d => d.data().isReleased === false);
+        return activeBooking || null;
+
+    } catch (e) {
+        console.error("Fehler beim Suchen der Buchung:", e);
+        showMessage(MESSAGE_ID, "DB Fehler (Suche): " + e.message, "error");
+        return null;
+    }
 }
 
 async function debugCreateBooking() {
     const { currentUser } = getState();
-    if(!currentUser) return;
-    
-    const todayStr = formatDate(new Date());
-    
-    // Prüfen ob schon eine aktive Buchung existiert
-    const existing = await getMyTodaysBookingDoc();
-    if(existing) {
-        showMessage(MESSAGE_ID, "Du hast heute schon eine aktive Buchung! Bitte erst resetten.", "error");
+    if(!currentUser) {
+        showMessage(MESSAGE_ID, "Nicht eingeloggt!", "error");
         return;
     }
     
+    if (!currentUser.userData.partei) {
+        showMessage(MESSAGE_ID, "Fehler: Dein Admin-User hat keine 'Partei' im Profil.", "error");
+        return;
+    }
+    
+    const todayStr = formatDate(new Date());
+    
     try {
+        // Prüfen ob schon eine aktive Buchung existiert
+        const existing = await getMyTodaysBookingDoc();
+        if(existing) {
+            showMessage(MESSAGE_ID, "Du hast heute schon eine aktive Buchung! Bitte erst resetten.", "error");
+            return;
+        }
+    
         await addDoc(collection(db, "bookings"), {
             date: todayStr,
             // TRICK: Wir buchen einen "Ganztages-Slot", damit der Auto-Checkout nicht greift!
@@ -117,59 +137,84 @@ async function debugCreateBooking() {
         });
         showMessage(MESSAGE_ID, "Test-Buchung (Ganztags) erstellt! Gehe ins Hauptmenü.", "success");
     } catch(e) {
-        showMessage(MESSAGE_ID, e.message, "error");
+        console.error(e);
+        showMessage(MESSAGE_ID, "Fehler beim Erstellen: " + e.message, "error");
     }
 }
 
 async function debugForceCheckin() {
-    const docSnap = await getMyTodaysBookingDoc();
-    if(!docSnap) {
-        showMessage(MESSAGE_ID, "Keine aktive Buchung für heute gefunden. Erst erstellen!", "error");
-        return;
-    }
     try {
+        const docSnap = await getMyTodaysBookingDoc();
+        if(!docSnap) {
+            showMessage(MESSAGE_ID, "Keine aktive Buchung für heute gefunden. Erst erstellen!", "error");
+            return;
+        }
+        // Nur Check-in Zeit setzen, das triggert den Status "Eingecheckt"
         await updateDoc(docSnap.ref, {
             checkInTime: new Date().toISOString()
         });
         showMessage(MESSAGE_ID, "Erzwungener Check-in erfolgreich!", "success");
-    } catch(e) { showMessage(MESSAGE_ID, e.message, "error"); }
+    } catch(e) { 
+        console.error(e);
+        showMessage(MESSAGE_ID, "Fehler Check-in: " + e.message, "error"); 
+    }
 }
 
 async function debugResetStatus() {
-    // Wir suchen ALLE Buchungen von heute (auch die releasten), um aufzuräumen
     const { currentUser } = getState();
-    const todayStr = formatDate(new Date());
-    const q = query(collection(db, "bookings"), where("date", "==", todayStr), where("partei", "==", currentUser.userData.partei));
-    const snap = await getDocs(q);
-
-    if(snap.empty) {
-        showMessage(MESSAGE_ID, "Nichts zum Zurücksetzen da.", "error");
-        return;
-    }
+    if (!currentUser) return;
 
     try {
+        const todayStr = formatDate(new Date());
+        // Wir suchen ALLE Buchungen von heute (auch die releasten), um aufzuräumen
+        const q = query(
+            collection(db, "bookings"), 
+            where("date", "==", todayStr), 
+            where("partei", "==", currentUser.userData.partei)
+        );
+        const snap = await getDocs(q);
+
+        let deletedCount = 0;
         const batch = writeBatch(db);
-        snap.forEach(d => {
-             // Wir löschen die Test-Buchungen einfach komplett, das ist sauberer für Tests
-             batch.delete(d.ref);
-        });
-        await batch.commit();
+        
+        if(!snap.empty) {
+            snap.forEach(d => {
+                 batch.delete(d.ref);
+                 deletedCount++;
+            });
+            await batch.commit();
+        }
 
         // Auch Timer löschen
         await debugKillTimer(true); 
         
-        showMessage(MESSAGE_ID, "Alles bereinigt (Buchung gelöscht).", "success");
-    } catch(e) { showMessage(MESSAGE_ID, e.message, "error"); }
+        if (deletedCount > 0) {
+            showMessage(MESSAGE_ID, "Alles bereinigt (Buchung & Timer gelöscht).", "success");
+        } else {
+            // Wenn nur Timer gelöscht wurde oder gar nichts da war
+            showMessage(MESSAGE_ID, "Reset durchgeführt (Timer geprüft).", "success");
+        }
+    } catch(e) { 
+        console.error(e);
+        showMessage(MESSAGE_ID, "Reset Fehler: " + e.message, "error"); 
+    }
 }
 
 async function debugKillTimer(silent = false) {
     const { currentUser } = getState();
     if(!currentUser) return;
+    
+    if (!currentUser.userData.partei) {
+        if(!silent) showMessage(MESSAGE_ID, "Keine Partei zugeordnet.", "error");
+        return;
+    }
+
     try {
         await deleteDoc(doc(db, "active_timers", currentUser.userData.partei));
         if(!silent) showMessage(MESSAGE_ID, "Aktiver Timer gelöscht.", "success");
     } catch(e) {
-        if(!silent) showMessage(MESSAGE_ID, e.message, "error");
+        // Fehler ignorieren wenn Dokument nicht existiert, ist okay beim Reset
+        if(!silent) showMessage(MESSAGE_ID, "Timer Kill Fehler: " + e.message, "error");
     }
 }
 // ==========================================================

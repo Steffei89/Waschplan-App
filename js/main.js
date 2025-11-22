@@ -15,7 +15,7 @@ import * as dom from './dom.js';
 import { getState, setCurrentUser, setUnsubscriber, setSelectedCalendarDate, getIsRegistering } from './state.js';
 import { getFormattedDate, today, tomorrow, createAndDownloadIcsFile } from './utils.js';
 import { 
-    showMessage, navigateTo, updateUserInfo, setTheme, unsubscribeAll, 
+    showMessage, navigateTo, updateUserInfo, setTheme, unsubscribeAll, unsubscribeForNavigation,
     hideConfirmation, updateSlotDropdownUI, showTimerDoneNotification,
     checkNotificationPermission, showChangelog
 } from './ui.js';
@@ -45,7 +45,6 @@ let currentTimerData = null;
 let activeTimerInterval = null; 
 let karmaUnsubscribe = null; 
 let myCurrentBooking = null;
-// NEU: Intervall für Auto-Checkout
 let autoCheckoutInterval = null;
 
 // --- AUTH FLOW ---
@@ -77,7 +76,7 @@ onAuthStateChanged(auth, async (user) => {
                 
                 startSession();
                 
-                // NEU: Sofort prüfen UND Intervall starten (jede Minute)
+                // Auto-Checkout Check
                 checkAndAutoCheckoutOldBookings();
                 if (autoCheckoutInterval) clearInterval(autoCheckoutInterval);
                 autoCheckoutInterval = setInterval(checkAndAutoCheckoutOldBookings, 60000);
@@ -99,12 +98,13 @@ onAuthStateChanged(auth, async (user) => {
                 dom.weatherWidget.style.display = 'flex'; 
                 navigateTo(dom.mainMenu);
                 
-                handleLoadNextBookings();
+                // START: Globale Listener (bleiben aktiv!)
+                handleLoadNextBookings(); 
                 handleLoadIncomingRequests();
                 handleLoadOutgoingRequests();
                 handleLoadOutgoingSuccess();
                 handleLoadPrograms();
-                handleListenToTimer();
+                handleListenToTimer(); 
                 
                 checkAppVersion();
 
@@ -118,10 +118,10 @@ onAuthStateChanged(auth, async (user) => {
             }
         }
     } else {
+        // LOGOUT: Hier killen wir ALLES
         unsubscribeAll();
         if(karmaUnsubscribe) karmaUnsubscribe();
         
-        // NEU: Intervall stoppen beim Logout
         if (autoCheckoutInterval) clearInterval(autoCheckoutInterval);
         
         setCurrentUser(null);
@@ -184,8 +184,6 @@ function handleLoadNextBookings() {
             dom.myBookingsList.innerHTML = '';
             const todayStr = getFormattedDate(new Date());
             
-            // Wir suchen nach einer aktiven Buchung für HEUTE
-            // Wichtig: Wir zeigen sie nur an, wenn sie noch NICHT freigegeben (released) ist.
             const myActive = bookings.find(b => 
                 b.partei === currentUser.userData.partei && 
                 b.date === todayStr && 
@@ -193,7 +191,7 @@ function handleLoadNextBookings() {
             );
             
             myCurrentBooking = myActive || null;
-            renderTimerUI();
+            renderTimerUI(); // Sofortiges UI Update bei Änderungen
 
             if (bookings.length === 0) {
                 dom.myBookingsList.innerHTML = `<p class="small-text">Keine kommenden Buchungen gefunden.</p>`;
@@ -260,7 +258,6 @@ function handleLoadNextBookings() {
     setUnsubscriber('quickView', unsub);
 }
 
-// ... (Restliche Load-Funktionen unverändert) ...
 function handleLoadIncomingRequests() {
     dom.incomingRequestsContainer.innerHTML = '<p class="small-text">Lade Tauschanfragen...</p>';
     dom.incomingRequestsContainer.style.display = 'none';
@@ -685,6 +682,7 @@ document.getElementById('refresh-app-btn').addEventListener('click', () => {
 function setupMainMenuListeners() {
     document.getElementById('book-btn').addEventListener('click', () => {
         trackMenuClick('btn_book');
+        unsubscribeForNavigation(); // <--- NEU: Globale Listener behalten
         dom.bookingDateInput.value = getFormattedDate(tomorrow);
         dom.dateValidationMessage.textContent = '';
         dom.bookingSlotSelect.value = '';
@@ -693,14 +691,14 @@ function setupMainMenuListeners() {
     });
     document.getElementById('overview-btn').addEventListener('click', () => {
         trackMenuClick('btn_week');
-        unsubscribeAll();
+        unsubscribeForNavigation(); // <--- NEU
         setupWeekDropdown();
         loadBookingsForWeek(dom.kwSelect.value, setUnsubscriber);
         navigateTo(dom.overviewSection);
     });
     document.getElementById('calendar-btn').addEventListener('click', () => {
         trackMenuClick('btn_calendar');
-        unsubscribeAll();
+        unsubscribeForNavigation(); // <--- NEU
         dom.calendarDayActions.style.display = 'none'; 
         setSelectedCalendarDate(null);
         const now = new Date();
@@ -709,13 +707,13 @@ function setupMainMenuListeners() {
     });
     
     document.getElementById('admin-btn').addEventListener('click', () => {
-        unsubscribeAll();
+        unsubscribeForNavigation(); // <--- NEU: Damit bleibt Timer aktiv!
         loadAdminUserData(); 
         navigateTo(dom.adminSection);
     });
     
     document.getElementById('profile-btn').addEventListener('click', () => {
-        unsubscribeAll();
+        unsubscribeForNavigation(); // <--- NEU
         loadProfileData(); 
         navigateTo(dom.profileSection);
     });
@@ -724,7 +722,7 @@ function setupMainMenuListeners() {
     if (minigameBtn) {
         minigameBtn.addEventListener('click', () => {
             trackMenuClick('btn_minigame');
-            unsubscribeAll(); 
+            unsubscribeForNavigation(); // <--- NEU
             initMinigame();
             navigateTo(dom.minigameSection);
         });

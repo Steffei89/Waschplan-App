@@ -2,6 +2,19 @@
 
 Hier werden alle wichtigen Änderungen an der Waschplan-App festgehalten.
 
+## [2.8.1] - 2025-11-23
+
+### 🐛 Bugfixes & Stabilität
+Dieses Update behebt wichtige Fehler in der Navigation und im Admin-Bereich.
+
+*** Live-Timer & Navigation:** Ein Fehler wurde behoben, der dazu führte, dass der Live-Timer und die Anzeige der aktuellen Buchung verschwanden, wenn man das Menü wechselte (z.B. ins Profil oder zum Admin-Bereich). Diese bleiben nun dauerhaft sichtbar.
+
+*** Admin Test-Labor:** Die Funktionen "Test-Buchung erstellen" und "Check-in erzwingen" wurden repariert. Sie fangen nun Fehler ab (z.B. fehlende Datenbank-Indexe) und zeigen Warnmeldungen an, statt die App abstürzen zu lassen.
+
+*** Push-Nachrichten:** Die Hintergrund-Verarbeitung für abgelaufene Timer wurde aktiviert. Ein Klick auf die Benachrichtigung öffnet oder fokussiert die App nun zuverlässig.
+
+*** Datenbank-Sicherheit:** Ein Fehler in den Sicherheitsregeln (doppelte Einträge für Minigame-Scores), der das Hochladen der Regeln blockierte, wurde behoben.
+
 ## [2.8.0] - 2025-11-23
 
 ### 🚀 Große Funktions-Erweiterung: "Smart Wash"
