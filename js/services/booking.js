@@ -1,6 +1,6 @@
 import { 
     db, query, where, getDocs, addDoc, deleteDoc, doc, orderBy, limit,
-    onSnapshot, getBookingsCollectionRef, updateDoc, Timestamp
+    onSnapshot, getBookingsCollectionRef, updateDoc
 } from '../firebase.js';
 import { getState } from '../state.js';
 import { showMessage } from '../ui.js';
@@ -10,7 +10,6 @@ import { checkBookingPermission, updateKarma } from './karma.js';
 import { BONUS_CANCEL_EARLY, PENALTY_CANCEL_LATE, COST_SLOT_NORMAL, COST_SLOT_PRIME } from '../config.js';
 import { getSystemStatus } from './maintenance.js';
 
-// ... (checkDuplicateBooking und checkSlotAvailability bleiben unverändert) ...
 export async function checkDuplicateBooking(selectedDate, partei) {
     const q = query(
         getBookingsCollectionRef(),
@@ -58,7 +57,6 @@ export async function checkSlotAvailability(selectedDate) {
 
         if (availability[booking.slot]) {
             if (booking.partei === myPartei) {
-                // NEU: Status anzeigen
                 let statusExtra = "";
                 if (booking.checkInTime && !booking.checkOutTime) statusExtra = " (Eingecheckt ▶️)";
                 
@@ -79,7 +77,6 @@ export async function checkSlotAvailability(selectedDate) {
     return availability;
 }
 
-// ... (performBooking und performDeletion bleiben unverändert) ...
 export async function performBooking(date, slot, messageElementId) { 
     if (!date || !slot) {
         showMessage(messageElementId, "Datum und Slot müssen ausgewählt werden!", 'error');
@@ -150,8 +147,8 @@ export async function performBooking(date, slot, messageElementId) {
             userId: currentUserId, 
             bookedAt: new Date().toISOString(),
             isSwap: false,
-            checkInTime: null, // NEU
-            checkOutTime: null // NEU
+            checkInTime: null,
+            checkOutTime: null
         });
 
         if (!userIsAdmin && cost !== 0) {
@@ -237,7 +234,6 @@ export async function performDeletion(date, slot, messageElementId) {
     }
 }
 
-// NEU: Check-In (QR Scan Erfolg)
 export async function performCheckIn(bookingId, messageElementId) {
     const { currentUser } = getState();
     if (!currentUser) return;
@@ -255,7 +251,6 @@ export async function performCheckIn(bookingId, messageElementId) {
     }
 }
 
-// NEU: Check-Out (ersetzt releaseSlotEarly Logik teilweise, bzw. nutzt sie)
 export async function performCheckOut(bookingId, messageElementId) {
     const { currentUser } = getState();
     if (!currentUser) return;
@@ -263,14 +258,12 @@ export async function performCheckOut(bookingId, messageElementId) {
     try {
         const bookingRef = doc(getBookingsCollectionRef(), bookingId);
         
-        // Wir setzen checkOutTime UND isReleased (damit Slot frei wird)
         await updateDoc(bookingRef, {
             isReleased: true,
             releasedAt: new Date().toISOString(),
             checkOutTime: new Date().toISOString()
         });
 
-        // BONUS GEBEN (Fairness)
         await updateKarma(currentUser.userData.partei, 5, "Früher fertig Bonus");
         showMessage(messageElementId, "Check-out erfolgreich! Slot freigegeben (+5 Karma).", 'success');
         return true;
@@ -281,21 +274,15 @@ export async function performCheckOut(bookingId, messageElementId) {
     }
 }
 
-// Wird für Kompatibilität noch behalten, leitet aber an performCheckOut weiter
 export async function releaseSlotEarly(bookingId, messageElementId) {
     return performCheckOut(bookingId, messageElementId);
 }
 
-// NEU: Automatische Bereinigung alter Slots (Auto-Checkout)
+// NEU & KORRIGIERT: Automatische Bereinigung alter Slots
 export async function checkAndAutoCheckoutOldBookings() {
     const { currentUser } = getState();
     if (!currentUser) return;
 
-    // Wir suchen Buchungen meiner Partei, die vergangen sind, aber kein checkOutTime haben
-    // Da wir in Firestore schlecht "Datum < heute" UND "checkOutTime == null" gleichzeitig filtern können (Index-Problem),
-    // laden wir die letzten Buchungen und filtern im Code.
-    
-    // Strategie: Lade letzte 10 Buchungen meiner Partei
     const q = query(
         getBookingsCollectionRef(),
         where("partei", "==", currentUser.userData.partei),
@@ -312,33 +299,29 @@ export async function checkAndAutoCheckoutOldBookings() {
         snapshot.forEach(async (docSnap) => {
             const data = docSnap.data();
             
-            // Wenn bereits ausgecheckt, ignorieren
             if (data.checkOutTime || data.isReleased) return;
 
-            // Endzeit des Slots ermitteln
-            // Format: "2025-11-22", Slot: "13:00-19:00"
-            const endTimeStr = data.slot.split('-')[1]; // "19:00"
+            const endTimeStr = data.slot.split('-')[1]; 
             const endHour = parseInt(endTimeStr.split(':')[0]);
             
             let isExpired = false;
             if (data.date < todayStr) {
-                isExpired = true; // War gestern oder früher
+                isExpired = true; 
             } else if (data.date === todayStr) {
                 if (currentHour >= endHour) {
-                    isExpired = true; // Slot ist heute vorbei
+                    isExpired = true; 
                 }
             }
 
             if (isExpired) {
-                // AUTO CHECKOUT DURCHFÜHREN
-                console.log(`Auto-Checkout für Buchung ${docSnap.id} (${data.date})`);
-                
-                // Wir setzen die CheckOutTime auf das theoretische Ende des Slots
+                console.log(`Auto-Checkout für Buchung ${docSnap.id}`);
                 const closingTime = new Date(data.date + "T" + endTimeStr).toISOString();
                 
+                // WICHTIG: Wir setzen isReleased auf true, damit das UI sich aktualisiert!
                 await updateDoc(docSnap.ref, {
                     checkOutTime: closingTime,
-                    autoCheckedOut: true // Flag für Statistik (User hat es vergessen)
+                    isReleased: true, // Damit gilt der Slot als "vorbei"
+                    autoCheckedOut: true 
                 });
             }
         });
