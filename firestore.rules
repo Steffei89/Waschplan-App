@@ -1,0 +1,127 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================
+    // NEU: REGEL FÜR DAS KARMA-SYSTEM (PARTIES)
+    // ============================================================
+    match /parties/{parteiName} {
+      // Jeder eingeloggte Nutzer darf die Punkte sehen
+      allow read: if request.auth != null;
+      
+      // Schreiben darf man nur, wenn...
+      allow write: if request.auth != null && (
+        // ...man zur entsprechenden Partei gehört (für Auto-Update & Buchung)
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.partei == parteiName ||
+        // ...ODER wenn man Admin ist (für manuelle Korrekturen)
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true
+      );
+    }
+    // ============================================================
+
+
+    // REGEL FÜR BENUTZERPROFILE
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == userId;
+
+      allow delete: if request.auth != null && (
+        (request.auth.uid == userId) || 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true)
+      );
+      
+      allow update: if request.auth != null && (
+        // Admin darf alles
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true)
+        ||
+        // Nutzer darf eigenes Profil ändern (aber keine sensiblen Felder)
+        (
+          (request.auth.uid == userId) &&
+          request.resource.data.isAdmin == resource.data.isAdmin &&
+          request.resource.data.partei == resource.data.partei &&
+          request.resource.data.email == resource.data.email &&
+          request.resource.data.uid == resource.data.uid
+        )
+      );
+    }
+
+    // REGEL FÜR BUCHUNGEN
+    match /bookings/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // REGEL FÜR TAUSCHANFRAGEN
+    match /swap_requests/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // REGEL FÜR APP-EINSTELLUNGEN
+    match /app_settings/config {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+                        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    
+    // REGEL FÜR SPERRUNGEN
+    match /blocked_slots/{blockId} {
+        allow read: if request.auth != null;
+        allow create, delete: if request.auth != null &&
+                              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // REGELN FÜR TIMER (Programme & Aktive Timer)
+    match /wash_programs/{programId} {
+      allow write: if request.auth != null && 
+                        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+      allow read: if request.auth != null;
+    }
+
+    match /active_timers/{partei} {
+      allow read, write: if request.auth != null &&
+                           get(/databases/$(database)/documents/users/$(request.auth.uid)).data.partei == partei;
+    }
+    
+    // REGEL FÜR NUTZUNGS-STATISTIK
+    match /usage_stats/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // 1. REGEL FÜR APP-ANALYTICS (Sitzungen)
+    match /analytics_sessions/{docId} {
+      allow create: if request.auth != null; // Jeder User darf Session starten
+      allow update: if request.auth != null; // Jeder darf seine Session updaten
+      allow read: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // 2. REGEL FÜR MINIGAME STATISTIKEN (Jedes Spiel)
+    match /analytics_games/{docId} {
+      allow create: if request.auth != null; // Jeder darf Spielstand speichern
+      allow read: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+    // REGEL FÜR MINIGAME
+    match /minigame_scores/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // REGEL FÜR MINIGAME SCORES & HISTORIE
+    match /minigame_scores/{docId} {
+      // Erlaubt Zugriff auf den Highscore der Partei
+      allow read, write: if request.auth != null;
+
+      // WICHTIG: Erlaubt Zugriff auf die Unter-Sammlung "history"
+      // Ohne das hier wird der Spielverlauf blockiert!
+      match /history/{historyId} {
+         allow read, write: if request.auth != null;
+      }
+    }
+    
+    // Erlaube angemeldeten Nutzern, Tickets zu erstellen
+    match /maintenance_tickets/{ticketId} {
+      allow create: if request.auth != null;
+      // Nur Admins dürfen lesen oder bearbeiten (Status ändern)
+      allow read, update, delete: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+
+  }
+}

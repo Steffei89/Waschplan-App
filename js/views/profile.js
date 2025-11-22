@@ -1,0 +1,219 @@
+import * as dom from '../dom.js';
+import { getState, setUnsubscriber } from '../state.js';
+import { handleChangePassword } from '../services/auth.js';
+import { db, getDoc, setDoc, doc } from '../firebase.js';
+import { showMessage, navigateTo, showChangelog, checkNotificationPermission } from '../ui.js';
+import { loadWashPrograms, addWashProgram, deleteWashProgram } from '../services/timers.js';
+import { getKarmaStatus, getPartyKarma } from '../services/karma.js';
+import { KARMA_START } from '../config.js';
+// NEU: Import der echten Push-Funktion
+import { initPushNotifications } from '../services/push.js';
+
+function getSettingsDocRef() {
+    return doc(db, 'app_settings', 'config');
+}
+
+function checkProfilePasswordMatch() {
+    const passField = dom.newPasswordInput; 
+    const confirmField = document.getElementById('new-password-confirm');
+    if (!passField || !confirmField) return;
+    const passValue = passField.value;
+    const confirmValue = confirmField.value;
+    if (passValue === "" && confirmValue === "") {
+        passField.classList.remove('input-valid', 'input-invalid');
+        confirmField.classList.remove('input-valid', 'input-invalid');
+        return;
+    }
+    if (passValue === confirmValue) {
+        passField.classList.add('input-valid');
+        passField.classList.remove('input-invalid');
+        confirmField.classList.add('input-valid');
+        confirmField.classList.remove('input-valid');
+    } else {
+        passField.classList.add('input-invalid');
+        passField.classList.remove('input-valid');
+        confirmField.classList.add('input-invalid');
+        confirmField.classList.remove('input-valid');
+    }
+}
+
+export function initProfileView() {
+    document.getElementById('change-password-btn').addEventListener('click', handleChangePassword);
+    
+    const passField = dom.newPasswordInput;
+    const confirmField = document.getElementById('new-password-confirm');
+    if (passField) passField.addEventListener('input', checkProfilePasswordMatch);
+    if (confirmField) confirmField.addEventListener('input', checkProfilePasswordMatch);
+
+    // Wetter speichern
+    document.getElementById('save-weather-plz-btn').addEventListener('click', async () => {
+        const newPlz = dom.weatherPlzInput.value.trim();
+        if (!newPlz || newPlz.length < 4 || !/^\d+$/.test(newPlz)) {
+            showMessage('profile-message', 'Ungültige PLZ.', 'error');
+            return;
+        }
+        try {
+            await setDoc(getSettingsDocRef(), { plz: newPlz }, { merge: true }); 
+            showMessage('profile-message', 'Wetter-Standort gespeichert!', 'success');
+        } catch (e) {
+            showMessage('profile-message', `Fehler: ${e.message}`, 'error');
+        }
+    });
+
+    // QR Code Generator
+    const qrBtn = document.getElementById('generate-qr-btn');
+    if (qrBtn) {
+        qrBtn.addEventListener('click', async () => {
+            const secret = document.getElementById('qr-secret-input').value.trim() || 'WASCH-START';
+            const img = document.getElementById('qr-image');
+            const display = document.getElementById('qr-code-display');
+            const textDisplay = document.getElementById('qr-code-text-display');
+            
+            try {
+                await setDoc(getSettingsDocRef(), { qrCodeSecret: secret }, { merge: true });
+                const apiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(secret)}`;
+                img.src = apiUrl;
+                textDisplay.textContent = secret;
+                display.style.display = 'block';
+                showMessage('profile-message', 'QR-Code generiert und Code gespeichert!', 'success');
+            } catch(e) {
+                showMessage('profile-message', 'Fehler beim Speichern des Codes.', 'error');
+            }
+        });
+    }
+
+    document.getElementById('delete-account-btn').addEventListener('click', () => {
+        dom.deleteAccountModal.style.display = 'flex';
+        dom.deleteAccountPasswordInput.value = '';
+        showMessage('delete-account-message', '', 'error');
+    });
+
+    dom.addProgramBtn.addEventListener('click', async () => {
+        const name = dom.programNameInput.value;
+        const duration = dom.programDurationInput.value;
+        const success = await addWashProgram(name, duration);
+        if (success) {
+            dom.programNameInput.value = '';
+            dom.programDurationInput.value = '';
+        }
+    });
+
+    // WICHTIG: Hier rufen wir jetzt die echte Init-Funktion auf!
+    document.getElementById('enable-notifications-btn').addEventListener('click', async () => {
+        // Wir versuchen direkt die Initialisierung, die die Permission abfragt
+        await initPushNotifications();
+        
+        // UI Update prüfen
+        if (Notification.permission === 'granted') {
+            showMessage('profile-message', 'Benachrichtigungen aktiviert!', 'success');
+            document.getElementById('enable-notifications-btn').style.display = 'none';
+        } else {
+            showMessage('profile-message', 'Bitte Benachrichtigungen im Browser erlauben.', 'error');
+        }
+    });
+
+    document.getElementById('show-changelog-btn').addEventListener('click', showChangelog);
+    
+    document.getElementById('back-to-menu-btn-4').addEventListener('click', () => navigateTo(dom.mainMenu));
+}
+
+export async function loadProfileData() {
+    const { currentUser, userIsAdmin } = getState();
+    if (currentUser) {
+        dom.profileEmail.textContent = currentUser.userData.email;
+        dom.profilePartei.textContent = currentUser.userData.partei;
+
+        const karma = await getPartyKarma(currentUser.userData.partei);
+        const { label, status, weeks } = getKarmaStatus(karma);
+        
+        let karmaContainer = document.getElementById('profile-karma-container');
+        if (!karmaContainer) {
+            karmaContainer = document.createElement('div');
+            karmaContainer.id = 'profile-karma-container';
+            karmaContainer.style.marginBottom = '20px';
+            karmaContainer.style.padding = '10px';
+            karmaContainer.style.backgroundColor = 'var(--primary-color-light)';
+            karmaContainer.style.borderRadius = '8px';
+            karmaContainer.style.border = '1px solid var(--primary-color)';
+            dom.profilePartei.parentElement.after(karmaContainer);
+        }
+
+        let statusColor = 'var(--text-color)';
+        if (status === 'VIP') statusColor = '#34c759'; 
+        if (status === 'Eingeschränkt') statusColor = '#ff3b30'; 
+
+        karmaContainer.innerHTML = `
+            <p style="margin:0; font-size:1.1em;"><strong>Karma:</strong> ${karma} Punkte</p>
+            <p style="margin:5px 0 0 0; font-size:0.9em; color:${statusColor}">Status: <strong>${label}</strong></p>
+            <p style="margin:5px 0 0 0; font-size:0.8em; opacity:0.8;">
+                Vorausbuchen: ${weeks} Woche(n). ${status === 'VIP' ? '2 Prime-Slots.' : (status === 'Eingeschränkt' ? 'Keine Prime-Slots.' : '1 Prime-Slot.')}
+            </p>
+        `;
+        
+        const passField = dom.newPasswordInput;
+        const confirmField = document.getElementById('new-password-confirm');
+
+        if (passField) {
+            passField.value = '';
+            passField.classList.remove('input-valid', 'input-invalid');
+        }
+        if (confirmField) {
+            confirmField.value = '';
+            confirmField.classList.remove('input-valid', 'input-invalid');
+        }
+
+        // Button nur anzeigen, wenn noch nicht erlaubt
+        const notifBtn = document.getElementById('enable-notifications-btn');
+        if (Notification.permission === 'default' || Notification.permission === 'denied') { 
+            notifBtn.style.display = 'block';
+        } else {
+            notifBtn.style.display = 'none'; 
+        }
+    }
+
+    if (userIsAdmin) {
+        dom.adminProgramsSection.style.display = 'block';
+        try {
+            const settingsSnap = await getDoc(getSettingsDocRef());
+            if (settingsSnap.exists()) {
+                const data = settingsSnap.data();
+                if (data.plz) dom.weatherPlzInput.value = data.plz;
+                if (data.qrCodeSecret) document.getElementById('qr-secret-input').value = data.qrCodeSecret;
+            }
+        } catch (e) {
+            dom.weatherPlzInput.value = ''; 
+        }
+
+        const unsub = loadWashPrograms((programs) => {
+            dom.programListContainer.innerHTML = ''; 
+            if (programs.length === 0) {
+                dom.programListContainer.innerHTML = '<p class="small-text">Keine Programme definiert.</p>';
+                return;
+            }
+            programs.forEach(prog => {
+                const item = document.createElement('div');
+                item.className = 'program-list-item';
+                item.innerHTML = `
+                    <span>${prog.name} (${prog.durationMinutes} Min)</span>
+                    <button class="button-small button-danger delete-program-btn" data-id="${prog.id}">Löschen</button>
+                `;
+                dom.programListContainer.appendChild(item);
+            });
+
+            document.querySelectorAll('.delete-program-btn').forEach(btn => {
+                if (btn.onclick) return; 
+                btn.onclick = (e) => {
+                    const id = e.target.dataset.id;
+                    if (confirm('Soll dieses Programm wirklich gelöscht werden?')) {
+                        deleteWashProgram(id);
+                    }
+                };
+            });
+        }, (error) => {
+            dom.programListContainer.innerHTML = '<p class="small-text">Fehler beim Laden.</p>';
+        });
+        setUnsubscriber('programs', unsub); 
+    } else {
+        dom.adminProgramsSection.style.display = 'none';
+    }
+}

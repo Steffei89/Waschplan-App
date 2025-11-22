@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Waschplan App</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="img/icon-192.png">
+<link rel="apple-touch-icon" href="img/icon-192.png">
+<meta name="theme-color" content="#007AFF">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script> 
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <p>Lade App...</p>
+</div>
+
+<div id="app" style="display:none;">
+
+  <div class="header-container">
+    <div class="header-controls-wrapper">
+        <div id="header-karma-display" class="karma-badge" style="display:none;" title="Dein Wasch-Karma">
+            <i id="header-karma-icon" class="fa-solid fa-circle-check"></i>
+            <span id="header-karma-value">--</span>
+        </div> 
+
+        <i id="refresh-app-btn" class="fa-solid fa-arrows-rotate clickable" title="App neu laden"></i>
+        <i id="theme-icon" class="fa-solid fa-sun clickable"></i>
+    </div>
+    <div id="weather-widget" style="display:none;" title="Wetter & Trocken-Prognose">
+      <i id="weather-icon" class="fa-solid fa-spinner fa-spin"></i>
+      <span id="weather-temp">--</span>°C
+      <span id="weather-label">Lade...</span>
+    </div>
+  </div>
+  
+  <div id="userInfo" class="user-info-compact" style="display:none;">
+    <div class="user-details"> 
+      <i class="fa-regular fa-user"></i>
+      <span id="current-username"></span> 
+      <small id="current-role" class="user-role-label"></small> 
+    </div>
+    <button id="logout-btn" class="logout-btn-compact" title="Abmelden">
+        <i class="fa-solid fa-power-off"></i>
+    </button>
+  </div>
+
+  <div id="liveTimerSection" class="card" style="display:none;"></div>
+
+  <div id="incomingRequestsContainer" style="display:none;"></div>
+  <div id="outgoingRequestsSuccessContainer" style="display:none;"></div>
+  <div id="outgoingRequestsStatusContainer" style="display:none;"></div>
+
+  <div id="loginForm" class="card">
+    <h2>Login</h2>
+    <div id="login-error" class="message-box error" style="display:none;"></div>
+    <div class="input-group">
+      <input type="email" id="login-identifier" placeholder="E-Mail" required>
+      <input type="password" id="login-password" placeholder="Passwort" required>
+    </div>
+    <button id="login-btn">Einloggen</button>
+    <p id="switch-register">Noch nicht registriert? <span id="show-register" class="clickable">Registrieren</span></p>
+    <p style="text-align: center; margin-top: 10px;" class="small-text"><span id="show-reset-password" class="clickable">Passwort vergessen?</span></p>
+    <div class="app-version">Version 2.8.0</div>
+  </div>
+
+  <div id="registerForm" class="card" style="display:none;">
+    <div id="register-error" class="message-box error" style="display:none;"></div>
+    <h2>Registrierung</h2>
+    <div class="input-group">
+      <input type="email" id="register-email" placeholder="E-Mail" required>
+      <input type="password" id="register-password" minlength="6" placeholder="Passwort" required>
+      <input type="password" id="register-password-confirm" minlength="6" placeholder="Passwort bestätigen" required>
+      <input type="text" id="register-invite-code" placeholder="Einladungscode" required>
+      <div id="partei-selection-wrapper" class="hidden"> 
+        <select id="register-partei" required>
+          <option value="" disabled selected>Partei wählen</option>
+          <option value="Micha & Stefan">Micha & Stefan</option>
+          <option value="Sarah & Florian">Sarah & Florian</option>
+          <option value="Christa & Uli">Christa & Uli</option>
+          <option value="Admin">Admin (Test)</option>
+        </select>
+      </div>
+    </div>
+    <button id="register-btn">Registrieren</button>
+    <p id="switch-login">Bereits registriert? <span id="show-login" class="clickable">Login</span></p>
+    <div class="app-version">Version 2.8.0</div>
+  </div>
+
+  <div id="verifyEmailMessage" class="card" style="display:none;">
+    <h2>Bitte E-Mail bestätigen</h2>
+    <div id="verify-email-success" class="message-box success" style="display:none;"></div>
+    <p class="small-text" style="margin-bottom: 15px; text-align: center; font-size: 1em; line-height: 1.5;">Wir haben eine E-Mail an <strong id="verify-email-address"></strong> gesendet. Bitte klicken Sie auf den Link in dieser E-Mail.</p>
+    <button id="back-to-login-from-verify-btn">Zurück zum Login</button>
+  </div>
+  <div id="resetPasswordForm" class="card" style="display:none;">
+    <button id="back-to-login-btn" class="back-button"><i class="fa-solid fa-chevron-left"></i> Zurück zum Login</button>
+    <h2>Passwort zurücksetzen</h2>
+    <div id="reset-message" class="message-box" style="display:none;"></div>
+    <p class="small-text" style="margin-bottom: 15px;">Bitte geben Sie Ihre E-Mail-Adresse ein.</p>
+    <div class="input-group">
+      <input type="email" id="reset-email" placeholder="E-Mail" required>
+    </div>
+    <button id="reset-password-btn">Link anfordern</button>
+  </div>
+
+  <div id="mainMenu" class="card" style="display:none;">
+    <h2>Menü</h2>
+    <div id="main-menu-message" class="message-box" style="display:none;"></div>
+    
+    <button id="book-btn">Buchen</button>
+    <button id="overview-btn">Übersicht (Woche)</button>
+    <button id="calendar-btn">Übersicht (Monat)</button>
+    <button id="minigame-btn"><i class="fa-solid fa-gamepad"></i> Socken-Retter spielen 🧸</button>
+    <button id="report-issue-btn" class="button-secondary" style="border-color: var(--error-color); color: var(--error-color);"><i class="fa-solid fa-triangle-exclamation"></i> Problem melden</button>
+
+    <button id="admin-btn" style="display:none;">Admin-Konsole</button>
+    <button id="profile-btn">Profil bearbeiten</button>
+    <div id="my-upcoming-bookings" class="mt-15">
+        <p class="font-semibold">Aktuelle Buchungen:</p>
+        <div id="my-bookings-list"></div>
+    </div>
+  </div>
+
+  <div id="maintenanceSection" class="card" style="display:none;">
+      <button id="back-to-menu-btn-maint" class="back-button"><i class="fa-solid fa-chevron-left"></i> Zurück</button>
+      <h2>Problem melden</h2>
+      <div id="maintenance-message" class="message-box" style="display:none;"></div>
+      <p>Was stimmt nicht mit der Maschine?</p>
+      <select id="maintenance-reason">
+          <option value="Defekt: Pumpt nicht ab">💦 Pumpt nicht ab</option>
+          <option value="Defekt: Tür klemmt">🚪 Tür klemmt</option>
+          <option value="Defekt: Kein Strom">🔌 Kein Strom / Display aus</option>
+          <option value="Verschmutzt">🧹 Stark verschmutzt</option>
+          <option value="Sonstiges">❓ Sonstiges</option>
+      </select>
+      <textarea id="maintenance-details" placeholder="Weitere Details (optional)" rows="3" style="width:100%; margin-bottom:15px; padding:10px; border-radius:8px; border:1px solid var(--border-color); font-family:inherit;"></textarea>
+      <button id="submit-maintenance-btn" class="button-danger">Problem melden</button>
+  </div>
+
+  <div id="minigameSection" class="card" style="display:none; text-align: center;">
+    <button id="back-to-menu-btn-game" class="back-button"><i class="fa-solid fa-chevron-left"></i> Zurück</button>
+    <h2>Socken-Retter 🫧</h2>
+    <div id="game-start-screen">
+        <p style="font-size: 1.1em; margin-bottom: 20px;">
+            Rette die saubere Wäsche vor dem schmutzigen Boden! <br>
+            <span class="small-text">Weiche dem Rotwein 🍷 und den Keimen 🦠 aus.</span>
+        </p>
+        <div class="leaderboard-container">
+            <h4>👑 Die fleißigsten Fänger</h4>
+            <div id="minigame-leaderboard">Lade Highscores...</div>
+        </div>
+        <p class="small-text" style="color: var(--success-color);">
+            <i class="fa-solid fa-gift"></i> <span id="minigame-rules-text">Lade Regeln...</span>
+        </p>
+        <button id="start-game-btn" class="button-success" style="font-size: 1.2em; padding: 15px;">Jetzt Spielen! 🚀</button>
+    </div>
+    <div id="game-container" style="position: relative; display: none; justify-content: center;">
+        <div id="game-score-display">Score: 0</div>
+        <div id="game-mute-btn"><i class="fa-solid fa-volume-high"></i></div>
+        <div id="game-pause-btn"><i class="fa-solid fa-pause"></i></div>
+        <div id="countdown-display" style="display: none;">3</div>
+        <div id="game-tutorial-overlay" style="display: none;">
+            <div class="hand-icon">👆</div>
+            <p>Zum Bewegen ziehen</p>
+        </div>
+        <canvas id="gameCanvas" width="320" height="480"></canvas>
+        <div id="game-pause-menu" style="display: none;">
+            <h3 style="color: var(--primary-color);">Pause ⏸️</h3>
+            <p>Aktueller Score: <strong id="pause-score">0</strong></p>
+            <button id="resume-game-btn" class="button-success">Weiter spielen ▶️</button>
+            <button id="restart-game-btn-pause" class="button-secondary">Neustart 🔄</button>
+            <button id="quit-game-btn" class="button-danger">Beenden ❌</button>
+        </div>
+        <div id="game-over-screen" style="display: none;">
+            <h3 style="color: #FF69B4; font-size: 1.8em; margin-bottom: 10px;">Oh nein! 🙈</h3>
+            <p style="font-size: 1.1em;">Punktzahl: <br><strong id="final-score" style="font-size: 2em;">0</strong></p>
+            <div style="background: #e8f5e9; padding: 10px; border-radius: 10px; margin: 15px 0; color: #2e7d32;">
+                <strong><span id="karma-won">0</span> Karma gewonnen!</strong> 🌟
+            </div>
+            <button id="restart-game-btn" class="button-primary">Nochmal versuchen ↺</button>
+            <button id="quit-game-over-btn" class="button-secondary" style="margin-top: 10px;">Beenden ❌</button>
+        </div>
+    </div>
+  </div>
+
+  <div id="bookingSection" class="card" style="display:none;">
+    <button id="back-to-menu-btn-1" class="back-button"><i class="fa-solid fa-chevron-left"></i> Zurück</button>
+    <h2>Buchung vornehmen</h2>
+    <div id="booking-error" class="message-box" style="display:none;"></div>
+    <input type="date" id="booking-date" required>
+    <div id="date-validation-message" class="small-text" style="color: var(--error-color);"></div>
+    <select id="booking-slot" required>
+      <option value="" disabled selected>Slot wählen</option>
+      <option value="07:00-13:00">07:00 - 13:00</option>
+      <option value="13:00-19:00">13:00 - 19:00</option>
+    </select>
+    <button id="book-submit"><span id="book-text">Buchen</span><i id="book-success-icon" class="fa-solid fa-check" style="display:none;"></i></button>
+  </div>
+
+  <div id="overviewSection" class="card" style="display:none;">
+    <button id="back-to-menu-btn-2" class="back-button"><i class="fa-solid fa-chevron-left"></i> Zurück</button>
+    <h2>Wochenübersicht</h2>
+    <div id="overview-message" class="message-box" style="display:none;"></div>
+    <select id="kw-select" class="mb-10"></select>
+    <div id="bookingsList"></div>
+  </div>
+
+  <div id="calendarSection" class="card" style="display:none;">
+    <button id="back-to-menu-btn-3" class="back-button"><i class="fa-solid fa-chevron-left"></i> Zurück</button>
+    <h2>Monatsübersicht</h2>
+    <div class="calendar-controls">
+      <button id="prev-month-btn"><i class="fa-solid fa-angle-left"></i></button>
+      <span id="current-month-display" class="font-semibold"></span>
+      <button id="next-month-btn"><i class="fa-solid fa-angle-right"></i></button>
+    </div>
+    <div id="calendar-grid"></div>
+    <div id="calendar-day-actions" class="mt-15" style="display:none;">
+        <h3 id="selected-day-title">Aktionen für: </h3>
+        <div id="calendar-action-message" class="message-box" style="display:none;"></div>
+        <div id="slot-action-07" class="slot-action-item">
+            <p><strong>07:00 - 13:00:</strong> <span id="slot-status-07">Verfügbar</span></p>
+            <button class="calendar-action-btn" data-slot="07:00-13:00" data-action="book" id="btn-book-07">Buchen</button>
+            <button class="calendar-action-btn button-danger" data-slot="07:00-13:00" data-action="delete" id="btn-delete-07" style="display:none;">Löschen</button>
+            <button class="calendar-action-btn button-primary" data-slot="07:00-13:00" data-action="request" id="btn-request-07" style="display:none;">Slot anfragen</button>
+        </div>
+        <div id="slot-action-13" class="slot-action-item">
+            <p><strong>13:00 - 19:00:</strong> <span id="slot-status-13">Verfügbar</span></p>
+            <button class="calendar-action-btn" data-slot="13:00-19:00" data-action="book" id="btn-book-13">Buchen</button>
+            <button class="calendar-action-btn button-danger" data-slot="13:00-19:00" data-action="delete" id="btn-delete-13" style="display:none;">Löschen</button>
+            <button class="calendar-action-btn button-primary" data-slot="13:00-19:00" data-action="request" id="btn-request-13" style="display:none;">Slot anfragen</button>
+        </div>
+    </div>
+    <div id="calendar-legend" class="mt-15">
+      <p class="font-semibold">Legende:</p>
+      <div id="partei-legend"></div>
+    </div>
+  </div>
+  
+  <div id="adminSection" class="card" style="display:none;">
+    <button id="back-to-menu-btn-6" class="back-button"><i class="fa-solid fa-chevron-left"></i> Zurück</button>
+    <h2>Admin-Konsole</h2>
+    <div id="admin-message" class="message-box" style="display:none;"></div>
+    
+    <details class="admin-group" open>
+        <summary>Status & Meldungen</summary>
+        <div class="admin-content">
+            <div id="admin-maintenance-controls" style="margin-bottom: 15px; padding: 10px; border: 1px solid var(--error-color); border-radius: 8px; background: rgba(255, 0, 0, 0.05);">
+                <h3 style="color: var(--error-color); margin-top:0; font-size:1em;">🛠️ Technik-Status</h3>
+                <p id="system-status-display">Status: <strong>Lade...</strong></p>
+                <button id="toggle-maintenance-btn" class="button-small button-danger">Wartungsmodus aktivieren</button>
+            </div>
+            <h4 style="margin-top:0;">📩 Offene Tickets</h4>
+            <div id="admin-tickets-container">Lade...</div>
+        </div>
+    </details>
+
+    <details class="admin-group">
+        <summary>Konfiguration (Wetter & QR)</summary>
+        <div class="admin-content">
+            <label>PLZ für Wetter:</label>
+            <div class="input-group" style="display:flex; gap:10px;">
+                <input type="text" id="weather-plz-input" placeholder="z.B. 83471" style="margin-bottom:0;">
+                <button id="save-weather-plz-btn" class="button-secondary" style="width:auto; margin-bottom:0;">Speichern</button>
+            </div>
+            <hr style="margin:15px 0;">
+            <h4 style="margin-top:0;">📱 QR-Code</h4>
+            <p class="small-text">Code für Check-in an der Maschine:</p>
+            <div class="input-group" style="display:flex; gap:10px; align-items:center;">
+                <input type="text" id="qr-secret-input" value="WASCH-START" placeholder="Code" style="margin-bottom:0;">
+                <button id="generate-qr-btn" class="button-primary" style="width:auto; margin-bottom:0;">Generieren</button>
+            </div>
+            <div id="qr-code-display" style="margin-top:15px; text-align:center; display:none;">
+                <img id="qr-image" src="" alt="QR Code" style="border:5px solid white; border-radius:4px;">
+                <p class="small-text">Code: <strong id="qr-code-text-display"></strong></p>
+            </div>
+            <hr style="margin:15px 0;">
+            <button class="button-danger" id="global-karma-reset-btn"><i class="fa-solid fa-rotate-right"></i> Karma Reset (Alle)</button>
+        </div>
+    </details>
+
+    <details class="admin-group">
+        <summary>Waschprogramme</summary>
+        <div class="admin-content">
+            <div class="input-group" style="display: flex; gap: 10px;">
+                <input type="text" id="program-name-input" placeholder="Name" style="flex-grow: 1; margin-bottom: 0;">
+                <input type="number" id="program-duration-input" placeholder="Min" style="width: 80px; margin-bottom: 0;">
+            </div>
+            <button id="add-program-btn" class="button-secondary" style="margin-top:10px;">Hinzufügen</button>
+            <div id="program-list-container" style="margin-top:15px;"></div>
+        </div>
+    </details>
+
+    <details class="admin-group">
+        <summary>Benutzerverwaltung</summary>
+        <div class="admin-content">
+            <div id="user-list-container"></div>
+        </div>
+    </details>
+
+    <details class="admin-group">
+        <summary>Statistiken & Analysen</summary>
+        <div class="admin-content">
+            <div id="stats-message" class="message-box" style="display:none;"></div>
+            <label for="stats-filter" class="small-text" style="margin-bottom: 5px; display: block;">Zeitraum:</label>
+            <select id="stats-filter" style="margin-bottom: 20px;">
+                <option value="all">Gesamte Zeit</option>
+                <option value="ytd">Dieses Jahr</option>
+                <option value="6m">Letzte 6 Monate</option>
+                <option value="30d">Letzte 30 Tage</option>
+            </select>
+
+            <div class="mt-15" style="margin-bottom: 30px;">
+                <h3>Aktueller Karma-Stand</h3>
+                <p class="small-text" style="text-align: center; margin-top: -10px; margin-bottom: 10px;">(Zielwert: 100 Punkte)</p>
+                <div class="chart-container"><canvas id="karmaChart"></canvas></div>
+            </div>
+
+            <div class="kpi-grid" id="stats-kpi-grid">
+                <div class="kpi-item"><span class="kpi-value" id="kpi-total-bookings">--</span><span class="kpi-label">Buchungen</span></div>
+                <div class="kpi-item"><span class="kpi-value" id="kpi-most-active">--</span><span class="kpi-label">Fleißigste Partei</span></div>
+                <div class="kpi-item"><span class="kpi-value" id="kpi-most-popular-day">--</span><span class="kpi-label">Beliebtester Tag</span></div>
+            </div>
+
+            <div id="advanced-stats-container" style="display: none;">
+                <hr style="margin: 30px 0; border-color: var(--primary-color-transparent);">
+                <div id="stats-heatmap-wrapper" style="display: none;">
+                    <h3>🔥 Auslastungs-Heatmap</h3>
+                    <p class="small-text" style="text-align: center;">Je dunkler, desto beliebter.</p>
+                    <div id="heatmap-container" style="overflow-x: auto; margin-bottom: 30px;"></div>
+                </div>
+                <div id="stats-user-lists-wrapper" style="display: none;">
+                    <h3>😇 Ruhm & 😈 Scham</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div class="kpi-item" style="text-align: left;">
+                            <h4 style="margin: 0 0 10px 0; font-size: 0.9em; color: var(--success-color);">🏆 Top Wäscher</h4>
+                            <div id="list-top-washers" class="small-text">Lade...</div>
+                        </div>
+                        <div class="kpi-item" style="text-align: left;">
+                            <h4 style="margin: 0 0 10px 0; font-size: 0.9em; color: var(--primary-color);">📱 App-Suchti</h4>
+                            <div id="list-top-users" class="small-text">Lade...</div>
+                        </div>
+                    </div>
+                    <div class="kpi-item" style="text-align: left; margin-top: 10px;">
+                         <h4 style="margin: 0 0 10px 0; font-size: 0.9em; color: #FF9500;">🎮 Minigame Profis</h4>
+                         <div id="list-top-gamers" class="small-text">Lade...</div>
+                    </div>
+                </div>
+                <div id="stats-game-balancing-wrapper" style="display: none;">
+                    <h3 style="margin-top: 30px;">🎮 Game Balancing</h3>
+                    <p class="small-text" style="text-align: center;">Score vs. Spieldauer (Sekunden)</p>
+                    <div class="chart-container">
+                         <canvas id="gameBalancingChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            <hr style="margin: 30px 0;">
+            <div class="mt-15">
+                <h3>Buchungen pro Partei</h3>
+                <div class="chart-container"><canvas id="parteiChart"></canvas></div>
+            </div>
+            <div class="mt-15">
+                <h3>Auslastung nach Slot</h3>
+                <div class="chart-container"><canvas id="slotChart"></canvas></div>
+                <div id="slot-stats-text" class="small-text mt-10"></div>
+            </div>
+            <div class="mt-15">
+                <h3>Buchungs-Trend (pro Monat)</h3>
+                <div class="chart-container"><canvas id="bookingsOverTimeChart"></canvas></div>
+            </div>
+            <div class="mt-15">
+                <h3>Auslastung nach Wochentag</h3>
+                <div class="chart-container"><canvas id="dayOfWeekChart"></canvas></div>
+            </div>
+        </div>
+    </details>
+  </div>
+
+  <div id="profileSection" class="card" style="display:none;">
+    <button id="back-to-menu-btn-4" class="back-button"><i class="fa-solid fa-chevron-left"></i> Zurück</button>
+    <h2>Profil bearbeiten</h2>
+    <div id="profile-message" class="message-box" style="display:none;"></div>
+    <p><strong>E-Mail:</strong> <span id="profile-email"></span></p>
+    <p><strong>Partei:</strong> <span id="profile-partei"></span></p> 
+    <h3>Passwort ändern</h3>
+    <input type="password" id="new-password" placeholder="Neues Passwort">
+    <input type="password" id="new-password-confirm" placeholder="Passwort bestätigen">
+    <button id="change-password-btn">Passwort aktualisieren</button>
+    <button id="enable-notifications-btn" class="button-secondary" style="margin-top: 10px; display: none;"><i class="fa-solid fa-bell"></i> Timer-Benachrichtigungen erlauben</button>
+    <button id="show-changelog-btn" class="button-secondary"><i class="fa-solid fa-gift"></i> Letzte Änderungen anzeigen</button>
+    <hr style="margin-top: 25px;">
+    <button id="delete-account-btn" class="button-danger">Konto löschen</button>
+    <div class="app-version">Version 2.8.0</div>
+  </div>
+
+  <div id="confirmationModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h3>Buchung löschen</h3>
+      <p id="confirm-text">Soll die Buchung wirklich gelöscht werden?</p>
+      <div class="modal-actions">
+        <button id="confirm-cancel" class="button-secondary">Abbrechen</button>
+        <button id="confirm-delete" class="button-danger">Löschen bestätigen</button>
+      </div>
+    </div>
+  </div>
+  
+  <div id="deleteAccountModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h3>Konto löschen</h3>
+      <div id="delete-account-message" class="message-box" style="display:none;"></div>
+      <p>Um Ihr Konto unwiderruflich zu löschen, geben Sie bitte zur Bestätigung Ihr Passwort ein.</p>
+      <p class="small-text">(Ihre Buchungen für Ihre Partei bleiben bestehen.)</p>
+      <input type="password" id="delete-account-password" placeholder="Ihr aktuelles Passwort" required>
+      <div class="modal-actions">
+        <button id="cancel-delete-account-btn" class="button-secondary">Abbrechen</button>
+        <button id="confirm-delete-account-btn" class="button-danger">Konto endgültig löschen</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="changelogModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h3>App-Update!</h3>
+      <p>Willkommen zur neuesten Version. Hier sind die Änderungen:</p>
+      <div id="changelogContent" class="changelog-content-box"></div>
+      <div class="modal-actions">
+        <button id="changelogCloseBtn" class="button-primary">Verstanden</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="scannerModal" class="modal" style="display:none;">
+    <div class="modal-content" style="max-width:400px; padding:20px;">
+        <h3 style="margin-top:0;">QR-Code scannen</h3>
+        <p class="small-text">Halte die Kamera auf den Code an der Maschine.</p>
+        <div id="reader" style="width: 100%; min-height: 250px; background:#000;"></div>
+        <div class="modal-actions" style="margin-top:15px;">
+            <button id="close-scanner-btn" class="button-secondary">Abbrechen</button>
+        </div>
+    </div>
+  </div>
+
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
