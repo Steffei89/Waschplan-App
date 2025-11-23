@@ -380,11 +380,53 @@ button:active { transform: scale(0.98); }
 .timer-stop-btn { background: rgba(255, 59, 48, 0.1); color: var(--error-color); box-shadow: none; border: none; }
 .timer-stop-btn:hover { background: rgba(255, 59, 48, 0.2); }
 
-/* Admin & Listen */
+/* Admin & Listen (NEU GESTYLT) */
 .user-list-item { background: var(--secondary-color); border: none; }
-details.admin-group { background: var(--secondary-color); border: none; margin-bottom: 15px; }
-details.admin-group summary { background: transparent; padding: 15px; }
-details.admin-group .admin-content { border-top: 1px solid var(--border-color); background: var(--background-color); }
+
+/* Details (Admin Gruppen) jetzt im Button-Look */
+details.admin-group {
+    background: var(--secondary-color);
+    border: 1px solid transparent;
+    border-radius: 12px;
+    margin-bottom: 15px;
+    overflow: hidden;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+    transition: all 0.2s ease;
+}
+
+details.admin-group:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+details.admin-group summary {
+    background: transparent;
+    padding: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--text-color);
+    outline: none;
+}
+
+details.admin-group summary::-webkit-details-marker { display: none; }
+details.admin-group summary::after {
+    content: '\f078'; /* Chevron Down */
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    transition: transform 0.2s;
+    opacity: 0.5;
+}
+details.admin-group[open] summary::after { transform: rotate(180deg); }
+
+details.admin-group .admin-content {
+    border-top: 1px solid var(--border-color);
+    background: rgba(0,0,0,0.02); /* Leichte Abdunklung innen */
+    padding: 20px;
+}
 
 /* MINIGAME STYLES (FIXED) */
 #minigameSection.active { 

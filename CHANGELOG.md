@@ -2,6 +2,28 @@
 
 Hier werden alle wichtigen Änderungen an der Waschplan-App festgehalten.
 
+## [2.9.0] - 2025-11-23
+
+### 🎨 Modernes Design & UI
+Die App hat einen kompletten optischen Neuanstrich bekommen!
+* **Neuer Look:** Statt Hintergrundbildern setzen wir jetzt auf moderne, saubere Farbverläufe (Gradients).
+    * *Light Mode:* Ein frischer, heller "Clean & Airy" Look.
+    * *Dark Mode:* Ein edler "Deep Midnight" Verlauf.
+* **Admin-Konsole:** Das Design der Admin-Konsole wurde an das Hauptmenü angepasst (einheitlicher Look). Die Menüs sind nun standardmäßig eingeklappt.
+* **Status-Widget:** Im Header gibt es jetzt eine kleine "Ampel" 👕, die sofort anzeigt, ob die Maschine gerade **Frei** (Grün) oder **Belegt** (Rot) ist.
+* **Animationen:** Seitenwechsel wischen jetzt wie in einer nativen App herein ("Slide-Over"), und Listen bauen sich elegant auf.
+
+### ⚖️ Fairness & Logik
+* **Karma-Update beim Tauschen:** Eine Lücke wurde geschlossen. Wer einen Slot per Tausch übernimmt, muss nun auch die entsprechenden Karma-Punkte ("Kosten") dafür zahlen. Vorher war die Übernahme kostenlos.
+* **Transaktionen:** Buchungen sind nun durch Datenbank-Transaktionen abgesichert, um Doppelbuchungen im Millisekunden-Bereich zu verhindern.
+
+### 🎮 Minigame
+* **Smoother Gameplay:** Die Steuerung des Wäschekorbs wurde komplett überarbeitet. Sie fühlt sich jetzt weicher an und ruckelt nicht mehr, da die Bewegung von der Eingabe entkoppelt wurde.
+
+### 🐛 Bugfixes
+* **Anzeige-Fehler:** Ein Fehler wurde behoben, bei dem die Buchungsliste verschwand, wenn man einen Eintrag löschte ("Selbstzerstörung" der Anzeige).
+* **Datenbank-Regeln:** Ein kritischer Konflikt in den Sicherheitsregeln (`firestore.rules`) für das Minigame wurde bereinigt.
+
 ## [2.8.1] - 2025-11-23
 
 ### 🐛 Bugfixes & Stabilität
