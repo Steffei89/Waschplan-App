@@ -32,10 +32,18 @@
         <i id="refresh-app-btn" class="fa-solid fa-arrows-rotate clickable" title="App neu laden"></i>
         <i id="theme-icon" class="fa-solid fa-sun clickable"></i>
     </div>
-    <div id="weather-widget" style="display:none;" title="Wetter & Trocken-Prognose">
-      <i id="weather-icon" class="fa-solid fa-spinner fa-spin"></i>
-      <span id="weather-temp">--</span>°C
-      <span id="weather-label">Lade...</span>
+    
+    <div style="display: flex; gap: 8px; align-items: center;">
+        <div id="machine-status-widget" class="status-widget" style="display:none;" title="Maschinen-Status">
+            <i id="machine-status-icon" class="fa-solid fa-shirt"></i>
+            <span id="machine-status-text">Lade...</span>
+        </div>
+
+        <div id="weather-widget" style="display:none;" title="Wetter & Trocken-Prognose">
+          <i id="weather-icon" class="fa-solid fa-spinner fa-spin"></i>
+          <span id="weather-temp">--</span>°C
+          <span id="weather-label">Lade...</span>
+        </div>
     </div>
   </div>
   

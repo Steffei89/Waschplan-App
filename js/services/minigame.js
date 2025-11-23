@@ -47,7 +47,8 @@ let machineCacheCtx = machineCache.getContext('2d');
 let machineCacheCreated = false;
 
 // Objekte
-let basket = { x: 0, y: 0, width: 80, baseWidth: 80, height: 50, tilt: 0, speed: 8, scaleX: 1, scaleY: 1, prevX: 0 };
+// NEU: targetX für smoothere Maus/Touch Steuerung
+let basket = { x: 0, y: 0, width: 80, baseWidth: 80, height: 50, tilt: 0, speed: 8, scaleX: 1, scaleY: 1, prevX: 0, targetX: null };
 let items = []; 
 let particles = []; 
 let floatingTexts = []; 
@@ -125,14 +126,9 @@ export async function initMinigame() {
 
         const rect = dom.gameCanvas.getBoundingClientRect();
         const x = clientX - rect.left;
-        const targetX = x - basket.width / 2;
         
-        const diff = targetX - basket.x;
-        basket.tilt = diff * 0.3; 
-        limitTilt();
-        
-        basket.x = targetX;
-        limitBasketPos();
+        // NEU: Wir setzen nur das Ziel, die Bewegung macht der Loop
+        basket.targetX = x - basket.width / 2;
     };
 
     dom.gameCanvas.addEventListener('mousemove', (e) => moveHandler(e.clientX));
@@ -379,6 +375,7 @@ function startGameWithCountdown() {
     basket.scaleX = 1;
     basket.scaleY = 1;
     basket.prevX = basket.x;
+    basket.targetX = null; // Reset
     keys.left = false;
     keys.right = false;
     
@@ -498,37 +495,44 @@ function loop() {
         if (magnetTimer <= 0) isMagnetActive = false;
     }
 
+    // --- NEUER BEWEGUNGS-CODE START ---
     let velocity = 0;
     const moveSpeed = basket.speed * timeFactor;
 
-    if (keys.left) {
-        velocity = -moveSpeed;
-        basket.tilt -= 2 * timeFactor;
-        if(basket.tilt < -10) basket.tilt = -10;
-        if (dom.tutorialOverlay) dom.tutorialOverlay.style.display = 'none';
-    } else if (keys.right) {
-        velocity = moveSpeed;
-        basket.tilt += 2 * timeFactor;
-        if(basket.tilt > 10) basket.tilt = 10;
-        if (dom.tutorialOverlay) dom.tutorialOverlay.style.display = 'none';
-    } else {
-        basket.tilt *= Math.pow(0.85, timeFactor);
+    // 1. Maus/Touch Ziel verfolgen (weiches Nachziehen)
+    if (basket.targetX !== null) {
+        // Lerp (Linear Interpolation) für weiche Bewegung: 0.2 ist die "Trägheit"
+        const diff = basket.targetX - basket.x;
+        if (Math.abs(diff) > 0.5) {
+            basket.x += diff * 0.2 * timeFactor; 
+        } else {
+            basket.x = basket.targetX; // Ziel erreicht
+            basket.targetX = null; // Reset
+        }
     }
-    
-    if (Math.abs(basket.x - basket.prevX) > 0.1) {
-        velocity = basket.x - basket.prevX;
-    }
-    basket.prevX = basket.x;
 
-    if(keys.left || keys.right) {
-        basket.x += velocity;
+    // 2. Tastatur (überschreibt Maus wenn gedrückt)
+    if (keys.left) {
+        basket.x -= moveSpeed;
+        basket.targetX = null; // Maus-Ziel abbrechen
+    } else if (keys.right) {
+        basket.x += moveSpeed;
+        basket.targetX = null;
     }
+
+    // 3. Tilt und Velocity berechnen (für alle Eingabemethoden gleich!)
+    velocity = basket.x - basket.prevX;
+    basket.tilt = velocity * 2.0; // Tilt basiert jetzt rein auf der echten Bewegung
+    
+    // Limits
+    limitTilt();
+    limitBasketPos();
+    
+    basket.prevX = basket.x;
+    // --- NEUER BEWEGUNGS-CODE ENDE ---
     
     let targetWidth = isPowerupActive ? basket.baseWidth * 1.5 : basket.baseWidth;
     basket.width += (targetWidth - basket.width) * (0.1 * timeFactor);
-
-    limitTilt();
-    limitBasketPos();
 
     const normalizedVel = velocity / timeFactor; 
     const speedFactor = Math.abs(normalizedVel) / basket.speed; 

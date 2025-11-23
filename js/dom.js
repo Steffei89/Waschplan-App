@@ -22,6 +22,8 @@ export const userInfo = document.getElementById("userInfo");
 export const themeIcon = document.getElementById("theme-icon"); 
 export const statisticBtn = document.getElementById("statistic-btn");
 export const weatherWidget = document.getElementById('weather-widget');
+// NEU: MACHINE STATUS WIDGET
+export const machineStatusWidget = document.getElementById('machine-status-widget');
 
 // Container
 export const incomingRequestsContainer = document.getElementById("incomingRequestsContainer"); 

@@ -42,7 +42,6 @@ export function initStatsView() {
             loadStatistics(true); 
         });
     }
-    // Der Zurück-Button Listener wurde entfernt, da er nicht mehr existiert
 }
 
 export async function trackMenuClick(counterName) {
@@ -57,14 +56,28 @@ export async function trackMenuClick(counterName) {
     }
 }
 
+// Helper um aktuelle CSS Variablen auszulesen (für Dark/Light Mode)
+function getChartColors() {
+    const style = getComputedStyle(document.body);
+    return {
+        textColor: style.getPropertyValue('--text-color').trim() || '#333',
+        gridColor: style.getPropertyValue('--border-color').trim() || 'rgba(128, 128, 128, 0.1)',
+        tooltipBg: style.getPropertyValue('--card-background').trim() || 'white',
+        primary: style.getPropertyValue('--primary-color').trim() || '#007AFF',
+        success: style.getPropertyValue('--success-color').trim() || '#34c759',
+        error: style.getPropertyValue('--error-color').trim() || '#ff3b30',
+        // Transparente Varianten für Fills
+        primaryTransparent: style.getPropertyValue('--primary-color-transparent').trim() || 'rgba(0, 122, 255, 0.5)',
+        secondary: '#8e8e93' // Fallback Grau
+    };
+}
+
 export async function loadStatistics(useCachedData = false) {
     const { userIsAdmin } = getState();
 
     destroyAllCharts();
 
-    // Wir nutzen jetzt die Admin-Message Box, falls vorhanden, oder stats-message
     if (!useCachedData) {
-        // Falls wir im Admin Panel sind
         showMessage('admin-message', 'Lade Statistikdaten...', 'success');
     }
     
@@ -92,7 +105,6 @@ export async function loadStatistics(useCachedData = false) {
         const filterValue = document.getElementById('stats-filter').value;
         const filteredBookings = filterBookings(allBookings, filterValue);
         
-        // Message ausblenden
         const msgBox = document.getElementById('admin-message');
         if(msgBox) msgBox.style.display = 'none';
 
@@ -138,7 +150,7 @@ async function loadAdvancedStats(allBookings, isAdmin) {
             gamesSnap.forEach(d => games.push(d.data()));
 
             const usersSnap = await getDocs(collection(db, "users"));
-            const userMap = {}; // ID -> Name
+            const userMap = {}; 
             usersSnap.forEach(doc => {
                 const d = doc.data();
                 userMap[doc.id] = d.username || d.email; 
@@ -161,14 +173,14 @@ async function loadAdvancedStats(allBookings, isAdmin) {
 }
 
 function renderUserLists(bookings, sessions, games, userMap) {
-    // 1. Top Wäscher (Partei-basiert)
+    // 1. Top Wäscher
     const bookingCounts = {};
     bookings.forEach(b => bookingCounts[b.partei] = (bookingCounts[b.partei] || 0) + 1);
     const sortedBookers = Object.entries(bookingCounts).sort((a,b) => b[1] - a[1]).slice(0,3);
     let htmlBookers = sortedBookers.map((entry, i) => `${i+1}. ${entry[0]} (${entry[1]})`).join('<br>');
     document.getElementById('list-top-washers').innerHTML = htmlBookers || '-';
 
-    // 2. App Suchtis (USER-basiert)
+    // 2. App Suchtis
     const sessionCounts = {};
     sessions.forEach(s => {
         if (s.userId) {
@@ -184,20 +196,13 @@ function renderUserLists(bookings, sessions, games, userMap) {
     let htmlUsers = sortedUsers.map((entry, i) => {
         const idOrName = entry[0];
         let displayName = idOrName;
-        
-        if (userMap[idOrName]) {
-            displayName = userMap[idOrName];
-        }
-        if (displayName.includes('@')) {
-             displayName = displayName.split('@')[0];
-        }
-
+        if (userMap[idOrName]) displayName = userMap[idOrName];
+        if (displayName.includes('@')) displayName = displayName.split('@')[0];
         return `${i+1}. ${displayName} (${entry[1]}x)`;
     }).join('<br>');
-    
     document.getElementById('list-top-users').innerHTML = htmlUsers || '-';
 
-    // 3. MINIGAME PROFIS
+    // 3. Minigame Profis
     const userGameScores = {}; 
     games.forEach(g => {
         const uid = g.userId;
@@ -226,6 +231,8 @@ function renderUserLists(bookings, sessions, games, userMap) {
 
 function renderGameBalancingChart(games) {
     const ctx = document.getElementById('gameBalancingChart').getContext('2d');
+    const colors = getChartColors(); // Farben laden
+    
     const scatterData = games.map(g => ({
         x: g.duration_seconds || 0,
         y: g.score || 0
@@ -237,14 +244,26 @@ function renderGameBalancingChart(games) {
             datasets: [{
                 label: 'Spielrunden',
                 data: scatterData,
-                backgroundColor: 'rgba(0, 122, 255, 0.6)'
+                backgroundColor: colors.primary // Theme Color
             }]
         },
         options: {
             responsive: true,
             scales: {
-                x: { type: 'linear', position: 'bottom', title: { display: true, text: 'Dauer (Sekunden)' } },
-                y: { title: { display: true, text: 'Score' } }
+                x: { 
+                    type: 'linear', position: 'bottom', 
+                    title: { display: true, text: 'Dauer (Sekunden)', color: colors.textColor },
+                    ticks: { color: colors.textColor },
+                    grid: { color: colors.gridColor }
+                },
+                y: { 
+                    title: { display: true, text: 'Score', color: colors.textColor },
+                    ticks: { color: colors.textColor },
+                    grid: { color: colors.gridColor }
+                }
+            },
+            plugins: {
+                legend: { labels: { color: colors.textColor } }
             }
         }
     });
@@ -271,8 +290,10 @@ function renderHeatmap(bookings) {
         }
     });
 
-    let html = '<table style="width:100%; border-collapse: collapse; font-size: 0.85em;">';
-    html += '<tr><th></th>' + days.map(d => `<th>${d}</th>`).join('') + '</tr>';
+    const colors = getChartColors();
+
+    let html = `<table style="width:100%; border-collapse: collapse; font-size: 0.85em; color: ${colors.textColor};">`;
+    html += '<tr><th></th>' + days.map(d => `<th style="padding:5px;">${d}</th>`).join('') + '</tr>';
 
     slots.forEach((slotName, r) => {
         html += `<tr><td style="font-weight:bold; padding:5px;">${slotName.substr(0,5)}</td>`;
@@ -280,8 +301,9 @@ function renderHeatmap(bookings) {
             const val = data[r][c];
             const intensity = val / maxVal;
             const alpha = Math.max(0.1, intensity); 
+            // Rotton für Heatmap
             const color = `rgba(255, 59, 48, ${alpha})`; 
-            html += `<td style="background:${color}; color:${intensity > 0.6 ? 'white':'black'}; text-align:center; padding:8px; border:1px solid rgba(0,0,0,0.1);">
+            html += `<td style="background:${color}; color:${intensity > 0.6 ? 'white' : colors.textColor}; text-align:center; padding:8px; border:1px solid ${colors.gridColor}; border-radius:4px;">
                         ${val > 0 ? val : ''}
                      </td>`;
         }
@@ -325,8 +347,15 @@ function renderKarmaChart(karmaData) {
             indexAxis: 'y', responsive: true,
             plugins: { legend: { display: false } },
             scales: {
-                x: { grid: { color: colors.gridColor }, ticks: { color: colors.textColor }, suggestedMin: 0, suggestedMax: 150 },
-                y: { grid: { display: false }, ticks: { color: colors.textColor } }
+                x: { 
+                    grid: { color: colors.gridColor }, 
+                    ticks: { color: colors.textColor }, 
+                    suggestedMin: 0, suggestedMax: 150 
+                },
+                y: { 
+                    grid: { display: false }, 
+                    ticks: { color: colors.textColor } 
+                }
             }
         }
     });
@@ -360,14 +389,6 @@ function renderKpis(filteredBookings, parteiCounts, dayOfWeekCounts) {
     document.getElementById('kpi-most-popular-day').textContent = dayLabels[mostPopularDayIndex];
 }
 
-function getChartColors() {
-    return {
-        textColor: getComputedStyle(document.body).getPropertyValue('--text-color') || '#333',
-        gridColor: getComputedStyle(document.body).getPropertyValue('--border-color') || 'rgba(128, 128, 128, 0.1)',
-        tooltipBg: getComputedStyle(document.body).getPropertyValue('--card-background') || 'white',
-    };
-}
-
 function getMonthLabels(filter) {
     const labels = [];
     const now = new Date();
@@ -393,8 +414,13 @@ function renderParteienChart(parteiCounts) {
     const ctx = document.getElementById('parteiChart').getContext('2d');
     chartInstances.parteiChart = new Chart(ctx, {
         type: 'doughnut',
-        data: { labels: dataLabels, datasets: [{ data: dataValues, backgroundColor: backgroundColors, borderWidth: 1 }] },
-        options: { responsive: true, aspectRatio: 1.5, plugins: { legend: { position: 'top', labels: { color: colors.textColor } } } }
+        data: { labels: dataLabels, datasets: [{ data: dataValues, backgroundColor: backgroundColors, borderWidth: 1, borderColor: colors.tooltipBg }] },
+        options: { 
+            responsive: true, aspectRatio: 1.5, 
+            plugins: { 
+                legend: { position: 'top', labels: { color: colors.textColor } } 
+            } 
+        }
     });
 }
 
@@ -403,11 +429,35 @@ function renderSlotChart(slotCounts) {
     const labels = Object.keys(slotCounts);
     const dataValues = Object.values(slotCounts);
     const ctx = document.getElementById('slotChart').getContext('2d');
+    
     chartInstances.slotChart = new Chart(ctx, {
         type: 'bar',
-        data: { labels: labels, datasets: [{ label: 'Anzahl Buchungen', data: dataValues, backgroundColor: ['rgba(0, 122, 255, 0.7)', 'rgba(255, 149, 0, 0.7)'], borderWidth: 1 }] },
-        options: { responsive: true, scales: { y: { beginAtZero: true, ticks: { color: colors.textColor, stepSize: 1 }, grid: { color: colors.gridColor } }, x: { ticks: { color: colors.textColor }, grid: { color: colors.gridColor } } }, plugins: { legend: { display: false } } }
+        data: { 
+            labels: labels, 
+            datasets: [{ 
+                label: 'Anzahl Buchungen', 
+                data: dataValues, 
+                backgroundColor: [colors.primary, colors.secondary], // Dynamische Farben
+                borderWidth: 1 
+            }] 
+        },
+        options: { 
+            responsive: true, 
+            scales: { 
+                y: { 
+                    beginAtZero: true, 
+                    ticks: { color: colors.textColor, stepSize: 1 }, 
+                    grid: { color: colors.gridColor } 
+                }, 
+                x: { 
+                    ticks: { color: colors.textColor }, 
+                    grid: { color: colors.gridColor } 
+                } 
+            }, 
+            plugins: { legend: { display: false } } 
+        }
     });
+    
     const textEl = document.getElementById('slot-stats-text');
     const totalCount = dataValues.reduce((a, b) => a + b, 0);
     if (totalCount > 0) {
@@ -424,11 +474,35 @@ function renderBookingsOverTimeChart(monthCounts, filterValue) {
     const container = document.getElementById('bookingsOverTimeChart').parentElement.parentElement;
     if (filterValue === '30d') { container.style.display = 'none'; return; }
     container.style.display = 'block';
+    
     const ctx = document.getElementById('bookingsOverTimeChart').getContext('2d');
     chartInstances.bookingsOverTimeChart = new Chart(ctx, {
         type: 'line',
-        data: { labels: labels, datasets: [{ label: 'Buchungen pro Monat', data: dataValues, fill: false, borderColor: 'var(--primary-color)', tension: 0.1 }] },
-        options: { responsive: true, scales: { y: { beginAtZero: true, ticks: { color: colors.textColor }, grid: { color: colors.gridColor } }, x: { ticks: { color: colors.textColor }, grid: { color: colors.gridColor } } }, plugins: { legend: { display: false } } }
+        data: { 
+            labels: labels, 
+            datasets: [{ 
+                label: 'Buchungen pro Monat', 
+                data: dataValues, 
+                fill: false, 
+                borderColor: colors.primary, // Dynamisch
+                tension: 0.1 
+            }] 
+        },
+        options: { 
+            responsive: true, 
+            scales: { 
+                y: { 
+                    beginAtZero: true, 
+                    ticks: { color: colors.textColor }, 
+                    grid: { color: colors.gridColor } 
+                }, 
+                x: { 
+                    ticks: { color: colors.textColor }, 
+                    grid: { color: colors.gridColor } 
+                } 
+            }, 
+            plugins: { legend: { display: false } } 
+        }
     });
 }
 
@@ -436,10 +510,33 @@ function renderDayOfWeekChart(dayOfWeekCounts) {
     const colors = getChartColors();
     const labels = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
     const dataValues = [dayOfWeekCounts[1], dayOfWeekCounts[2], dayOfWeekCounts[3], dayOfWeekCounts[4], dayOfWeekCounts[5], dayOfWeekCounts[6], dayOfWeekCounts[0]];
+    
     const ctx = document.getElementById('dayOfWeekChart').getContext('2d');
     chartInstances.dayOfWeekChart = new Chart(ctx, {
         type: 'bar',
-        data: { labels: labels, datasets: [{ label: 'Wochentage', data: dataValues, backgroundColor: 'rgba(52, 199, 89, 0.7)', borderWidth: 1 }] },
-        options: { responsive: true, scales: { y: { beginAtZero: true, ticks: { color: colors.textColor }, grid: { color: colors.gridColor } }, x: { ticks: { color: colors.textColor }, grid: { color: colors.gridColor } } }, plugins: { legend: { display: false } } }
+        data: { 
+            labels: labels, 
+            datasets: [{ 
+                label: 'Wochentage', 
+                data: dataValues, 
+                backgroundColor: colors.success, // Dynamisch
+                borderWidth: 1 
+            }] 
+        },
+        options: { 
+            responsive: true, 
+            scales: { 
+                y: { 
+                    beginAtZero: true, 
+                    ticks: { color: colors.textColor }, 
+                    grid: { color: colors.gridColor } 
+                }, 
+                x: { 
+                    ticks: { color: colors.textColor }, 
+                    grid: { color: colors.gridColor } 
+                } 
+            }, 
+            plugins: { legend: { display: false } } 
+        }
     });
 }

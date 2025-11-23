@@ -1,6 +1,6 @@
 import { 
     db, query, where, getDocs, addDoc, deleteDoc, doc, orderBy, limit,
-    onSnapshot, getBookingsCollectionRef, updateDoc
+    onSnapshot, getBookingsCollectionRef, updateDoc, runTransaction
 } from '../firebase.js';
 import { getState } from '../state.js';
 import { showMessage } from '../ui.js';
@@ -10,7 +10,8 @@ import { checkBookingPermission, updateKarma } from './karma.js';
 import { BONUS_CANCEL_EARLY, PENALTY_CANCEL_LATE, COST_SLOT_NORMAL, COST_SLOT_PRIME } from '../config.js';
 import { getSystemStatus } from './maintenance.js';
 
-// ... (Bestehende Helper Funktionen bleiben) ...
+// ... (Bestehende Helper Funktionen checkDuplicateBooking, checkSlotAvailability bleiben) ...
+
 export async function checkDuplicateBooking(selectedDate, partei) {
     const q = query(getBookingsCollectionRef(), where('date', '==', selectedDate), where('partei', '==', partei));
     const snapshot = await getDocs(q);
@@ -46,10 +47,43 @@ export async function checkSlotAvailability(selectedDate) {
     return availability;
 }
 
-// ... (performBooking, performDeletion, performCheckIn, performCheckOut, checkAndAutoCheckoutOldBookings wie zuvor) ...
-// Ich kürze diese Standard-Funktionen hier ab, da sie unverändert sind. 
-// Bitte nutze den Code aus dem vorherigen Schritt für diese Funktionen oder lasse sie stehen, wenn du nur ergänzt.
-// WICHTIG IST DIE NEUE FUNKTION UNTEN:
+// ===== NEUE FUNKTION: STATUS-LISTENER =====
+export function subscribeToMachineStatus(onStatusUpdate) {
+    // Wir hören auf alle Buchungen für HEUTE
+    const todayStr = formatDate(new Date());
+    const q = query(getBookingsCollectionRef(), where("date", "==", todayStr));
+    
+    return onSnapshot(q, (snapshot) => {
+        const bookings = [];
+        snapshot.forEach(d => bookings.push(d.data()));
+        
+        // Berechne Status
+        const now = new Date();
+        const hour = now.getHours();
+        let currentSlot = null;
+        
+        if (hour >= 7 && hour < 13) currentSlot = "07:00-13:00";
+        else if (hour >= 13 && hour < 19) currentSlot = "13:00-19:00";
+        
+        let status = 'free'; // Default: Frei
+        
+        if (currentSlot) {
+            // Suche Buchung für den aktuellen Slot
+            const activeBooking = bookings.find(b => b.slot === currentSlot);
+            
+            if (activeBooking) {
+                // Wenn Buchung existiert, ist sie belegt, ES SEI DENN sie wurde freigegeben (Checkout)
+                if (!activeBooking.isReleased) {
+                    status = 'busy';
+                }
+            }
+        }
+        
+        onStatusUpdate(status);
+    });
+}
+
+// ... (Restliche Funktionen wie performBooking, performDeletion etc. bleiben UNVERÄNDERT) ...
 
 export async function performBooking(date, slot, messageElementId) { 
     if (!date || !slot) { showMessage(messageElementId, "Datum/Slot wählen!", 'error'); return false; }
@@ -58,34 +92,64 @@ export async function performBooking(date, slot, messageElementId) {
     if ((await getSystemStatus()) === 'maintenance') { showMessage(messageElementId, "Wartung!", 'error'); return false; }
     const selectedDate = new Date(date); selectedDate.setHours(0, 0, 0, 0);
     if (selectedDate < today) { showMessage(messageElementId, "Vergangenheit!", 'error'); return false; }
+    
     let cost = 0;
     if (!userIsAdmin) {
         const check = await checkBookingPermission(date, slot);
         if (!check.allowed) { showMessage(messageElementId, check.error, 'error'); return false; }
-        cost = check.cost; 
+        cost = check.cost;
     }
+
     try {
-        const bookingsColRef = getBookingsCollectionRef();
-        const hasDuplicate = await checkDuplicateBooking(date, currentUser.userData.partei);
-        const q = query(bookingsColRef, where("date", "==", date), where("slot", "==", slot));
-        const existingBookings = await getDocs(q);
-        let releasedDocId = null;
-        if (!existingBookings.empty) {
-             const first = existingBookings.docs[0].data();
-             if (first.isReleased) releasedDocId = existingBookings.docs[0].id;
-             else { showMessage(messageElementId, "Belegt!", 'error'); return false; }
-        }
-        if (hasDuplicate && !releasedDocId) { showMessage(messageElementId, "Schon gebucht!", 'error'); return false; }
-        if (releasedDocId) await deleteDoc(doc(bookingsColRef, releasedDocId));
-        await addDoc(bookingsColRef, {
-            date: date, slot: slot, partei: currentUser.userData.partei, userId: currentUserId, 
-            bookedAt: new Date().toISOString(), isSwap: false, checkInTime: null, checkOutTime: null, isReleased: false
+        await runTransaction(db, async (transaction) => {
+            const bookingsRef = getBookingsCollectionRef();
+            const qSlot = query(bookingsRef, where("date", "==", date), where("slot", "==", slot));
+            const slotSnap = await getDocs(qSlot); 
+            
+            const qDup = query(bookingsRef, where("date", "==", date), where("partei", "==", currentUser.userData.partei));
+            const dupSnap = await getDocs(qDup);
+            
+            let isSpontaneous = false;
+            if (!slotSnap.empty) {
+                const existing = slotSnap.docs[0].data();
+                if (existing.isReleased) {
+                    isSpontaneous = true;
+                    transaction.delete(slotSnap.docs[0].ref); 
+                } else {
+                    throw "Dieser Slot wurde gerade von jemand anderem gebucht.";
+                }
+            }
+
+            if (!isSpontaneous && !dupSnap.empty) {
+                const myBooking = dupSnap.docs[0].data();
+                if (!myBooking.isReleased) throw "Eure Partei hat an diesem Tag bereits gebucht.";
+            }
+
+            const newBookingRef = doc(bookingsRef); 
+            transaction.set(newBookingRef, {
+                date: date, slot: slot, partei: currentUser.userData.partei, userId: currentUserId, 
+                bookedAt: new Date().toISOString(), isSwap: false, checkInTime: null, checkOutTime: null, isReleased: false
+            });
+
+            if (!userIsAdmin && cost !== 0) {
+                const partyRef = doc(db, "parties", currentUser.userData.partei);
+                const partyDoc = await transaction.get(partyRef);
+                if (!partyDoc.exists()) throw "Partei-Daten fehlen.";
+                
+                const newKarma = (partyDoc.data().karma || 100) + cost;
+                transaction.update(partyRef, { karma: newKarma });
+            }
         });
-        if (!userIsAdmin && cost !== 0) await updateKarma(currentUser.userData.partei, cost, "Buchung");
+
         showMessage(messageElementId, `Erfolg! (${cost} Karma)`, 'success');
         if (messageElementId === 'booking-error') document.getElementById("booking-slot").value = ''; 
         return true;
-    } catch (e) { showMessage(messageElementId, `Fehler: ${e.message}`, 'error'); return false; }
+
+    } catch (e) {
+        console.error(e);
+        showMessage(messageElementId, typeof e === 'string' ? e : "Buchung fehlgeschlagen (Gleichzeitiger Zugriff?)", 'error');
+        return false;
+    }
 }
 
 export async function performDeletion(date, slot, messageElementId) {
@@ -149,14 +213,11 @@ export async function checkAndAutoCheckoutOldBookings() {
     } catch (e) { console.warn("Auto-Cleanup Fehler:", e); }
 }
 
-// ===== NEUE FUNKTION: SPEZIELLER LISTENER FÜR MEINE AKTIVE BUCHUNG =====
 export function listenToMyActiveBooking(onData) {
     const { currentUser } = getState();
     if (!currentUser) return () => {};
 
     const todayStr = formatDate(new Date());
-    
-    // Wir suchen gezielt nach Buchungen MEINER Partei für HEUTE, die NICHT freigegeben sind.
     const q = query(
         getBookingsCollectionRef(),
         where("partei", "==", currentUser.userData.partei),
@@ -166,7 +227,6 @@ export function listenToMyActiveBooking(onData) {
 
     return onSnapshot(q, (snapshot) => {
         if (!snapshot.empty) {
-            // Wir nehmen die erste gefundene (sollte eh nur eine geben)
             const docSnap = snapshot.docs[0];
             onData({ id: docSnap.id, ...docSnap.data() });
         } else {
@@ -178,7 +238,6 @@ export function listenToMyActiveBooking(onData) {
     });
 }
 
-// Alte Funktion bleibt für die Liste unten
 export function loadNextBookingsOverview(onData, onError) {
     const todayFormatted = formatDate(new Date());
     const q = query(getBookingsCollectionRef(), where("date", ">=", todayFormatted), orderBy("date"), orderBy("slot"), limit(5));

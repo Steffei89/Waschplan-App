@@ -22,7 +22,8 @@ import {
 import { handleRegister, handleLogin, handleLogout, handlePasswordReset, handleDeleteAccount } from './services/auth.js';
 import { loadWeather } from './services/weather.js';
 import { loadStatistics, initStatsView, trackMenuClick } from './services/stats.js';
-import { performBooking, performDeletion, loadNextBookingsOverview, checkSlotAvailability, performCheckIn, performCheckOut, checkAndAutoCheckoutOldBookings } from './services/booking.js';
+// NEU: subscribeToMachineStatus importieren
+import { performBooking, performDeletion, loadNextBookingsOverview, checkSlotAvailability, performCheckIn, performCheckOut, checkAndAutoCheckoutOldBookings, subscribeToMachineStatus } from './services/booking.js';
 import { 
     loadIncomingRequests, loadOutgoingRequestStatus, loadOutgoingRequestSuccess,
     confirmSwapTransaction, rejectSwapRequest, dismissRequestNotification
@@ -46,6 +47,8 @@ let activeTimerInterval = null;
 let karmaUnsubscribe = null; 
 let myCurrentBooking = null;
 let autoCheckoutInterval = null;
+// NEU: Variable für den Status-Listener
+let machineStatusUnsubscribe = null;
 
 // --- AUTH FLOW ---
 
@@ -105,6 +108,9 @@ onAuthStateChanged(auth, async (user) => {
                 handleLoadPrograms();
                 handleListenToTimer();
                 
+                // NEU: Maschinen-Status initialisieren
+                handleMachineStatus();
+                
                 checkAppVersion();
 
             } else {
@@ -119,12 +125,16 @@ onAuthStateChanged(auth, async (user) => {
     } else {
         unsubscribeAll();
         if(karmaUnsubscribe) karmaUnsubscribe();
+        if(machineStatusUnsubscribe) machineStatusUnsubscribe(); // NEU: Aufräumen
         
         if (autoCheckoutInterval) clearInterval(autoCheckoutInterval);
         
         setCurrentUser(null);
         updateUserInfo(null);
         dom.weatherWidget.style.display = 'none';
+        
+        // NEU: Status Widget ausblenden
+        if(dom.machineStatusWidget) dom.machineStatusWidget.style.display = 'none';
         
         if (activeTimerInterval) clearInterval(activeTimerInterval);
         dom.liveTimerSection.style.display = 'none';
@@ -145,6 +155,38 @@ document.addEventListener("visibilitychange", () => {
         updateSession();
     }
 });
+
+// NEU: Funktion für den Maschinen-Status
+function handleMachineStatus() {
+    if(machineStatusUnsubscribe) machineStatusUnsubscribe();
+    
+    const widget = dom.machineStatusWidget;
+    const icon = document.getElementById('machine-status-icon');
+    const text = document.getElementById('machine-status-text');
+    
+    if(!widget) return;
+    widget.style.display = 'flex';
+    
+    machineStatusUnsubscribe = subscribeToMachineStatus((status) => {
+        if (status === 'busy') {
+            widget.className = 'status-widget status-busy';
+            text.textContent = 'Belegt';
+            icon.className = 'fa-solid fa-shirt'; 
+        } else {
+            widget.className = 'status-widget status-free';
+            text.textContent = 'Frei';
+            icon.className = 'fa-regular fa-circle-check';
+        }
+    });
+}
+
+// ... (Der gesamte Rest der Datei bleibt UNVERÄNDERT) ...
+// ACHTUNG: Da ich hier den Rest nicht erneut poste, achte darauf,
+// dass du beim Kopieren nichts von dem existierenden Code löschst,
+// der nach "handleMachineStatus" folgen würde (setupKarmaHeaderListener, etc.)
+// Am besten kopierst du den neuen Block "handleMachineStatus" und den Aufruf
+// in "onAuthStateChanged" und die Imports manuell, wenn du unsicher bist.
+// Aber da du "komplette Codes" wolltest, hier ist der Rest der Datei:
 
 // ===== KARMA HEADER LISTENER =====
 function setupKarmaHeaderListener(parteiName) {
@@ -214,6 +256,7 @@ function handleLoadNextBookings() {
                     delBtn.onclick = async (e) => {
                         e.target.disabled = true;
                         e.target.textContent = 'Lösche...';
+                        // HIER IST DER FIX VOM VORHERIGEN SCHRITT:
                         const success = await performDeletion(booking.date, booking.slot, 'main-menu-message');
                         if (success && dom.bookingDateInput.value === booking.date) {
                             dom.bookingDateInput.dispatchEvent(new Event('change'));
@@ -472,7 +515,6 @@ function renderTimerUI() {
             if (remainingMs <= 0) {
                 clearInterval(activeTimerInterval);
                 activeTimerInterval = null;
-                // showTimerDoneNotification wurde ENTFERNT, Backend macht das.
                 stopWashTimer(currentUser.userData.partei); 
                 currentTimerData = null; 
                 renderTimerUI(); 
