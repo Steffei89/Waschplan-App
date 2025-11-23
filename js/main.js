@@ -16,7 +16,7 @@ import { getState, setCurrentUser, setUnsubscriber, setSelectedCalendarDate, get
 import { getFormattedDate, today, tomorrow, createAndDownloadIcsFile } from './utils.js';
 import { 
     showMessage, navigateTo, updateUserInfo, setTheme, unsubscribeAll, unsubscribeForNavigation,
-    hideConfirmation, updateSlotDropdownUI, showTimerDoneNotification,
+    hideConfirmation, updateSlotDropdownUI,
     checkNotificationPermission, showChangelog
 } from './ui.js';
 import { handleRegister, handleLogin, handleLogout, handlePasswordReset, handleDeleteAccount } from './services/auth.js';
@@ -98,13 +98,12 @@ onAuthStateChanged(auth, async (user) => {
                 dom.weatherWidget.style.display = 'flex'; 
                 navigateTo(dom.mainMenu);
                 
-                // START: Globale Listener (bleiben aktiv!)
-                handleLoadNextBookings(); 
+                handleLoadNextBookings();
                 handleLoadIncomingRequests();
                 handleLoadOutgoingRequests();
                 handleLoadOutgoingSuccess();
                 handleLoadPrograms();
-                handleListenToTimer(); 
+                handleListenToTimer();
                 
                 checkAppVersion();
 
@@ -118,7 +117,6 @@ onAuthStateChanged(auth, async (user) => {
             }
         }
     } else {
-        // LOGOUT: Hier killen wir ALLES
         unsubscribeAll();
         if(karmaUnsubscribe) karmaUnsubscribe();
         
@@ -191,7 +189,7 @@ function handleLoadNextBookings() {
             );
             
             myCurrentBooking = myActive || null;
-            renderTimerUI(); // Sofortiges UI Update bei Änderungen
+            renderTimerUI(); 
 
             if (bookings.length === 0) {
                 dom.myBookingsList.innerHTML = `<p class="small-text">Keine kommenden Buchungen gefunden.</p>`;
@@ -259,8 +257,6 @@ function handleLoadNextBookings() {
 }
 
 function handleLoadIncomingRequests() {
-    dom.incomingRequestsContainer.innerHTML = '<p class="small-text">Lade Tauschanfragen...</p>';
-    dom.incomingRequestsContainer.style.display = 'none';
     const unsub = loadIncomingRequests(
         (pendingRequests) => {
             dom.incomingRequestsContainer.innerHTML = '';
@@ -476,7 +472,7 @@ function renderTimerUI() {
             if (remainingMs <= 0) {
                 clearInterval(activeTimerInterval);
                 activeTimerInterval = null;
-                showTimerDoneNotification(programName);
+                // showTimerDoneNotification wurde ENTFERNT, Backend macht das.
                 stopWashTimer(currentUser.userData.partei); 
                 currentTimerData = null; 
                 renderTimerUI(); 
@@ -682,7 +678,7 @@ document.getElementById('refresh-app-btn').addEventListener('click', () => {
 function setupMainMenuListeners() {
     document.getElementById('book-btn').addEventListener('click', () => {
         trackMenuClick('btn_book');
-        unsubscribeForNavigation(); // <--- NEU: Globale Listener behalten
+        unsubscribeForNavigation(); 
         dom.bookingDateInput.value = getFormattedDate(tomorrow);
         dom.dateValidationMessage.textContent = '';
         dom.bookingSlotSelect.value = '';
@@ -691,14 +687,14 @@ function setupMainMenuListeners() {
     });
     document.getElementById('overview-btn').addEventListener('click', () => {
         trackMenuClick('btn_week');
-        unsubscribeForNavigation(); // <--- NEU
+        unsubscribeForNavigation(); 
         setupWeekDropdown();
         loadBookingsForWeek(dom.kwSelect.value, setUnsubscriber);
         navigateTo(dom.overviewSection);
     });
     document.getElementById('calendar-btn').addEventListener('click', () => {
         trackMenuClick('btn_calendar');
-        unsubscribeForNavigation(); // <--- NEU
+        unsubscribeForNavigation(); 
         dom.calendarDayActions.style.display = 'none'; 
         setSelectedCalendarDate(null);
         const now = new Date();
@@ -707,13 +703,13 @@ function setupMainMenuListeners() {
     });
     
     document.getElementById('admin-btn').addEventListener('click', () => {
-        unsubscribeForNavigation(); // <--- NEU: Damit bleibt Timer aktiv!
+        unsubscribeForNavigation(); 
         loadAdminUserData(); 
         navigateTo(dom.adminSection);
     });
     
     document.getElementById('profile-btn').addEventListener('click', () => {
-        unsubscribeForNavigation(); // <--- NEU
+        unsubscribeForNavigation(); 
         loadProfileData(); 
         navigateTo(dom.profileSection);
     });
@@ -722,7 +718,7 @@ function setupMainMenuListeners() {
     if (minigameBtn) {
         minigameBtn.addEventListener('click', () => {
             trackMenuClick('btn_minigame');
-            unsubscribeForNavigation(); // <--- NEU
+            unsubscribeForNavigation(); 
             initMinigame();
             navigateTo(dom.minigameSection);
         });

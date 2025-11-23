@@ -25,7 +25,6 @@ async function sendPushNotification(userQuery, title, body, url = 'https://wasch
     let tokens = [];
     const userIds = [];
 
-    // Helper: Tokens sammeln aus verschiedenen Feldern
     const collectTokens = (userData) => {
         let found = [];
         if (userData.fcmTokens && Array.isArray(userData.fcmTokens)) {
@@ -42,17 +41,16 @@ async function sendPushNotification(userQuery, title, body, url = 'https://wasch
         tokens = tokens.concat(collectTokens(doc.data()));
     });
 
-    // Duplikate entfernen
     tokens = [...new Set(tokens)];
 
     if (tokens.length === 0) return;
 
-    // Payload Bauen (Sicher für iOS & Android)
+    // HIER WIRD DER TEXT DEFINIERT
     const messagePayload = {
         tokens: tokens,
         notification: {
             title: title,
-            body: body
+            body: body // Wird jetzt vom Aufrufer gesteuert (siehe unten)
         },
         webpush: {
             headers: { "Urgency": "high" },
@@ -61,16 +59,17 @@ async function sendPushNotification(userQuery, title, body, url = 'https://wasch
                 icon: '/img/icon-192.png',
                 badge: '/img/icon-maskable-192.png',
                 vibrate: [200, 100, 200],
-                tag: 'waschplan-alert'
+                tag: 'waschplan-alert',
+                requireInteraction: true // Nachricht bleibt stehen bis Klick
             }
         }
     };
 
     try {
         const response = await messaging.sendEachForMulticast(messagePayload);
-        console.log(`Push "${title}" an ${tokens.length} Geräte gesendet. Erfolg: ${response.successCount}`);
+        console.log(`Push "${title}" gesendet. Erfolg: ${response.successCount}`);
 
-        // Cleanup ungültiger Tokens
+        // Token Cleanup
         if (response.failureCount > 0) {
             const failedTokens = [];
             response.responses.forEach((resp, idx) => {
@@ -78,7 +77,6 @@ async function sendPushNotification(userQuery, title, body, url = 'https://wasch
             });
             
             if (failedTokens.length > 0) {
-                console.log("Bereinige ungültige Tokens...", failedTokens.length);
                 const batch = db.batch();
                 userIds.forEach(uid => {
                     const ref = db.collection('users').doc(uid);
@@ -93,12 +91,11 @@ async function sendPushNotification(userQuery, title, body, url = 'https://wasch
 }
 
 // ============================================================================
-// 1. CRONJOB: Timer-Check UND Buchungs-Erinnerung (Jede Minute)
+// 1. CRONJOB
 // ============================================================================
 exports.checkTimerDone = onSchedule("every 1 minutes", async (event) => {
     const now = admin.firestore.Timestamp.now();
     
-    // --- TEIL A: Timer abgelaufen? ---
     const timerQuery = db.collection('active_timers')
         .where('endTime', '<=', now)
         .where('notified', '!=', true);
@@ -108,44 +105,33 @@ exports.checkTimerDone = onSchedule("every 1 minutes", async (event) => {
 
     timerSnap.forEach(doc => {
         const data = doc.data();
-        const starter = data.startedBy;
         const partei = doc.id;
 
-        let q;
-        if (starter) {
-            q = db.collection('users').where(admin.firestore.FieldPath.documentId(), '==', starter);
-        } else {
-            q = db.collection('users').where('partei', '==', partei);
-        }
+        const q = db.collection('users').where('partei', '==', partei);
 
         promises.push((async () => {
-            await sendPushNotification(q, "Wäsche fertig! 🧺", `Programm "${data.programName}" ist durch. Bitte auschecken!`);
+            // ÄNDERUNG: Kurzer Titel, leerer Body (oder sehr kurz)
+            // Auf iOS erscheint der Titel fett. Der Body normal darunter.
+            // Wir schreiben alles in den Titel, damit es wie EINE Zeile wirkt.
+            await sendPushNotification(q, "Wäsche ist fertig! ✅", "Bitte auschecken.");
             await doc.ref.update({ notified: true });
         })());
     });
 
-    // --- TEIL B: Buchungs-Erinnerung (Start) ---
+    // Buchungs-Erinnerung
     const berlinDate = new Date().toLocaleString("en-US", {timeZone: "Europe/Berlin"});
     const dateObj = new Date(berlinDate);
     const currentHour = dateObj.getHours();
     const currentMin = dateObj.getMinutes();
 
-    // Nur in den ersten 5 Minuten der Stunde prüfen (Performance)
     if (currentMin < 5) {
         let targetSlot = null;
         if (currentHour === 7) targetSlot = "07:00-13:00";
         if (currentHour === 13) targetSlot = "13:00-19:00";
 
         if (targetSlot) {
-            const year = dateObj.getFullYear();
-            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-            const day = String(dateObj.getDate()).padStart(2, '0');
-            const todayStr = `${year}-${month}-${day}`;
-
-            // Suche Buchungen, die JETZT starten und noch keine Erinnerung haben
-            // Hinweis: Firestore behandelt fehlende Felder in != Abfragen oft speziell,
-            // aber 'reminderSent' wird bei neuen Buchungen einfach fehlen.
-            // Sicherer ist: Wir laden die Buchungen des Slots und filtern im Code.
+            const todayStr = dateObj.toISOString().split('T')[0]; // Vereinfacht YYYY-MM-DD
+            
             const bookingQuery = db.collection('bookings')
                 .where('date', '==', todayStr)
                 .where('slot', '==', targetSlot);
@@ -154,12 +140,10 @@ exports.checkTimerDone = onSchedule("every 1 minutes", async (event) => {
             
             bookingSnap.forEach(doc => {
                 const b = doc.data();
-                // Nur senden, wenn noch NICHT gesendet wurde
                 if (b.partei && !b.reminderSent) {
                     promises.push((async () => {
                         const q = db.collection('users').where('partei', '==', b.partei);
-                        await sendPushNotification(q, "Wasch-Slot beginnt! 🕒", `Euer Slot (${targetSlot}) beginnt jetzt.`);
-                        // Markieren als gesendet
+                        await sendPushNotification(q, "Wasch-Slot beginnt! 🕒", "");
                         await doc.ref.update({ reminderSent: true });
                     })());
                 }
@@ -176,39 +160,18 @@ exports.checkTimerDone = onSchedule("every 1 minutes", async (event) => {
 exports.onSwapRequest = onDocumentCreated("swap_requests/{requestId}", async (event) => {
     const snapshot = event.data;
     if (!snapshot) return;
-    
     const data = snapshot.data();
-    const targetPartei = data.targetPartei;
-    const requester = data.requesterPartei;
-    
-    if (!targetPartei) return;
-
-    console.log(`Neue Tauschanfrage von ${requester} an ${targetPartei}`);
-
-    const q = db.collection('users').where('partei', '==', targetPartei);
-    
-    // Datum formatieren (YYYY-MM-DD -> DD.MM.)
-    const dateParts = (data.targetDate || "").split('-');
-    const dateNice = dateParts.length === 3 ? `${dateParts[2]}.${dateParts[1]}.` : data.targetDate;
-
-    await sendPushNotification(q, "Neue Tauschanfrage 🔄", `${requester} möchte deinen Slot am ${dateNice} tauschen.`);
+    const q = db.collection('users').where('partei', '==', data.targetPartei);
+    await sendPushNotification(q, "Neue Tauschanfrage 🔄", "");
 });
 
 // ============================================================================
-// 3. TRIGGER: Neues Problem (Wartung)
+// 3. TRIGGER: Neues Problem
 // ============================================================================
 exports.onMaintenanceTicket = onDocumentCreated("maintenance_tickets/{ticketId}", async (event) => {
     const snapshot = event.data;
     if (!snapshot) return;
-
     const data = snapshot.data();
-    const reason = data.reason || "Unbekannt";
-    const userEmail = data.email || "Jemand";
-
-    console.log(`Neues Ticket: ${reason}`);
-
-    // Nachricht an alle Admins
     const q = db.collection('users').where('isAdmin', '==', true);
-
-    await sendPushNotification(q, "⚠️ Problem gemeldet", `${userEmail} meldet: ${reason}`);
+    await sendPushNotification(q, "⚠️ Problem gemeldet", `${data.reason}`);
 });
