@@ -6,7 +6,8 @@ import { getState } from '../state.js';
 import { showMessage } from '../ui.js';
 import { checkDuplicateBooking } from './booking.js';
 import { updateKarma } from './karma.js';
-import { BONUS_SWAP_ACCEPT } from '../config.js';
+// WICHTIG: Hier habe ich COST_SLOT_NORMAL und COST_SLOT_PRIME hinzugefügt
+import { BONUS_SWAP_ACCEPT, COST_SLOT_NORMAL, COST_SLOT_PRIME } from '../config.js';
 
 export async function handleSwapRequest(targetBooking, messageElementId) {
     const { currentUser, currentUserId } = getState();
@@ -121,8 +122,22 @@ export async function confirmSwapTransaction(requestId) {
             transaction.update(requestRef, { status: 'accepted' });
         });
 
-        // BONUS FÜR HELFER (Auf Partei)
+        // ===== FAIRNESS UPDATE START =====
+        
+        // 1. Kosten ermitteln (Wochenende vs. Werktag)
+        const dateObj = new Date(reqData.targetDate);
+        const isWeekend = (dateObj.getDay() === 0 || dateObj.getDay() === 6);
+        // Diese Werte sind negativ (z.B. -10 oder -20)
+        const cost = isWeekend ? COST_SLOT_PRIME : COST_SLOT_NORMAL;
+
+        // 2. Dem EMPFÄNGER (Requester) die Kosten abziehen
+        // Da 'cost' negativ ist, addieren wir es einfach, um Punkte abzuziehen.
+        await updateKarma(reqData.requesterPartei, cost, "Tausch-Übernahme");
+
+        // 3. Dem GEBER (Dir) den Bonus gutschreiben
         await updateKarma(currentUser.userData.partei, BONUS_SWAP_ACCEPT, "Tausch-Bonus");
+
+        // ===== FAIRNESS UPDATE ENDE =====
 
         showMessage(messageElementId, `Tausch erfolgreich! Slot übergeben (+${BONUS_SWAP_ACCEPT} Karma).`, 'success');
 

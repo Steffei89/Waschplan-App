@@ -214,7 +214,7 @@ function handleLoadNextBookings() {
                     delBtn.onclick = async (e) => {
                         e.target.disabled = true;
                         e.target.textContent = 'Lösche...';
-                        const success = await performDeletion(booking.date, booking.slot, 'my-upcoming-bookings');
+                        const success = await performDeletion(booking.date, booking.slot, 'main-menu-message');
                         if (success && dom.bookingDateInput.value === booking.date) {
                             dom.bookingDateInput.dispatchEvent(new Event('change'));
                         }
