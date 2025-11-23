@@ -116,13 +116,16 @@ body {
   display: flex;
   justify-content: space-between; 
   align-items: center;
-  margin-bottom: 10px; /* Reduziert von 20px für kompakteren Look */
+  margin-bottom: 10px;
+  gap: 10px; /* Sicherheitsabstand damit nichts klebt */
 }
 
 .header-controls-wrapper {
     display: flex;
     align-items: center;
-    gap: 12px; 
+    gap: 12px;
+    flex-shrink: 1; /* Darf schrumpfen wenn nötig */
+    min-width: 0;   /* Verhindert Überlauf */
 }
 
 #weather-widget {
@@ -138,8 +141,9 @@ body {
   color: var(--text-color); 
   padding: 6px 12px;
   border-radius: 20px;
-  flex-shrink: 0; 
-  transition: all 0.3s ease; 
+  flex-shrink: 0; /* Wetter darf nicht gequetscht werden */
+  transition: all 0.3s ease;
+  white-space: nowrap; /* Textumbruch verhindern */
 }
 
 .header-container #theme-icon,
@@ -156,6 +160,7 @@ body {
   justify-content: center;
   align-items: center;
   transition: all 0.3s ease;
+  flex-shrink: 0;
 }
 
 .header-container #theme-icon:active,
@@ -181,6 +186,9 @@ body {
   -webkit-backdrop-filter: blur(15px) saturate(180%);
   backdrop-filter: blur(15px) saturate(180%);
   transition: background 0.3s ease;
+  white-space: nowrap;
+  flex-shrink: 1; /* Darf etwas kleiner werden */
+  overflow: hidden;
 }
 
 #weather-widget i {
@@ -197,6 +205,37 @@ body {
 #weather-widget.is-wet { color: var(--error-color); border-color: var(--error-color); }
 #weather-widget.is-wet i { color: var(--error-color); }
 #weather-widget i.fa-spinner { color: var(--primary-color); }
+
+/* ====== RESPONSIVE ANPASSUNGEN FÜR KLEINE SCREENS ====== */
+@media (max-width: 450px) {
+    .header-controls-wrapper {
+        gap: 6px; /* Engere Abstände zwischen den Buttons */
+    }
+
+    .header-container #theme-icon,
+    .header-container #refresh-app-btn {
+        width: 38px;  /* Etwas kleinere Buttons */
+        height: 38px;
+        font-size: 1.2em;
+    }
+
+    .karma-badge {
+        height: 38px;
+        padding: 0 10px;
+        font-size: 0.85em;
+    }
+
+    #weather-widget {
+        padding: 5px 10px;
+        font-size: 0.9em;
+    }
+
+    /* WICHTIG: Text Label (z.B. "Leicht bewölkt") ausblenden, nur Icon+Temp zeigen */
+    #weather-label {
+        display: none;
+    }
+}
+/* ======================================================= */
 
 h2 { text-align: center; margin-bottom: 20px; color: var(--text-color); }
 

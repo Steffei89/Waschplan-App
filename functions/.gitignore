@@ -1,5 +1,4 @@
 node_modules/
-*.local# .gitignore im Ordner functions/
-node_modules/
+*.local
 *.log
 firebase-debug.log*

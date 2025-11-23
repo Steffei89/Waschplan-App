@@ -2,7 +2,7 @@
 export const SECRET_INVITE_CODE = "FamRei2025"; 
 // ==========================
 
-export const APP_VERSION = "2.8.0"; // Stats Update
+export const APP_VERSION = "2.8.1"; // Stats Update
 
 // ===== Wasch-Karma Einstellungen =====
 export const KARMA_START = 100;       
