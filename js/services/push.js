@@ -1,4 +1,3 @@
-// js/services/push.js
 import { messaging, getToken, onMessage, doc, updateDoc, db, arrayUnion } from '../firebase.js';
 import { getState } from '../state.js';
 import { showMessage } from '../ui.js';
@@ -9,18 +8,22 @@ export async function initPushNotifications() {
     const { currentUser } = getState();
     if (!currentUser) return;
 
-    // Check ob Browser das überhaupt kann
     if (!('Notification' in window)) {
-        console.log("Dieser Browser unterstützt keine Notifications.");
+        console.log("Kein Push-Support.");
+        return;
+    }
+
+    // iOS Check
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+    if (isIOS && !isStandalone) {
+        console.log("iOS: Bitte App zum Home-Screen hinzufügen für Push.");
         return;
     }
 
     try {
         const permission = await Notification.requestPermission();
-        if (permission !== 'granted') {
-            console.warn("Push-Berechtigung verweigert.");
-            return;
-        }
+        if (permission !== 'granted') return;
 
         const registration = await navigator.serviceWorker.ready;
         if (!registration) return;
@@ -31,16 +34,21 @@ export async function initPushNotifications() {
         });
         
         if (currentToken) {
-            console.log("FCM Token:", currentToken);
             await saveTokenToDatabase(currentToken);
         }
 
         // Listener für Nachrichten bei OFFENER App
         onMessage(messaging, (payload) => {
             console.log('Nachricht im Vordergrund:', payload);
-            const title = payload.notification.title;
-            const body = payload.notification.body;
+            
+            // WICHTIG: Wir prüfen jetzt 'data', da 'notification' leer sein kann
+            const data = payload.data || {};
+            const title = data.title || payload.notification?.title || 'Nachricht';
+            const body = data.body || payload.notification?.body || '';
+
             showMessage('main-menu-message', `🔔 ${title}: ${body}`, 'success', 8000);
+            
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
         });
 
     } catch (err) {
@@ -54,7 +62,6 @@ async function saveTokenToDatabase(token) {
 
     const userRef = doc(db, "users", currentUser.uid);
     try {
-        // Fügt den Token zur Liste hinzu (arrayUnion verhindert Duplikate)
         await updateDoc(userRef, {
             fcmTokens: arrayUnion(token),
             lastTokenUpdate: new Date().toISOString()

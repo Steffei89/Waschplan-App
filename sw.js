@@ -1,4 +1,4 @@
-// sw.js
+// sw.js - Version 3.0 (Data-Only Support)
 importScripts('https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.1/firebase-messaging-compat.js');
 
@@ -14,50 +14,40 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-// Empfängt Nachrichten im Hintergrund
+console.log('[sw.js] Service Worker v3.0 geladen.');
+
 messaging.onBackgroundMessage((payload) => {
-  console.log('[sw.js] Background message: ', payload);
+  console.log('[sw.js] Data message received:', payload);
   
-  const title = payload.notification.title;
-  const options = {
-    body: payload.notification.body,
+  // Daten aus payload.data holen (weil wir keine 'notification' mehr senden)
+  const data = payload.data || {};
+  const title = data.title || 'Waschplan';
+  const body = data.body || 'Wäsche ist fertig!';
+  const url = data.url || '/';
+
+  const notificationOptions = {
+    body: body,
     icon: '/img/icon-192.png',
     badge: '/img/icon-maskable-192.png',
-    vibrate: [200, 100, 200],
-    data: {
-        url: 'https://waschplanapp.web.app' // URL zum Öffnen
-    }
+    tag: 'washing-timer', // Verhindert Stapeln
+    data: { url: url }    // URL für Klick-Event durchreichen
   };
-  
-  self.registration.showNotification(title, options);
-});
 
-self.addEventListener('install', (event) => {
-    console.log('Service Worker installing.');
-    event.waitUntil(self.skipWaiting()); 
-});
-
-self.addEventListener('activate', (event) => {
-    console.log('Service Worker activating.');
-    event.waitUntil(self.clients.claim());
+  return self.registration.showNotification(title, notificationOptions);
 });
 
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
-    
-    // Versuche, die URL aus den Daten zu holen, sonst nimm Root
-    const urlToOpen = (event.notification.data && event.notification.data.url) ? event.notification.data.url : '/';
+    const urlToOpen = event.notification.data?.url || '/';
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
-            // Prüfen, ob App bereits offen ist
             for (let i = 0; i < windowClients.length; i++) {
                 const client = windowClients[i];
                 if (client.url.includes(urlToOpen) && 'focus' in client) {
                     return client.focus();
                 }
             }
-            // Wenn nicht offen, neu öffnen
             if (clients.openWindow) {
                 return clients.openWindow(urlToOpen);
             }
