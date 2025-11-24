@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script> 
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=fix_ios">
 </head>
 <body>
 
@@ -464,7 +464,7 @@
     </div>
   </div>
 
-  <div id="scannerModal" class="modal" style="display:none;">
+</div> <div id="scannerModal" class="modal" style="display:none;">
     <div class="modal-content" style="max-width:400px; padding:20px;">
         <h3 style="margin-top:0;">QR-Code scannen</h3>
         <p class="small-text">Halte die Kamera auf den Code an der Maschine.</p>
@@ -473,8 +473,6 @@
             <button id="close-scanner-btn" class="button-secondary">Abbrechen</button>
         </div>
     </div>
-  </div>
-
 </div>
 
 <script type="module" src="js/main.js"></script>
