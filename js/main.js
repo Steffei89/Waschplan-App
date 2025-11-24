@@ -180,14 +180,6 @@ function handleMachineStatus() {
     });
 }
 
-// ... (Der gesamte Rest der Datei bleibt UNVERÄNDERT) ...
-// ACHTUNG: Da ich hier den Rest nicht erneut poste, achte darauf,
-// dass du beim Kopieren nichts von dem existierenden Code löschst,
-// der nach "handleMachineStatus" folgen würde (setupKarmaHeaderListener, etc.)
-// Am besten kopierst du den neuen Block "handleMachineStatus" und den Aufruf
-// in "onAuthStateChanged" und die Imports manuell, wenn du unsicher bist.
-// Aber da du "komplette Codes" wolltest, hier ist der Rest der Datei:
-
 // ===== KARMA HEADER LISTENER =====
 function setupKarmaHeaderListener(parteiName) {
     if(karmaUnsubscribe) karmaUnsubscribe();
@@ -256,7 +248,6 @@ function handleLoadNextBookings() {
                     delBtn.onclick = async (e) => {
                         e.target.disabled = true;
                         e.target.textContent = 'Lösche...';
-                        // HIER IST DER FIX VOM VORHERIGEN SCHRITT:
                         const success = await performDeletion(booking.date, booking.slot, 'main-menu-message');
                         if (success && dom.bookingDateInput.value === booking.date) {
                             dom.bookingDateInput.dispatchEvent(new Event('change'));
@@ -475,8 +466,12 @@ async function getStoredQrCode() {
     } catch(e) { return 'WASCH-START'; }
 }
 
+// === HIER IST DIE GEÄNDERTE FUNKTION MIT DER ZEIT-SPERRE ===
 function renderTimerUI() {
-    if (activeTimerInterval) clearInterval(activeTimerInterval); 
+    if (activeTimerInterval) {
+        clearTimeout(activeTimerInterval);
+        clearInterval(activeTimerInterval);
+    }
     activeTimerInterval = null; 
 
     const { currentUser } = getState();
@@ -488,6 +483,7 @@ function renderTimerUI() {
     
     dom.liveTimerSection.innerHTML = ''; 
 
+    // FALL 1: Timer läuft
     if (currentTimerData) {
         dom.liveTimerSection.style.display = 'block';
         setTimeout(() => dom.liveTimerSection.classList.add('active'), 10); 
@@ -513,7 +509,7 @@ function renderTimerUI() {
             const remainingMs = endTimeMs - nowMs;
 
             if (remainingMs <= 0) {
-                clearInterval(activeTimerInterval);
+                if (activeTimerInterval) clearInterval(activeTimerInterval);
                 activeTimerInterval = null;
                 stopWashTimer(currentUser.userData.partei); 
                 currentTimerData = null; 
@@ -558,31 +554,72 @@ function renderTimerUI() {
         });
 
     } else {
+        // FALL 2: Kein Timer, aber Buchung heute
         if (myCurrentBooking) {
             dom.liveTimerSection.style.display = 'block';
             setTimeout(() => dom.liveTimerSection.classList.add('active'), 10);
 
+            // Unterfall: Noch NICHT eingecheckt
             if (!myCurrentBooking.checkInTime) {
-                dom.liveTimerSection.innerHTML = `
-                    <div class="timer-start-container" style="text-align:center;">
-                        <h3 style="margin:0 0 10px 0;">Dein Slot: ${myCurrentBooking.slot}</h3>
-                        <p style="margin-bottom:15px;">Bitte einchecken, wenn du an der Maschine bist.</p>
-                        <button id="check-in-btn" class="button-primary" style="font-size:1.2em; padding:15px;">
-                            <i class="fa-solid fa-qrcode"></i> Check-in (Scan)
-                        </button>
-                    </div>
-                `;
-                document.getElementById('check-in-btn').addEventListener('click', async () => {
-                    const correctCode = await getStoredQrCode();
-                    startScanner(async (code) => {
-                        if (code === correctCode) {
-                            await performCheckIn(myCurrentBooking.id, 'main-menu-message');
-                        } else {
-                            alert("Falscher QR-Code!");
-                        }
+                
+                // === NEUE LOGIK: Zeit prüfen ===
+                const now = new Date();
+                // Slot z.B. "07:00-13:00" -> Startzeit extrahieren
+                const [startHour, startMinute] = myCurrentBooking.slot.split('-')[0].split(':').map(Number);
+                
+                // Datum-Objekt für Startzeit heute erstellen
+                const startTime = new Date();
+                startTime.setHours(startHour, startMinute, 0, 0);
+
+                if (now < startTime) {
+                    // ZU FRÜH: Button deaktiviert anzeigen
+                    dom.liveTimerSection.innerHTML = `
+                        <div class="timer-start-container" style="text-align:center;">
+                            <h3 style="margin:0 0 10px 0;">Dein Slot: ${myCurrentBooking.slot}</h3>
+                            <p style="margin-bottom:15px; color: var(--text-color); opacity: 0.8;">
+                                <i class="fa-regular fa-clock"></i> Check-in möglich ab <strong>${String(startHour).padStart(2, '0')}:${String(startMinute).padStart(2, '0')} Uhr</strong>
+                            </p>
+                            <button class="button-secondary" disabled style="opacity: 0.6; cursor: not-allowed; background-color: var(--secondary-color); color: var(--text-color);">
+                                <i class="fa-solid fa-hourglass-start"></i> Warte auf Startzeit...
+                            </button>
+                        </div>
+                    `;
+
+                    // Automatisch aktualisieren wenn Zeit erreicht
+                    const msUntilStart = startTime - now;
+                    if (msUntilStart > 0 && msUntilStart < 24 * 60 * 60 * 1000) {
+                        activeTimerInterval = setTimeout(() => {
+                            renderTimerUI(); 
+                            showMessage('main-menu-message', 'Deine Zeit beginnt jetzt! Check-in ist freigeschaltet.', 'success');
+                        }, msUntilStart);
+                    }
+
+                } else {
+                    // ZEIT ERREICHT: Check-in erlauben
+                    dom.liveTimerSection.innerHTML = `
+                        <div class="timer-start-container" style="text-align:center;">
+                            <h3 style="margin:0 0 10px 0;">Dein Slot: ${myCurrentBooking.slot}</h3>
+                            <p style="margin-bottom:15px;">Bitte einchecken, wenn du an der Maschine bist.</p>
+                            <button id="check-in-btn" class="button-primary" style="font-size:1.2em; padding:15px;">
+                                <i class="fa-solid fa-qrcode"></i> Check-in (Scan)
+                            </button>
+                        </div>
+                    `;
+                    document.getElementById('check-in-btn').addEventListener('click', async () => {
+                        const correctCode = await getStoredQrCode();
+                        startScanner(async (code) => {
+                            if (code === correctCode) {
+                                await performCheckIn(myCurrentBooking.id, 'main-menu-message');
+                            } else {
+                                alert("Falscher QR-Code!");
+                            }
+                        });
                     });
-                });
+                }
+                // === ENDE NEUE LOGIK ===
+
             } 
+            // Unterfall: BEREITS eingecheckt
             else {
                 let buttonsHTML = '';
                 if(allPrograms.length > 0) {
