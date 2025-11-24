@@ -561,3 +561,81 @@ canvas#gameCanvas {
 @keyframes itemSlideUp { to { opacity: 1; transform: translateY(0); } }
 .booking-item:nth-child(2), .my-booking-item:nth-child(2) { animation-delay: 0.05s; }
 .booking-item:nth-child(3), .my-booking-item:nth-child(3) { animation-delay: 0.1s; }
+
+/* =========================================
+   NEU: FIX FÜR QR-CODE SCANNER VIDEO (iOS)
+   ========================================= */
+#reader {
+    width: 100%;
+    position: relative;
+    overflow: hidden;
+    border-radius: 12px;
+}
+
+#reader video {
+    width: 100% !important;
+    height: auto !important;
+    object-fit: cover;
+    border-radius: 12px;
+    display: block !important; /* Erzwingt Anzeige */
+}
+
+/* Versteckt unnötige Elemente der Library, falls vorhanden */
+#reader__dashboard_section_csr span, 
+#reader__dashboard_section_swaplink {
+    display: none !important;
+}
+
+/* 1. WICHTIG: Die Modal-Klasse fehlte wahrscheinlich oder war unvollständig */
+.modal {
+    position: fixed; /* Fixiert über allem */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.6); /* Halbtransparenter Hintergrund */
+    display: flex; /* Flexbox für Zentrierung */
+    justify-content: center;
+    align-items: center;
+    z-index: 3000; /* Sehr hoch, damit es über allem liegt */
+    backdrop-filter: blur(5px); /* Schicker Blur-Effekt */
+}
+
+/* Inhalt des Modals */
+.modal-content {
+    background: var(--background-color, #fff);
+    padding: 20px;
+    border-radius: 16px;
+    width: 90%;
+    max-width: 400px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    text-align: center;
+    position: relative;
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+/* 2. FIX FÜR DAS KAMERA-BILD */
+#reader {
+    width: 100%;
+    background: #000; /* Schwarzer Hintergrund solange Kamera lädt */
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    margin-bottom: 15px;
+}
+
+/* Erzwingt, dass das Video den Container ausfüllt */
+#reader video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover; /* Füllt den Bereich ohne Verzerrung */
+    border-radius: 12px;
+    display: block !important;
+}
+
+/* Versteckt unnötige Links vom Scanner-Plugin */
+#reader__dashboard_section_csr span, 
+#reader__dashboard_section_swaplink {
+    display: none !important;
+}
