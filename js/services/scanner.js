@@ -1,6 +1,5 @@
 // js/services/scanner.js
 
-// Variable muss null sein zu Beginn
 let html5QrCode = null;
 
 export function startScanner(onSuccess, onFailure) {
@@ -9,14 +8,13 @@ export function startScanner(onSuccess, onFailure) {
     
     if (!modal) return;
     
-    // 1. Modal sofort anzeigen
+    // 1. Modal anzeigen
     modal.style.display = 'flex';
     
-    // 2. Timeout erhöht auf 400ms für Sicherheit bei Animationen
+    // 2. Timeout geben, damit das DOM sicher bereit ist (iOS braucht das)
     setTimeout(() => {
-        // Sicherheitscheck: Hat der User das Modal während des Wartens schon wieder geschlossen?
+        // Falls der User wild klickt und es schon wieder zu ist
         if (modal.style.display === 'none') return;
-
         startCamera(onSuccess, onFailure);
     }, 400);
 
@@ -28,7 +26,7 @@ export function startScanner(onSuccess, onFailure) {
 }
 
 function startCamera(onSuccess, onFailure) {
-    // A. Aufräumen: Falls noch eine alte Instanz existiert -> Zerstören!
+    // A. Aufräumen alter Instanzen
     if (html5QrCode) {
         try {
             html5QrCode.stop().then(() => {
@@ -36,56 +34,64 @@ function startCamera(onSuccess, onFailure) {
             }).catch(() => {
                 html5QrCode.clear();
             });
-        } catch (e) { console.warn("Cleanup Fehler:", e); }
-        html5QrCode = null; 
+        } catch (e) { console.warn("Cleanup:", e); }
+        html5QrCode = null;
     }
 
-    // B. Neue Instanz erstellen
+    // B. Instanz erstellen (mit verbose=false für weniger Logs)
     try {
-        // "verbose: false" unterdrückt unnötige Konsolen-Logs
         html5QrCode = new window.Html5Qrcode("reader", false);
 
+        // KONFIGURATION FÜR IOS OPTIMIERT
         const config = { 
-            fps: 20, // Erhöht von 10 auf 20 für flüssigeres Scannen
-            qrbox: { width: 250, height: 250 },
-            aspectRatio: 1.0, 
-            disableFlip: false,
-            // WICHTIG: Nutzt native Android/iOS Scanner-API (viel besser im Dunkeln!)
+            fps: 10,
+            // Dynamische Box-Größe: Verhindert Fehler auf kleinen Screens
+            qrbox: function(viewfinderWidth, viewfinderHeight) {
+                const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                return {
+                    width: Math.floor(minEdge * 0.7), // 70% der Breite
+                    height: Math.floor(minEdge * 0.7)
+                };
+            },
+            // WICHTIG: aspectRatio WEGLASSEN für iOS!
+            // Nutzt native iOS Scanner Engine wenn verfügbar (schneller)
             experimentalFeatures: {
                 useBarCodeDetectorIfSupported: true
             }
         };
-        
-        // C. Kamera-Einstellungen für bessere Qualität
-        const constraints = { 
-            facingMode: "environment",
-            focusMode: "continuous", // Versucht Autofokus zu erzwingen
-            // Bevorzugt HD-Auflösung für mehr Schärfe bei schlechtem Licht
-            width: { min: 640, ideal: 1280, max: 1920 },
-            height: { min: 480, ideal: 720, max: 1080 }
-        };
-        
-        // Starten
+
+        // C. Starten - Simple Methode (Beste Kompatibilität)
         html5QrCode.start(
-            constraints, 
+            { facingMode: "environment" }, // Fordert explizit Rückkamera
             config,
-            (decodedText, decodedResult) => {
-                // Erfolg
+            (decodedText) => {
+                // Erfolg!
                 stopScanner();
                 onSuccess(decodedText);
             },
             (errorMessage) => {
-                // Scan-Fehler ignorieren wir im Loop
+                // Scannt gerade nichts... ignorieren.
             }
         ).catch(err => {
-            console.error("Kamera-Start Fehler:", err);
-            alert("Kamera konnte nicht gestartet werden. Bitte Berechtigung prüfen.");
+            // Fehler-Handling
+            console.error("Start Error:", err);
+            
+            // Spezifische Meldung für den User extrahieren
+            let msg = "Kamera-Fehler: " + err;
+            if (err.name === "NotAllowedError" || err.toString().includes("Permission")) {
+                msg = "Zugriff verweigert! Bitte erlaube den Kamera-Zugriff in den iOS Einstellungen (Safari > Kamera).";
+            } else if (err.name === "NotFoundError") {
+                msg = "Keine Rückkamera gefunden.";
+            } else if (err.toString().includes("OverconstrainedError")) {
+                msg = "Kamera-Auflösung nicht unterstützt.";
+            }
+
+            alert(msg);
             stopScanner();
         });
 
     } catch (e) {
-        console.error("Init Fehler:", e);
-        alert("Fehler beim Initialisieren des Scanners.");
+        alert("Init-Fehler: " + e);
         stopScanner();
     }
 }
@@ -99,8 +105,7 @@ function stopScanner() {
             html5QrCode.stop().then(() => {
                 html5QrCode.clear();
                 html5QrCode = null; 
-            }).catch(err => {
-                console.warn("Stop Fehler:", err);
+            }).catch(() => {
                 try { html5QrCode.clear(); } catch(e){}
                 html5QrCode = null;
             });

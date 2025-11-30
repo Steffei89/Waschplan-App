@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script> 
-<link rel="stylesheet" href="style.css?v=fix_ios">
+<link rel="stylesheet" href="style.css?v=fix_ios_v2">
 </head>
 <body>
 
@@ -74,7 +74,7 @@
     <button id="login-btn">Einloggen</button>
     <p id="switch-register">Noch nicht registriert? <span id="show-register" class="clickable">Registrieren</span></p>
     <p style="text-align: center; margin-top: 10px;" class="small-text"><span id="show-reset-password" class="clickable">Passwort vergessen?</span></p>
-    <div class="app-version">Version 2.9.1</div>
+    <div class="app-version">Version 2.9.2</div>
   </div>
 
   <div id="registerForm" class="card" style="display:none;">
@@ -85,19 +85,10 @@
       <input type="password" id="register-password" minlength="6" placeholder="Passwort" required>
       <input type="password" id="register-password-confirm" minlength="6" placeholder="Passwort bestätigen" required>
       <input type="text" id="register-invite-code" placeholder="Einladungscode" required>
-      <div id="partei-selection-wrapper" class="hidden"> 
-        <select id="register-partei" required>
-          <option value="" disabled selected>Partei wählen</option>
-          <option value="Micha & Stefan">Micha & Stefan</option>
-          <option value="Sarah & Florian">Sarah & Florian</option>
-          <option value="Christa & Uli">Christa & Uli</option>
-          <option value="Admin">Admin (Test)</option>
-        </select>
-      </div>
     </div>
     <button id="register-btn">Registrieren</button>
     <p id="switch-login">Bereits registriert? <span id="show-login" class="clickable">Login</span></p>
-    <div class="app-version">Version 2.9.1</div>
+    <div class="app-version">Version 2.9.2</div>
   </div>
 
   <div id="verifyEmailMessage" class="card" style="display:none;">
@@ -425,7 +416,7 @@
     <button id="show-changelog-btn" class="button-secondary"><i class="fa-solid fa-gift"></i> Letzte Änderungen anzeigen</button>
     <hr style="margin-top: 25px;">
     <button id="delete-account-btn" class="button-danger">Konto löschen</button>
-    <div class="app-version">Version 2.9.1</div>
+    <div class="app-version">Version 2.9.2</div>
   </div>
 
   <div id="confirmationModal" class="modal" style="display:none;">
@@ -464,7 +455,25 @@
     </div>
   </div>
 
-</div> <div id="scannerModal" class="modal" style="display:none;">
+  <div id="setupParteiModal" class="modal" style="display:none;">
+    <div class="modal-content">
+      <h3>Willkommen! 🎉</h3>
+      <p>Die Prüfung war erfolgreich.</p>
+      <p>Bitte wählen Sie jetzt Ihre Partei aus, um fortzufahren.</p>
+      <select id="setup-partei-select" style="margin-top:15px;">
+          <option value="" disabled selected>Partei wählen</option>
+          <option value="Micha & Stefan">Micha & Stefan</option>
+          <option value="Sarah & Florian">Sarah & Florian</option>
+          <option value="Christa & Uli">Christa & Uli</option>
+          <option value="Admin">Admin (Test)</option>
+      </select>
+      <button id="setup-partei-save-btn" class="button-primary">Speichern & Starten</button>
+    </div>
+  </div>
+
+</div> 
+
+<div id="scannerModal" class="modal" style="display:none;">
     <div class="modal-content" style="max-width:400px; padding:20px;">
         <h3 style="margin-top:0;">QR-Code scannen</h3>
         <p class="small-text">Halte die Kamera auf den Code an der Maschine.</p>

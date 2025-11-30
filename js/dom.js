@@ -1,7 +1,6 @@
 export const loadingOverlay = document.getElementById("loadingOverlay");
 export const appContainer = document.getElementById("app");
 
-// NEU: HEADER CONTAINER
 export const headerContainer = document.querySelector(".header-container"); 
 
 // Formulare & Sektionen
@@ -22,7 +21,6 @@ export const userInfo = document.getElementById("userInfo");
 export const themeIcon = document.getElementById("theme-icon"); 
 export const statisticBtn = document.getElementById("statistic-btn");
 export const weatherWidget = document.getElementById('weather-widget');
-// NEU: MACHINE STATUS WIDGET
 export const machineStatusWidget = document.getElementById('machine-status-widget');
 
 // Container
@@ -69,6 +67,11 @@ export const changelogModal = document.getElementById('changelogModal');
 export const changelogContent = document.getElementById('changelogContent');
 export const changelogCloseBtn = document.getElementById('changelogCloseBtn');
 
+// NEU: Setup Modal
+export const setupParteiModal = document.getElementById('setupParteiModal');
+export const setupParteiSelect = document.getElementById('setup-partei-select');
+export const setupParteiSaveBtn = document.getElementById('setup-partei-save-btn');
+
 // Timer
 export const liveTimerSection = document.getElementById('liveTimerSection');
 export const adminProgramsSection = document.getElementById('admin-programs-section');
@@ -88,7 +91,7 @@ export const karmaWonDisplay = document.getElementById("karma-won");
 export const leaderboardList = document.getElementById("minigame-leaderboard");
 
 export const gamePauseBtn = document.getElementById("game-pause-btn");
-export const gameMuteBtn = document.getElementById("game-mute-btn"); // <--- NEU
+export const gameMuteBtn = document.getElementById("game-mute-btn"); 
 export const gamePauseMenu = document.getElementById("game-pause-menu");
 export const pauseScoreDisplay = document.getElementById("pause-score");
 export const resumeGameBtn = document.getElementById("resume-game-btn");

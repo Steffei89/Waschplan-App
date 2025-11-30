@@ -21,22 +21,31 @@ service cloud.firestore {
       allow write: if isParteiMitglied(parteiName) || isAdmin();
     }
 
-    // 👤 BENUTZERPROFILE (Hier ist der neue Sicherheits-Check!)
+    // 👤 BENUTZERPROFILE
     match /users/{userId} {
       allow read: if isSignedIn();
       
-      // Erstellen: Nur wenn der Invite-Code korrekt ist!
-      // ACHTUNG: Hier steht jetzt dein geheimer Code
+      // Erstellen: Nur mit korrektem Invite-Code! (Partei ist hier noch optional)
       allow create: if isSignedIn() 
                     && request.auth.uid == userId
                     && request.resource.data.inviteCode == "FamRei2025";
       
       allow delete: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
       
+      // Update: Admin darf alles.
+      // Nutzer darf Profil ändern, ABER:
+      // 1. Admin-Status darf nicht geändert werden.
+      // 2. Partei darf NUR geändert werden, wenn sie vorher noch NICHT gesetzt war (Erste Einrichtung).
       allow update: if isAdmin() || (
         isSignedIn() && request.auth.uid == userId &&
         request.resource.data.isAdmin == resource.data.isAdmin &&
-        request.resource.data.partei == resource.data.partei 
+        (
+          // Fall A: Partei ist schon gesetzt -> darf nicht geändert werden (muss gleich bleiben)
+          (resource.data.partei != null && resource.data.partei != "" && request.resource.data.partei == resource.data.partei)
+          ||
+          // Fall B: Partei war noch leer -> darf jetzt gesetzt werden (Erste Einrichtung)
+          (resource.data.partei == null || resource.data.partei == "")
+        )
       );
     }
 
