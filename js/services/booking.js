@@ -10,8 +10,6 @@ import { checkBookingPermission, updateKarma } from './karma.js';
 import { BONUS_CANCEL_EARLY, PENALTY_CANCEL_LATE, COST_SLOT_NORMAL, COST_SLOT_PRIME } from '../config.js';
 import { getSystemStatus } from './maintenance.js';
 
-// ... (Bestehende Helper Funktionen checkDuplicateBooking, checkSlotAvailability bleiben) ...
-
 export async function checkDuplicateBooking(selectedDate, partei) {
     const q = query(getBookingsCollectionRef(), where('date', '==', selectedDate), where('partei', '==', partei));
     const snapshot = await getDocs(q);
@@ -83,13 +81,13 @@ export function subscribeToMachineStatus(onStatusUpdate) {
     });
 }
 
-// ... (Restliche Funktionen wie performBooking, performDeletion etc. bleiben UNVERÄNDERT) ...
-
+// ===== HIER IST DIE KORRIGIERTE FUNKTION =====
 export async function performBooking(date, slot, messageElementId) { 
     if (!date || !slot) { showMessage(messageElementId, "Datum/Slot wählen!", 'error'); return false; }
     const { currentUser, currentUserId, userIsAdmin } = getState();
     if (!currentUser) return false;
     if ((await getSystemStatus()) === 'maintenance') { showMessage(messageElementId, "Wartung!", 'error'); return false; }
+    
     const selectedDate = new Date(date); selectedDate.setHours(0, 0, 0, 0);
     if (selectedDate < today) { showMessage(messageElementId, "Vergangenheit!", 'error'); return false; }
     
@@ -102,42 +100,70 @@ export async function performBooking(date, slot, messageElementId) {
 
     try {
         await runTransaction(db, async (transaction) => {
+            // 1. REFERENZEN VORBEREITEN
+            // Wir erstellen eine ID aus Datum und Slot, um Doppelbuchungen technisch unmöglich zu machen.
+            const uniqueBookingId = `${date}_${slot.replace(':', '-')}`;
+            const bookingRef = doc(db, "bookings", uniqueBookingId);
+            const partyRef = doc(db, "parties", currentUser.userData.partei);
+
+            // 2. ALLE LESE-OPERATIONEN (Müssen VOR Schreib-Operationen kommen!)
+            
+            // A) Slot prüfen (Transaktional)
+            const bookingDoc = await transaction.get(bookingRef);
+            
+            // B) Duplikate prüfen (Vorab-Check per Query)
             const bookingsRef = getBookingsCollectionRef();
-            const qSlot = query(bookingsRef, where("date", "==", date), where("slot", "==", slot));
-            const slotSnap = await getDocs(qSlot); 
-            
             const qDup = query(bookingsRef, where("date", "==", date), where("partei", "==", currentUser.userData.partei));
-            const dupSnap = await getDocs(qDup);
+            const dupSnap = await getDocs(qDup); 
+
+            // C) Karma lesen (Transaktional)
+            let currentKarma = 0;
+            if (!userIsAdmin && cost !== 0) {
+                const partyDoc = await transaction.get(partyRef);
+                if (!partyDoc.exists()) throw "Partei-Daten fehlen.";
+                currentKarma = partyDoc.data().karma || 100;
+            }
+
+            // 3. LOGIK-CHECKS
             
-            let isSpontaneous = false;
-            if (!slotSnap.empty) {
-                const existing = slotSnap.docs[0].data();
-                if (existing.isReleased) {
-                    isSpontaneous = true;
-                    transaction.delete(slotSnap.docs[0].ref); 
-                } else {
+            // Check: Ist Slot belegt?
+            if (bookingDoc.exists()) {
+                const existing = bookingDoc.data();
+                // Wenn sie NICHT released ist, ist der Slot voll.
+                if (!existing.isReleased) {
                     throw "Dieser Slot wurde gerade von jemand anderem gebucht.";
                 }
             }
 
-            if (!isSpontaneous && !dupSnap.empty) {
-                const myBooking = dupSnap.docs[0].data();
-                if (!myBooking.isReleased) throw "Eure Partei hat an diesem Tag bereits gebucht.";
+            // Check: Hat Partei heute schon gebucht?
+            const hasActiveBooking = dupSnap.docs.some(d => !d.data().isReleased && d.id !== uniqueBookingId);
+            if (hasActiveBooking) {
+                throw "Eure Partei hat an diesem Tag bereits gebucht.";
             }
 
-            const newBookingRef = doc(bookingsRef); 
-            transaction.set(newBookingRef, {
-                date: date, slot: slot, partei: currentUser.userData.partei, userId: currentUserId, 
-                bookedAt: new Date().toISOString(), isSwap: false, checkInTime: null, checkOutTime: null, isReleased: false
+            // Check: Karma
+            if (!userIsAdmin && (currentKarma + cost < 0)) {
+                throw "Nicht genug Karma (während Transaktion geprüft).";
+            }
+
+            // 4. SCHREIB-OPERATIONEN
+            
+            // Buchung anlegen / überschreiben
+            transaction.set(bookingRef, {
+                date: date, 
+                slot: slot, 
+                partei: currentUser.userData.partei, 
+                userId: currentUserId, 
+                bookedAt: new Date().toISOString(), 
+                isSwap: false, 
+                checkInTime: null, 
+                checkOutTime: null, 
+                isReleased: false
             });
 
+            // Karma abziehen
             if (!userIsAdmin && cost !== 0) {
-                const partyRef = doc(db, "parties", currentUser.userData.partei);
-                const partyDoc = await transaction.get(partyRef);
-                if (!partyDoc.exists()) throw "Partei-Daten fehlen.";
-                
-                const newKarma = (partyDoc.data().karma || 100) + cost;
-                transaction.update(partyRef, { karma: newKarma });
+                transaction.update(partyRef, { karma: currentKarma + cost });
             }
         });
 
@@ -146,22 +172,31 @@ export async function performBooking(date, slot, messageElementId) {
         return true;
 
     } catch (e) {
-        console.error(e);
-        showMessage(messageElementId, typeof e === 'string' ? e : "Buchung fehlgeschlagen (Gleichzeitiger Zugriff?)", 'error');
+        console.error("Booking Error:", e);
+        const msg = typeof e === 'string' ? e : "Buchung fehlgeschlagen (Bitte erneut versuchen).";
+        showMessage(messageElementId, msg, 'error');
         return false;
     }
 }
+// ===========================================
 
 export async function performDeletion(date, slot, messageElementId) {
     const { currentUserId, currentUser, userIsAdmin } = getState();
     if (!date || !slot || !currentUser) return false;
+    
+    // Für die Löschung müssen wir die ID rekonstruieren oder per Query suchen.
+    // Da wir die ID jetzt deterministisch machen, könnten wir auch direkt zugreifen,
+    // aber die Query-Methode ist sicherer für alte Buchungen (Rückwärtskompatibilität).
     const bookingsColRef = getBookingsCollectionRef();
     let q = userIsAdmin ? query(bookingsColRef, where("date", "==", date), where("slot", "==", slot)) : query(bookingsColRef, where("date", "==", date), where("slot", "==", slot), where("partei", "==", currentUser.userData.partei));
+    
     try {
         const snap = await getDocs(q);
         if (snap.empty) { showMessage(messageElementId, "Nicht gefunden/Berechtigung fehlt.", 'error'); return false; }
+        
         const docToDelete = snap.docs[0]; const data = docToDelete.data();
         await deleteDoc(docToDelete.ref);
+        
         if (data.userId === currentUserId || (!userIsAdmin && data.partei === currentUser.userData.partei)) {
             const bookingDate = new Date(data.date + "T" + data.slot.substring(0,5));
             const hoursDiff = (bookingDate - new Date()) / (1000 * 60 * 60);

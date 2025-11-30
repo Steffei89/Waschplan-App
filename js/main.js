@@ -22,7 +22,6 @@ import {
 import { handleRegister, handleLogin, handleLogout, handlePasswordReset, handleDeleteAccount } from './services/auth.js';
 import { loadWeather } from './services/weather.js';
 import { loadStatistics, initStatsView, trackMenuClick } from './services/stats.js';
-// NEU: subscribeToMachineStatus importieren
 import { performBooking, performDeletion, loadNextBookingsOverview, checkSlotAvailability, performCheckIn, performCheckOut, checkAndAutoCheckoutOldBookings, subscribeToMachineStatus } from './services/booking.js';
 import { 
     loadIncomingRequests, loadOutgoingRequestStatus, loadOutgoingRequestSuccess,
@@ -40,6 +39,8 @@ import { startSession, updateSession } from './services/analytics.js';
 import { reportIssue } from './services/maintenance.js'; 
 import { startScanner } from './services/scanner.js';
 import { initPushNotifications } from './services/push.js';
+// NEU: Import der Gestensteuerung
+import { initGestures } from './services/gestures.js';
 
 let allPrograms = []; 
 let currentTimerData = null; 
@@ -47,7 +48,6 @@ let activeTimerInterval = null;
 let karmaUnsubscribe = null; 
 let myCurrentBooking = null;
 let autoCheckoutInterval = null;
-// NEU: Variable für den Status-Listener
 let machineStatusUnsubscribe = null;
 
 // --- AUTH FLOW ---
@@ -85,6 +85,9 @@ onAuthStateChanged(auth, async (user) => {
                 autoCheckoutInterval = setInterval(checkAndAutoCheckoutOldBookings, 60000);
 
                 initPushNotifications();
+                
+                // NEU: Gestensteuerung starten
+                initGestures();
 
                 if (userData.partei) {
                     try {
@@ -108,7 +111,6 @@ onAuthStateChanged(auth, async (user) => {
                 handleLoadPrograms();
                 handleListenToTimer();
                 
-                // NEU: Maschinen-Status initialisieren
                 handleMachineStatus();
                 
                 checkAppVersion();
@@ -125,7 +127,7 @@ onAuthStateChanged(auth, async (user) => {
     } else {
         unsubscribeAll();
         if(karmaUnsubscribe) karmaUnsubscribe();
-        if(machineStatusUnsubscribe) machineStatusUnsubscribe(); // NEU: Aufräumen
+        if(machineStatusUnsubscribe) machineStatusUnsubscribe();
         
         if (autoCheckoutInterval) clearInterval(autoCheckoutInterval);
         
@@ -133,7 +135,6 @@ onAuthStateChanged(auth, async (user) => {
         updateUserInfo(null);
         dom.weatherWidget.style.display = 'none';
         
-        // NEU: Status Widget ausblenden
         if(dom.machineStatusWidget) dom.machineStatusWidget.style.display = 'none';
         
         if (activeTimerInterval) clearInterval(activeTimerInterval);
@@ -156,7 +157,6 @@ document.addEventListener("visibilitychange", () => {
     }
 });
 
-// NEU: Funktion für den Maschinen-Status
 function handleMachineStatus() {
     if(machineStatusUnsubscribe) machineStatusUnsubscribe();
     
@@ -466,7 +466,6 @@ async function getStoredQrCode() {
     } catch(e) { return 'WASCH-START'; }
 }
 
-// === HIER IST DIE GEÄNDERTE FUNKTION MIT DER ZEIT-SPERRE ===
 function renderTimerUI() {
     if (activeTimerInterval) {
         clearTimeout(activeTimerInterval);
@@ -564,15 +563,11 @@ function renderTimerUI() {
                 
                 // === NEUE LOGIK: Zeit prüfen ===
                 const now = new Date();
-                // Slot z.B. "07:00-13:00" -> Startzeit extrahieren
                 const [startHour, startMinute] = myCurrentBooking.slot.split('-')[0].split(':').map(Number);
-                
-                // Datum-Objekt für Startzeit heute erstellen
                 const startTime = new Date();
                 startTime.setHours(startHour, startMinute, 0, 0);
 
                 if (now < startTime) {
-                    // ZU FRÜH: Button deaktiviert anzeigen
                     dom.liveTimerSection.innerHTML = `
                         <div class="timer-start-container" style="text-align:center;">
                             <h3 style="margin:0 0 10px 0;">Dein Slot: ${myCurrentBooking.slot}</h3>
@@ -585,7 +580,6 @@ function renderTimerUI() {
                         </div>
                     `;
 
-                    // Automatisch aktualisieren wenn Zeit erreicht
                     const msUntilStart = startTime - now;
                     if (msUntilStart > 0 && msUntilStart < 24 * 60 * 60 * 1000) {
                         activeTimerInterval = setTimeout(() => {
@@ -595,7 +589,6 @@ function renderTimerUI() {
                     }
 
                 } else {
-                    // ZEIT ERREICHT: Check-in erlauben
                     dom.liveTimerSection.innerHTML = `
                         <div class="timer-start-container" style="text-align:center;">
                             <h3 style="margin:0 0 10px 0;">Dein Slot: ${myCurrentBooking.slot}</h3>
@@ -616,10 +609,8 @@ function renderTimerUI() {
                         });
                     });
                 }
-                // === ENDE NEUE LOGIK ===
 
             } 
-            // Unterfall: BEREITS eingecheckt
             else {
                 let buttonsHTML = '';
                 if(allPrograms.length > 0) {
