@@ -2,94 +2,114 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // 🛠 HELFER-FUNKTIONEN
+    // --- HILFSFUNKTIONEN (Die "Ausweis-Kontrolle") ---
+    
+    // Prüft, ob User eingeloggt ist
     function isSignedIn() {
       return request.auth != null;
     }
-    function isAdmin() {
-      return isSignedIn() && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    
+    // Holt die Daten des aktuellen Nutzers aus der Datenbank
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
-    function isParteiMitglied(parteiName) {
-      return isSignedIn() && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.partei == parteiName;
+    
+    // Prüft, ob der Nutzer Admin ist
+    function isAdmin() {
+      return isSignedIn() && getUserData().isAdmin == true;
+    }
+    
+    // Prüft, ob der Nutzer zur angegebenen Partei gehört
+    // WICHTIG: Das verhindert, dass man für andere bucht!
+    function isMemberOf(parteiName) {
+      return isSignedIn() && getUserData().partei == parteiName;
     }
 
-    // 🏠 KARMA-SYSTEM
+    // --- REGELN FÜR DIE SAMMLUNGEN ---
+
+    // 1. Parteien & Karma
     match /parties/{parteiName} {
       allow read: if isSignedIn();
-      allow write: if isParteiMitglied(parteiName) || isAdmin();
+      // Nur Mitglieder der Partei dürfen ihr Karma ändern (oder Admin)
+      allow write: if isMemberOf(parteiName) || isAdmin();
     }
 
-    // 👤 BENUTZERPROFILE
+    // 2. Benutzerprofile
     match /users/{userId} {
       allow read: if isSignedIn();
       
-      // Erstellen: Nur mit korrektem Invite-Code! (Partei ist hier noch optional)
+      // Erstellen nur mit korrektem Invite-Code "FamRei2025"
       allow create: if isSignedIn() 
                     && request.auth.uid == userId
                     && request.resource.data.inviteCode == "FamRei2025";
-      
+                    
+      // Löschen darf nur der Admin oder der Nutzer selbst
       allow delete: if (isSignedIn() && request.auth.uid == userId) || isAdmin();
       
-      // Update: Admin darf alles.
-      // Nutzer darf Profil ändern, ABER:
-      // 1. Admin-Status darf nicht geändert werden.
-      // 2. Partei darf NUR geändert werden, wenn sie vorher noch NICHT gesetzt war (Erste Einrichtung).
+      // Update-Regeln (Streng!)
       allow update: if isAdmin() || (
         isSignedIn() && request.auth.uid == userId &&
-        request.resource.data.isAdmin == resource.data.isAdmin &&
+        request.resource.data.isAdmin == resource.data.isAdmin && // Darf sich selbst nicht zum Admin machen
         (
-          // Fall A: Partei ist schon gesetzt -> darf nicht geändert werden (muss gleich bleiben)
-          (resource.data.partei != null && resource.data.partei != "" && request.resource.data.partei == resource.data.partei)
-          ||
-          // Fall B: Partei war noch leer -> darf jetzt gesetzt werden (Erste Einrichtung)
-          (resource.data.partei == null || resource.data.partei == "")
+          // Partei darf nur gesetzt werden, wenn sie vorher LEER war (Initiale Einrichtung)
+          (resource.data.partei == null || resource.data.partei == "") ||
+          // Oder wenn sie gleich bleibt
+          (request.resource.data.partei == resource.data.partei)
         )
       );
     }
 
-    // 📅 BUCHUNGEN
+    // 3. Buchungen (Hier war die größte Lücke!)
     match /bookings/{docId} {
-      allow read, create: if isSignedIn();
-      allow update: if isSignedIn() && (
-        resource.data.partei == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.partei ||
-        isAdmin()
+      allow read: if isSignedIn();
+      
+      // Erstellen: Nur erlaubt, wenn man für SEINE EIGENE Partei bucht!
+      allow create: if isAdmin() || (
+        isSignedIn() && 
+        isMemberOf(request.resource.data.partei)
       );
-      allow delete: if isSignedIn() && (
-        resource.data.userId == request.auth.uid || 
-        resource.data.partei == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.partei ||
-        isAdmin()
+      
+      // Bearbeiten (z.B. Check-in): Nur eigene Partei oder Admin
+      allow update: if isAdmin() || (
+        isSignedIn() && 
+        isMemberOf(resource.data.partei)
+      );
+      
+      // Löschen: Nur EIGENE Buchungen löschen erlaubt!
+      allow delete: if isAdmin() || (
+        isSignedIn() && 
+        isMemberOf(resource.data.partei)
       );
     }
 
-    // 🔄 TAUSCHANFRAGEN
+    // 4. Tauschanfragen
     match /swap_requests/{docId} {
       allow read, write: if isSignedIn();
     }
 
-    // ⚙️ APP-EINSTELLUNGEN
+    // 5. App-Einstellungen (Wetter PLZ, QR Code)
     match /app_settings/config {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
     
-    // 🚫 SPERRUNGEN
+    // 6. Sperrungen / Wartung
     match /blocked_slots/{blockId} {
       allow read: if isSignedIn();
-      allow create, delete: if isAdmin();
+      allow write: if isAdmin();
     }
 
-    // ⏱️ TIMER
+    // 7. Timer Programme
     match /wash_programs/{programId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
     match /active_timers/{partei} {
-      allow read, write: if isParteiMitglied(partei) || isAdmin();
+      // Timer darf nur von der betroffenen Partei oder Admin gesetzt werden
+      allow read, write: if isMemberOf(partei) || isAdmin();
     }
     
-    // 📊 STATISTIK & ANALYTICS
+    // 8. Statistik & Analytics
     match /usage_stats/{docId} {
       allow read, write: if isSignedIn();
     }
@@ -102,7 +122,7 @@ service cloud.firestore {
       allow read: if isAdmin();
     }
 
-    // 🎮 MINIGAME
+    // 9. Minigame Highscores
     match /minigame_scores/{docId} {
       allow read, write: if isSignedIn();
       match /history/{historyId} {
@@ -110,9 +130,11 @@ service cloud.firestore {
       }
     }
     
-    // 🛠 WARTUNG
+    // 10. Wartungstickets (Tickets melden)
     match /maintenance_tickets/{ticketId} {
+      // Jeder darf ein Ticket erstellen
       allow create: if isSignedIn();
+      // Lesen/Update/Löschen darf nur der Admin (verhindert Manipulation durch Nutzer)
       allow read, update, delete: if isAdmin();
     }
   }

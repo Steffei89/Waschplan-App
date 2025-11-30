@@ -59,14 +59,13 @@ export async function loadAdminUserData() {
     setupTestLab();
 }
 
-// ==================== TEST LABOR LOGIK (FINAL & GEPRÜFT) ====================
+// ==================== TEST LABOR LOGIK ====================
 function setupTestLab() {
     const createBookingBtn = document.getElementById('debug-create-booking-btn');
     const forceCheckinBtn = document.getElementById('debug-force-checkin-btn');
     const resetStatusBtn = document.getElementById('debug-reset-status-btn');
     const killTimerBtn = document.getElementById('debug-kill-timer-btn');
 
-    // .onclick verhindert doppelte Ausführung, falls Funktion mehrfach aufgerufen wird
     if (createBookingBtn) createBookingBtn.onclick = debugCreateBooking;
     if (forceCheckinBtn) forceCheckinBtn.onclick = debugForceCheckin;
     if (resetStatusBtn) resetStatusBtn.onclick = debugResetStatus;
@@ -80,7 +79,6 @@ async function getMyTodaysBookingDoc() {
     const todayStr = formatDate(new Date());
     
     try {
-        // Wir nutzen simple Gleichheits-Filter, das benötigt KEINEN komplexen Index
         const q = query(
             collection(db, "bookings"),
             where("date", "==", todayStr),
@@ -90,7 +88,6 @@ async function getMyTodaysBookingDoc() {
         const snap = await getDocs(q);
         if(snap.empty) return null;
 
-        // Lokale Suche nach der aktiven Buchung (nicht released)
         const activeBooking = snap.docs.find(d => d.data().isReleased === false);
         return activeBooking || null;
 
@@ -116,7 +113,6 @@ async function debugCreateBooking() {
     const todayStr = formatDate(new Date());
     
     try {
-        // Prüfen ob schon eine aktive Buchung existiert
         const existing = await getMyTodaysBookingDoc();
         if(existing) {
             showMessage(MESSAGE_ID, "Du hast heute schon eine aktive Buchung! Bitte erst resetten.", "error");
@@ -125,7 +121,6 @@ async function debugCreateBooking() {
     
         await addDoc(collection(db, "bookings"), {
             date: todayStr,
-            // TRICK: Wir buchen einen "Ganztages-Slot", damit der Auto-Checkout nicht greift!
             slot: "00:00-23:59", 
             partei: currentUser.userData.partei,
             userId: currentUser.uid,
@@ -149,7 +144,6 @@ async function debugForceCheckin() {
             showMessage(MESSAGE_ID, "Keine aktive Buchung für heute gefunden. Erst erstellen!", "error");
             return;
         }
-        // Nur Check-in Zeit setzen, das triggert den Status "Eingecheckt"
         await updateDoc(docSnap.ref, {
             checkInTime: new Date().toISOString()
         });
@@ -166,7 +160,6 @@ async function debugResetStatus() {
 
     try {
         const todayStr = formatDate(new Date());
-        // Wir suchen ALLE Buchungen von heute (auch die releasten), um aufzuräumen
         const q = query(
             collection(db, "bookings"), 
             where("date", "==", todayStr), 
@@ -185,13 +178,11 @@ async function debugResetStatus() {
             await batch.commit();
         }
 
-        // Auch Timer löschen
         await debugKillTimer(true); 
         
         if (deletedCount > 0) {
             showMessage(MESSAGE_ID, "Alles bereinigt (Buchung & Timer gelöscht).", "success");
         } else {
-            // Wenn nur Timer gelöscht wurde oder gar nichts da war
             showMessage(MESSAGE_ID, "Reset durchgeführt (Timer geprüft).", "success");
         }
     } catch(e) { 
@@ -213,7 +204,6 @@ async function debugKillTimer(silent = false) {
         await deleteDoc(doc(db, "active_timers", currentUser.userData.partei));
         if(!silent) showMessage(MESSAGE_ID, "Aktiver Timer gelöscht.", "success");
     } catch(e) {
-        // Fehler ignorieren wenn Dokument nicht existiert, ist okay beim Reset
         if(!silent) showMessage(MESSAGE_ID, "Timer Kill Fehler: " + e.message, "error");
     }
 }
@@ -243,10 +233,17 @@ function loadPrograms() {
         programs.forEach(prog => {
             const item = document.createElement('div');
             item.className = 'program-list-item';
-            item.innerHTML = `
-                <span>${prog.name} (${prog.durationMinutes} Min)</span>
-                <button class="button-small button-danger delete-program-btn" data-id="${prog.id}">Löschen</button>
-            `;
+            // Sicheres Erstellen von Textelementen
+            const span = document.createElement('span');
+            span.textContent = `${prog.name} (${prog.durationMinutes} Min)`;
+            
+            const btn = document.createElement('button');
+            btn.className = 'button-small button-danger delete-program-btn';
+            btn.dataset.id = prog.id;
+            btn.textContent = 'Löschen';
+
+            item.appendChild(span);
+            item.appendChild(btn);
             container.appendChild(item);
         });
 
@@ -260,6 +257,7 @@ function loadPrograms() {
     setUnsubscriber('programs', unsub);
 }
 
+// === HIER WURDE DIE SICHERHEITSLÜCKE GESCHLOSSEN ===
 function loadAdminTickets() {
     const ticketContainer = document.getElementById('admin-tickets-container');
     if (!ticketContainer) return;
@@ -267,7 +265,8 @@ function loadAdminTickets() {
     const unsub = subscribeToTickets((tickets) => {
         ticketContainer.innerHTML = '';
         if (tickets.length === 0) {
-            ticketContainer.innerHTML = '<p class="small-text">Keine Meldungen vorhanden.</p>';
+            ticketContainer.textContent = 'Keine Meldungen vorhanden.';
+            ticketContainer.className = 'small-text';
             return;
         }
 
@@ -279,24 +278,62 @@ function loadAdminTickets() {
             const btnText = isOpen ? 'Als erledigt markieren' : 'Wieder öffnen';
             const btnClass = isOpen ? 'button-success' : 'button-secondary';
 
+            // Container
             const div = document.createElement('div');
             div.className = 'user-list-item';
             div.style.borderLeft = `5px solid ${statusColor}`;
             
-            div.innerHTML = `
-                <div style="display:flex; justify-content:space-between; margin-bottom:5px;">
-                    <span style="font-weight:bold; color:${statusColor}">${statusText}</span>
-                    <span class="small-text">${date}</span>
-                </div>
-                <div style="font-weight:bold; margin-bottom:5px;">${ticket.reason}</div>
-                <div style="font-size:0.9em; margin-bottom:10px; color:var(--text-color);">${ticket.details || 'Keine Details'}</div>
-                <div class="small-text" style="margin-bottom:10px;">Von: ${ticket.email} (${ticket.partei})</div>
-                <button class="button-small ${btnClass} ticket-toggle-btn">${btnText}</button>
-            `;
-
-            div.querySelector('.ticket-toggle-btn').addEventListener('click', async () => {
+            // Header (Status + Datum)
+            const headerDiv = document.createElement('div');
+            headerDiv.style.display = 'flex';
+            headerDiv.style.justifyContent = 'space-between';
+            headerDiv.style.marginBottom = '5px';
+            
+            const statusSpan = document.createElement('span');
+            statusSpan.style.fontWeight = 'bold';
+            statusSpan.style.color = statusColor;
+            statusSpan.textContent = statusText;
+            
+            const dateSpan = document.createElement('span');
+            dateSpan.className = 'small-text';
+            dateSpan.textContent = date;
+            
+            headerDiv.appendChild(statusSpan);
+            headerDiv.appendChild(dateSpan);
+            
+            // Grund (Reason)
+            const reasonDiv = document.createElement('div');
+            reasonDiv.style.fontWeight = 'bold';
+            reasonDiv.style.marginBottom = '5px';
+            reasonDiv.textContent = ticket.reason; // SICHER: textContent statt innerHTML
+            
+            // Details
+            const detailsDiv = document.createElement('div');
+            detailsDiv.style.fontSize = '0.9em';
+            detailsDiv.style.marginBottom = '10px';
+            detailsDiv.style.color = 'var(--text-color)';
+            detailsDiv.textContent = ticket.details || 'Keine Details'; // SICHER: textContent
+            
+            // User Info
+            const metaDiv = document.createElement('div');
+            metaDiv.className = 'small-text';
+            metaDiv.style.marginBottom = '10px';
+            metaDiv.textContent = `Von: ${ticket.email} (${ticket.partei})`; // SICHER: textContent
+            
+            // Button
+            const btn = document.createElement('button');
+            btn.className = `button-small ${btnClass} ticket-toggle-btn`;
+            btn.textContent = btnText;
+            btn.addEventListener('click', async () => {
                 await toggleTicketStatus(ticket.id, ticket.status);
             });
+
+            // Alles zusammenbauen
+            div.appendChild(headerDiv);
+            div.appendChild(reasonDiv);
+            div.appendChild(detailsDiv);
+            div.appendChild(metaDiv);
+            div.appendChild(btn);
 
             ticketContainer.appendChild(div);
         });
@@ -343,10 +380,21 @@ async function loadMinigameAdmin() {
             let nameDisplay = data.partei;
             if(data.username) nameDisplay += ` (${data.username})`;
 
-            item.innerHTML = `
-                <span><strong>${data.score}</strong> - ${nameDisplay}</span>
-                <button class="button-small button-danger delete-score-btn" data-partei="${docSnap.id}"><i class="fa-solid fa-trash"></i></button>
-            `;
+            // Text-Teil sicher erstellen
+            const span = document.createElement('span');
+            span.innerHTML = `<strong>${data.score}</strong> - `; // Score ist Zahl, okay.
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = nameDisplay; // Name ist User-Input, muss safe sein!
+            span.appendChild(nameSpan);
+
+            // Lösch Button
+            const btn = document.createElement('button');
+            btn.className = 'button-small button-danger delete-score-btn';
+            btn.dataset.partei = docSnap.id;
+            btn.innerHTML = '<i class="fa-solid fa-trash"></i>';
+
+            item.appendChild(span);
+            item.appendChild(btn);
             container.appendChild(item);
         });
 
@@ -391,6 +439,8 @@ function renderUserList(users, karmaMap) {
         const currentKarma = user.partei ? (karmaMap[user.partei] ?? KARMA_START) : '--';
         const username = user.username || "";
 
+        // Hinweis: Hier wird HTML-String verwendet, was okay ist, da wir Inputs generieren
+        // Aber Username sollte escaped werden. Wir nutzen value="${username}" Attribut, das ist relativ sicher.
         item.innerHTML = `
             <div class="user-list-item-header">
                 <strong>${user.email}</strong>
@@ -399,7 +449,7 @@ function renderUserList(users, karmaMap) {
             <div class="user-list-item-body">
                 <div class="admin-action-row">
                     <label>Name:</label>
-                    <input type="text" class="admin-username-input" value="${username}" placeholder="Name" style="margin-bottom:0; flex-grow:1;">
+                    <input type="text" class="admin-username-input" value="${username.replace(/"/g, '&quot;')}" placeholder="Name" style="margin-bottom:0; flex-grow:1;">
                     <button class="button-small button-secondary save-username-btn">Save</button>
                 </div>
                 <div class="admin-action-row">
@@ -501,7 +551,6 @@ async function handleGlobalKarmaReset() {
 }
 
 export function initAdminView() {
-    // FIX: Back Button mit 'back' Parameter
     document.getElementById('back-to-menu-btn-6').addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
 
     const toggleBtn = document.getElementById('toggle-maintenance-btn');

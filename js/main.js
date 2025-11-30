@@ -60,8 +60,6 @@ onAuthStateChanged(auth, async (user) => {
     if (user) { 
         try {
             await new Promise(resolve => setTimeout(resolve, 500));
-            // Wir reloaden den User nur, wenn wir sicher sind, dass wir online sind, 
-            // um Hänger zu vermeiden.
             try { await user.reload(); } catch(e) { console.warn("User reload failed (Offline?)", e); }
             
             if (!user.emailVerified) {
@@ -74,22 +72,18 @@ onAuthStateChanged(auth, async (user) => {
             if (userDocSnap.exists()) {
                 const userData = userDocSnap.data();
                 
-                // === CHECK: PARTEI FEHLT? (Neuer Nutzer) ===
                 if (!userData.partei) {
                     dom.loadingOverlay.style.display = 'none';
                     dom.appContainer.style.display = 'block';
                     
-                    // SICHERHEITS-CHECK: Existiert das Modal?
                     if (!dom.setupParteiModal) {
                         alert("FEHLER: 'index.html' ist veraltet! Bitte die Datei aktualisieren.");
                         return;
                     }
 
-                    // Alles andere ausblenden
                     navigateTo(null);
                     dom.setupParteiModal.style.display = 'flex';
                     
-                    // Listener für das Speichern
                     if (dom.setupParteiSaveBtn) {
                         dom.setupParteiSaveBtn.onclick = async () => {
                             const selected = dom.setupParteiSelect.value;
@@ -109,11 +103,9 @@ onAuthStateChanged(auth, async (user) => {
                             }
                         };
                     }
-                    return; // WICHTIG: Hier stoppen!
+                    return; 
                 }
-                // ================================================
 
-                // === NORMALER LOGIN (Bestehender Nutzer) ===
                 setCurrentUser({ uid: user.uid, ...user, userData });
                 
                 startSession();
@@ -138,13 +130,11 @@ onAuthStateChanged(auth, async (user) => {
                 setupMainMenuListeners(); 
                 loadWeather(); 
                 
-                // UI ANZEIGEN
                 dom.loadingOverlay.style.display = 'none';
                 dom.appContainer.style.display = 'block';
 
                 if(dom.weatherWidget) dom.weatherWidget.style.display = 'flex'; 
                 
-                // Hier könnte der Fehler liegen, wenn dom.mainMenu fehlt oder navigateTo crasht
                 navigateTo(dom.mainMenu);
                 
                 handleLoadNextBookings();
@@ -157,20 +147,14 @@ onAuthStateChanged(auth, async (user) => {
                 checkAppVersion();
 
             } else {
-                // User in Auth, aber kein Profil in Firestore?
                 await handleLogout(); 
             }
         } catch (e) {
             console.error("Critical Auth Error:", e);
-            
-            // FEHLERBEHANDLUNG:
-            // Wenn der User hier landet, sieht er sonst nur den Login-Screen, obwohl er eingeloggt ist.
-            // Wir loggen ihn aus und zeigen den Fehler.
             alert("Ein Fehler ist aufgetreten:\n" + e.message + "\n\nBitte App neu laden.");
             await handleLogout();
         }
     } else {
-        // NICHT EINGELOGGT
         dom.loadingOverlay.style.display = 'none';
         dom.appContainer.style.display = 'block';
 
@@ -262,14 +246,57 @@ function handleLoadNextBookings() {
             bookings.forEach(booking => {
                 const formattedDate = new Date(booking.date + "T00:00:00").toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
                 const isMyParteiBooking = booking.partei === currentUser.userData.partei;
+                
                 const item = document.createElement('div');
                 item.className = 'my-booking-item';
+
+                // --- SICHERHEITS-UPDATE START ---
+                // Details sicher zusammenbauen (ohne innerHTML für User-Input)
+                const detailsDiv = document.createElement('div');
+                detailsDiv.className = 'booking-details';
+                
+                const dateStrong = document.createElement('strong');
+                dateStrong.textContent = formattedDate;
+                
+                const slotText = document.createTextNode(` (${booking.slot})`);
+                
+                const parteiSpan = document.createElement('span');
+                parteiSpan.className = 'small-text ml-10';
+                parteiSpan.textContent = booking.partei; // SAFE
+
+                detailsDiv.appendChild(dateStrong);
+                detailsDiv.appendChild(slotText);
+                detailsDiv.appendChild(parteiSpan);
+
+                // Status Text hinzufügen (sicher, da hardcoded Strings)
+                if (isMyParteiBooking || userIsAdmin) {
+                     if (booking.isReleased) {
+                         const statusSpan = document.createElement('span');
+                         statusSpan.style.color = 'var(--success-color)';
+                         statusSpan.style.fontSize = '0.8em';
+                         statusSpan.style.display = 'block';
+                         statusSpan.textContent = '(Abgeschlossen ✅)';
+                         detailsDiv.appendChild(statusSpan);
+                     } else if (booking.checkInTime) {
+                         const statusSpan = document.createElement('span');
+                         statusSpan.style.color = 'var(--primary-color)';
+                         statusSpan.style.fontWeight = 'bold';
+                         statusSpan.style.fontSize = '0.8em';
+                         statusSpan.style.display = 'block';
+                         statusSpan.textContent = '(Läuft ▶️)';
+                         detailsDiv.appendChild(statusSpan);
+                     }
+                }
+                item.appendChild(detailsDiv);
+                // --- SICHERHEITS-UPDATE ENDE ---
+
                 if (isMyParteiBooking || userIsAdmin) {
                     const icsBtn = document.createElement('button');
                     icsBtn.className = 'button-small export-ics-btn';
                     icsBtn.title = 'In Kalender speichern';
                     icsBtn.innerHTML = '<i class="fa-regular fa-calendar-plus"></i>';
                     icsBtn.onclick = (e) => { e.stopPropagation(); createAndDownloadIcsFile(booking.date, booking.slot); };
+                    
                     const delBtn = document.createElement('button');
                     delBtn.className = 'button-small button-danger delete-my-booking-btn';
                     delBtn.textContent = 'Löschen';
@@ -278,20 +305,15 @@ function handleLoadNextBookings() {
                         const success = await performDeletion(booking.date, booking.slot, 'main-menu-message');
                         if (success && dom.bookingDateInput.value === booking.date) dom.bookingDateInput.dispatchEvent(new Event('change'));
                     };
+                    
                     const actionsDiv = document.createElement('div');
                     actionsDiv.className = 'booking-actions';
                     actionsDiv.appendChild(icsBtn);
+                    
                     if (userIsAdmin) actionsDiv.appendChild(delBtn);
                     else { if (!booking.checkInTime) actionsDiv.appendChild(delBtn); }
-                    let statusText = '';
-                    if (booking.isReleased) statusText = '<br><span style="color:var(--success-color); font-size:0.8em;">(Abgeschlossen ✅)</span>';
-                    else if (booking.checkInTime) statusText = '<br><span style="color:var(--primary-color); font-weight:bold; font-size:0.8em;">(Läuft ▶️)</span>';
-                    const detailsDiv = document.createElement('div');
-                    detailsDiv.className = 'booking-details';
-                    detailsDiv.innerHTML = `<strong>${formattedDate}</strong> (${booking.slot})<span class="small-text ml-10">${booking.partei}</span>${statusText}`;
-                    item.appendChild(detailsDiv); item.appendChild(actionsDiv);
-                } else {
-                     item.innerHTML = `<div class="booking-details"><strong>${formattedDate}</strong> (${booking.slot})<span class="small-text ml-10">${booking.partei}</span></div>`;
+                    
+                    item.appendChild(actionsDiv);
                 }
                 dom.myBookingsList.appendChild(item);
             });
@@ -301,7 +323,6 @@ function handleLoadNextBookings() {
     setUnsubscriber('quickView', unsub);
 }
 
-// ... handleLoadIncomingRequests, handleLoadOutgoingRequests, handleLoadOutgoingSuccess ... (Unverändert)
 function handleLoadIncomingRequests() {
     const unsub = loadIncomingRequests(
         (pendingRequests) => {
@@ -312,17 +333,37 @@ function handleLoadIncomingRequests() {
             header.className = 'request-item-header';
             header.textContent = `Eingehende Tauschanfragen (${pendingRequests.length})`;
             dom.incomingRequestsContainer.appendChild(header);
+            
             pendingRequests.forEach(req => {
                 const dateStr = new Date(req.targetDate + "T00:00:00").toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-                const item = document.createElement('div'); item.className = 'request-item';
-                const detailsDiv = document.createElement('div'); detailsDiv.className = 'request-details';
-                detailsDiv.innerHTML = `<strong>${dateStr} (${req.targetSlot})</strong><span class="small-text ml-10">von: ${req.requesterPartei}</span>`;
+                
+                const item = document.createElement('div'); 
+                item.className = 'request-item';
+                
+                // --- SICHERHEITS-UPDATE ---
+                const detailsDiv = document.createElement('div'); 
+                detailsDiv.className = 'request-details';
+                
+                const dateStrong = document.createElement('strong');
+                dateStrong.textContent = `${dateStr} (${req.targetSlot})`;
+                
+                const fromSpan = document.createElement('span');
+                fromSpan.className = 'small-text ml-10';
+                fromSpan.textContent = `von: ${req.requesterPartei}`; // SAFE
+                
+                detailsDiv.appendChild(dateStrong);
+                detailsDiv.appendChild(fromSpan);
+                // --------------------------
+
                 const actionsDiv = document.createElement('div'); actionsDiv.className = 'request-actions';
                 const acceptBtn = document.createElement('button'); acceptBtn.className = 'button-small button-success'; acceptBtn.textContent = 'Annehmen';
                 acceptBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); acceptBtn.disabled = true; acceptBtn.textContent = 'Prüfe...'; confirmSwapTransaction(req.id); };
                 const rejectBtn = document.createElement('button'); rejectBtn.className = 'button-small button-secondary'; rejectBtn.textContent = 'Ablehnen';
                 rejectBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); rejectBtn.disabled = true; rejectBtn.textContent = '...'; rejectSwapRequest(req.id); };
-                actionsDiv.appendChild(acceptBtn); actionsDiv.appendChild(rejectBtn); item.appendChild(detailsDiv); item.appendChild(actionsDiv);
+                actionsDiv.appendChild(acceptBtn); actionsDiv.appendChild(rejectBtn); 
+                
+                item.appendChild(detailsDiv); 
+                item.appendChild(actionsDiv);
                 dom.incomingRequestsContainer.appendChild(item);
             });
         },
@@ -339,10 +380,27 @@ function handleLoadOutgoingRequests() {
             if (rejectedRequests.length === 0) { container.style.display = 'none'; return; }
             container.style.display = 'block';
             const header = document.createElement('h3'); header.className = 'request-item-header'; header.style.color = 'var(--error-color)'; header.textContent = `Abgelehnte Anfragen (${rejectedRequests.length})`; container.appendChild(header);
+            
             rejectedRequests.forEach(req => {
                 const dateStr = new Date(req.targetDate + "T00:00:00").toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
                 const item = document.createElement('div'); item.className = 'request-item rejected'; 
-                item.innerHTML = `<div class="request-details"><strong>${dateStr} (${req.targetSlot})</strong><span class="small-text ml-10">Anfrage an ${req.targetPartei} wurde abgelehnt.</span></div>`;
+                
+                // --- SICHERHEITS-UPDATE ---
+                const detailsDiv = document.createElement('div');
+                detailsDiv.className = 'request-details';
+                
+                const dateStrong = document.createElement('strong');
+                dateStrong.textContent = `${dateStr} (${req.targetSlot})`;
+                
+                const infoSpan = document.createElement('span');
+                infoSpan.className = 'small-text ml-10';
+                infoSpan.textContent = `Anfrage an ${req.targetPartei} wurde abgelehnt.`; // SAFE
+                
+                detailsDiv.appendChild(dateStrong);
+                detailsDiv.appendChild(infoSpan);
+                item.appendChild(detailsDiv);
+                // --------------------------
+
                 const actionsDiv = document.createElement('div'); actionsDiv.className = 'request-actions';
                 const okBtn = document.createElement('button'); okBtn.className = 'button-small button-secondary dismiss-notification-btn'; okBtn.textContent = 'OK';
                 okBtn.addEventListener('click', async (e) => { e.preventDefault(); okBtn.disabled = true; await dismissRequestNotification(req.id); });
@@ -362,10 +420,27 @@ function handleLoadOutgoingSuccess() {
             if (acceptedRequests.length === 0) { container.style.display = 'none'; return; }
             container.style.display = 'block';
             const header = document.createElement('h3'); header.className = 'request-item-header'; header.style.color = 'var(--success-color)'; header.textContent = `Angenommene Anfragen (${acceptedRequests.length})`; container.appendChild(header);
+            
             acceptedRequests.forEach(req => {
                 const dateStr = new Date(req.targetDate + "T00:00:00").toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
                 const item = document.createElement('div'); item.className = 'request-item accepted'; 
-                item.innerHTML = `<div class="request-details"><strong>${dateStr} (${req.targetSlot})</strong><span class="small-text ml-10">Tausch mit ${req.targetPartei} war erfolgreich!</span></div>`;
+                
+                // --- SICHERHEITS-UPDATE ---
+                const detailsDiv = document.createElement('div');
+                detailsDiv.className = 'request-details';
+                
+                const dateStrong = document.createElement('strong');
+                dateStrong.textContent = `${dateStr} (${req.targetSlot})`;
+                
+                const infoSpan = document.createElement('span');
+                infoSpan.className = 'small-text ml-10';
+                infoSpan.textContent = `Tausch mit ${req.targetPartei} war erfolgreich!`; // SAFE
+                
+                detailsDiv.appendChild(dateStrong);
+                detailsDiv.appendChild(infoSpan);
+                item.appendChild(detailsDiv);
+                // --------------------------
+
                 const actionsDiv = document.createElement('div'); actionsDiv.className = 'request-actions';
                 const okBtn = document.createElement('button'); okBtn.className = 'button-small button-secondary dismiss-notification-btn'; okBtn.textContent = 'OK';
                 okBtn.addEventListener('click', async (e) => { e.preventDefault(); okBtn.disabled = true; okBtn.textContent = '...'; await dismissRequestNotification(req.id); });
@@ -402,7 +477,6 @@ function renderTimerUI() {
         return; 
     }
     
-    // Sicherheit: Existiert das Element überhaupt?
     if(!dom.liveTimerSection) return;
 
     dom.liveTimerSection.innerHTML = ''; 
@@ -461,7 +535,6 @@ function checkPasswordMatch() {
 }
 
 function checkInviteCode() { 
-    // UI Logik für das Dropdown-Anzeigen (erst ab 8 Zeichen)
     const inviteCodeField = document.getElementById('register-invite-code');
     const parteiWrapper = document.getElementById('partei-selection-wrapper');
     if (!inviteCodeField || !parteiWrapper) return;

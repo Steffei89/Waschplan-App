@@ -13,7 +13,7 @@ export function initOverviewView(unsubscriberSetter) {
     dom.kwSelect.addEventListener('change', (e) => {
         loadBookingsForWeek(e.target.value, unsubscriberSetter);
     });
-    // FIX: Back Button mit 'back' Parameter
+    // Back Button mit 'back' Parameter
     document.getElementById('back-to-menu-btn-2').addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
 }
 
@@ -113,58 +113,82 @@ export async function loadBookingsForWeek(kwString, unsubscriberSetter) {
             }
 
             const isMyParteiBooking = booking.partei === currentUser.userData.partei;
-            let actionsHTML = '';
-
-            if (isMyParteiBooking || userIsAdmin) {
-                actionsHTML = `<button class="button-small button-danger delete-overview-btn" 
-                                data-date="${booking.date}" data-slot="${booking.slot}">Löschen</button>`;
-            } else {
-                const hasDuplicate = myPartyBookedDates.has(booking.date);
-                actionsHTML = `<button class="button-small ${hasDuplicate ? 'button-secondary' : 'button-primary'} swap-request-btn" 
-                                data-id="${booking.id}" data-date="${booking.date}" data-slot="${booking.slot}" data-partei="${booking.partei}"
-                                ${hasDuplicate ? 'disabled title="Ihre Partei hat an diesem Tag bereits gebucht."' : ''}>
-                                Slot anfragen</button>`;
-            }
-
+            
+            // --- SICHERHEITS-UPDATE: Elemente sicher erstellen (kein innerHTML String-Basteln) ---
             const item = document.createElement('div');
             item.className = 'booking-item';
-            item.innerHTML = `
-                <div><strong>${booking.slot}</strong> <span class="small-text ml-10">${booking.partei}</span></div>
-                <div class="booking-actions">${actionsHTML}</div>
-            `;
+
+            // Linker Teil: Slot und Partei
+            const infoDiv = document.createElement('div');
+            const slotStrong = document.createElement('strong');
+            slotStrong.textContent = booking.slot;
+            
+            const parteiSpan = document.createElement('span');
+            parteiSpan.className = 'small-text ml-10';
+            parteiSpan.textContent = booking.partei; // Safe Text
+
+            infoDiv.appendChild(slotStrong);
+            infoDiv.appendChild(parteiSpan);
+
+            // Rechter Teil: Buttons
+            const actionsDiv = document.createElement('div');
+            actionsDiv.className = 'booking-actions';
+
+            if (isMyParteiBooking || userIsAdmin) {
+                const delBtn = document.createElement('button');
+                delBtn.className = 'button-small button-danger delete-overview-btn';
+                delBtn.textContent = 'Löschen';
+                // Daten sicher anhängen
+                delBtn.dataset.date = booking.date;
+                delBtn.dataset.slot = booking.slot;
+                
+                delBtn.onclick = async (e) => {
+                    e.target.disabled = true;
+                    e.target.textContent = 'Lösche...';
+                    await performDeletion(booking.date, booking.slot, 'overview-message');
+                };
+                actionsDiv.appendChild(delBtn);
+
+            } else {
+                const hasDuplicate = myPartyBookedDates.has(booking.date);
+                const swapBtn = document.createElement('button');
+                swapBtn.className = `button-small ${hasDuplicate ? 'button-secondary' : 'button-primary'} swap-request-btn`;
+                swapBtn.textContent = 'Slot anfragen';
+                
+                if (hasDuplicate) {
+                    swapBtn.disabled = true;
+                    swapBtn.title = "Ihre Partei hat an diesem Tag bereits gebucht.";
+                }
+
+                swapBtn.onclick = async (e) => {
+                    e.target.disabled = true;
+                    e.target.textContent = 'Angefragt...';
+                    // Sicherer Aufruf mit Objekt-Daten
+                    await handleSwapRequest({ 
+                        id: booking.id, 
+                        date: booking.date, 
+                        slot: booking.slot, 
+                        partei: booking.partei 
+                    }, 'overview-message');
+                    
+                    setTimeout(() => {
+                        if (e.target) { 
+                            e.target.disabled = false;
+                            e.target.textContent = 'Slot anfragen';
+                        }
+                    }, 3000); 
+                };
+                actionsDiv.appendChild(swapBtn);
+            }
+
+            item.appendChild(infoDiv);
+            item.appendChild(actionsDiv);
             dom.bookingsList.appendChild(item);
         });
-
-        attachOverviewListeners();
 
     }, (error) => {
         dom.bookingsList.innerHTML = `<p class="small-text" style="color: var(--error-color);">Fehler beim Laden der Wochenbuchungen.</p>`;
     });
     
     unsubscriberSetter('overview', unsubscribe);
-}
-
-function attachOverviewListeners() {
-    document.querySelectorAll('.delete-overview-btn').forEach(btn => {
-        btn.onclick = async (e) => {
-            e.target.disabled = true;
-            e.target.textContent = 'Lösche...';
-            await performDeletion(e.target.dataset.date, e.target.dataset.slot, 'overview-message');
-        };
-    });
-
-    document.querySelectorAll('.swap-request-btn:not([disabled])').forEach(btn => {
-        btn.onclick = async (e) => {
-            e.target.disabled = true;
-            e.target.textContent = 'Angefragt...';
-            const { id, date, slot, partei } = e.target.dataset;
-            await handleSwapRequest({ id, date, slot, partei }, 'overview-message');
-            setTimeout(() => {
-                if (e.target) { 
-                    e.target.disabled = false;
-                    e.target.textContent = 'Slot anfragen';
-                }
-            }, 3000); 
-        };
-    });
 }
