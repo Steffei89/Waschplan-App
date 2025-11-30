@@ -13,7 +13,8 @@ export function initOverviewView(unsubscriberSetter) {
     dom.kwSelect.addEventListener('change', (e) => {
         loadBookingsForWeek(e.target.value, unsubscriberSetter);
     });
-    document.getElementById('back-to-menu-btn-2').addEventListener('click', () => navigateTo(dom.mainMenu));
+    // FIX: Back Button mit 'back' Parameter
+    document.getElementById('back-to-menu-btn-2').addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
 }
 
 export function setupWeekDropdown() {

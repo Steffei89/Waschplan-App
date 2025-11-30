@@ -57,9 +57,6 @@ onAuthStateChanged(auth, async (user) => {
         return; 
     }
 
-    // HIER WURDE GEÄNDERT: Wir verstecken den Loader noch NICHT!
-    // Wir warten, bis wir wissen, wer der User ist.
-    
     if (user) { 
         try {
             // Wir warten kurz, um Flackern zu vermeiden und Datenkonsistenz zu sichern
@@ -805,7 +802,7 @@ function setupMainMenuListeners() {
     
     const backGameBtn = document.getElementById('back-to-menu-btn-game');
     if (backGameBtn) {
-        backGameBtn.addEventListener('click', () => navigateTo(dom.mainMenu));
+        backGameBtn.addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
     }
 
     const reportBtn = document.getElementById('report-issue-btn');
@@ -817,7 +814,7 @@ function setupMainMenuListeners() {
     }
     
     const maintBackBtn = document.getElementById('back-to-menu-btn-maint');
-    if (maintBackBtn) maintBackBtn.addEventListener('click', () => navigateTo(dom.mainMenu));
+    if (maintBackBtn) maintBackBtn.addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
 
     const submitMaintBtn = document.getElementById('submit-maintenance-btn');
     if (submitMaintBtn) {
@@ -838,7 +835,8 @@ function setupMainMenuListeners() {
     }
 }
 
-document.getElementById('back-to-menu-btn-1').addEventListener('click', () => navigateTo(dom.mainMenu));
+// Hier ist der Fix für den ersten Button
+document.getElementById('back-to-menu-btn-1').addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
 
 dom.bookSubmitBtn.addEventListener("click", async () => {
     const date = dom.bookingDateInput.value;

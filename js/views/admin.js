@@ -501,7 +501,8 @@ async function handleGlobalKarmaReset() {
 }
 
 export function initAdminView() {
-    document.getElementById('back-to-menu-btn-6').addEventListener('click', () => navigateTo(dom.mainMenu));
+    // FIX: Back Button mit 'back' Parameter
+    document.getElementById('back-to-menu-btn-6').addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
 
     const toggleBtn = document.getElementById('toggle-maintenance-btn');
     const statusDisplay = document.getElementById('system-status-display');

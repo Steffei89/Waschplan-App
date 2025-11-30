@@ -1,4 +1,4 @@
-/* style.css - Final Version: Admin Beauty, Responsive Header, No-Flash & Gestures */
+/* style.css - Final Version: Admin Beauty, Responsive Header, Gestures & Directions */
 
 /* 1. GLOBALE FIXES */
 * {
@@ -287,29 +287,49 @@ details.admin-group .admin-content { border-top: 1px solid var(--border-color); 
 #reader, #reader video { width: 100% !important; border-radius: 12px; object-fit: cover; }
 #reader__dashboard_section_csr span, #reader__dashboard_section_swaplink { display: none !important; }
 
-/* ANIMATIONEN (NO-FLASH) */
-@keyframes slide-in-right { from { transform: translateX(100%); } to { transform: translateX(0); } }
-@keyframes slide-out-left { from { transform: translateX(0); filter: brightness(1); } to { transform: translateX(-30%); filter: brightness(0.8); } }
-@keyframes slide-in-left { from { transform: translateX(-30%); filter: brightness(0.8); } to { transform: translateX(0); filter: brightness(1); } }
-@keyframes slide-out-right { from { transform: translateX(0); z-index: 100; } to { transform: translateX(100%); z-index: 100; } }
-::view-transition-new(root) { animation: 300ms cubic-bezier(0.16, 1, 0.3, 1) both slide-in-right; }
-::view-transition-old(root) { animation: 300ms cubic-bezier(0.16, 1, 0.3, 1) both slide-out-left; }
+/* ANIMATIONEN (View Transitions) */
 
-/* =========================================
-   5. GESTEN-FEEDBACK (NEU)
-   ========================================= */
+/* Keyframes für Slide-Effekte */
+@keyframes fade-out-left {
+  to { transform: translateX(-30%); opacity: 0; filter: brightness(0.8); }
+}
+@keyframes slide-in-from-right {
+  from { transform: translateX(100%); }
+}
+@keyframes fade-out-right {
+  to { transform: translateX(30%); opacity: 0; filter: brightness(0.8); }
+}
+@keyframes slide-in-from-left {
+  from { transform: translateX(-100%); }
+}
+
+/* 1. STANDARD (VORWÄRTS): Neue Seite kommt von RECHTS */
+::view-transition-old(root) {
+  animation: 300ms cubic-bezier(0.4, 0, 0.2, 1) both fade-out-left;
+}
+::view-transition-new(root) {
+  animation: 300ms cubic-bezier(0.4, 0, 0.2, 1) both slide-in-from-right;
+}
+
+/* 2. RÜCKWÄRTS: Neue Seite kommt von LINKS (wenn data-transition="back" gesetzt ist) */
+:root[data-transition="back"]::view-transition-old(root) {
+  animation: 300ms cubic-bezier(0.4, 0, 0.2, 1) both fade-out-right;
+}
+:root[data-transition="back"]::view-transition-new(root) {
+  animation: 300ms cubic-bezier(0.4, 0, 0.2, 1) both slide-in-from-left;
+}
+
+/* 3. GESTEN-FEEDBACK (Bounce beim Wischen im Kalender) */
 @keyframes bounce-right-hint {
     0% { transform: translateX(0); }
-    40% { transform: translateX(15px); } /* Federt nach rechts */
-    100% { transform: translateX(0); }   /* Zurück zur Mitte */
+    50% { transform: translateX(25px); } 
+    100% { transform: translateX(0); }
 }
-
 @keyframes bounce-left-hint {
     0% { transform: translateX(0); }
-    40% { transform: translateX(-15px); } /* Federt nach links */
-    100% { transform: translateX(0); }    /* Zurück zur Mitte */
+    50% { transform: translateX(-25px); } 
+    100% { transform: translateX(0); }
 }
 
-/* Diese Klassen werden per JS hinzugefügt, wenn man wischt */
 .anim-swipe-right { animation: bounce-right-hint 0.4s cubic-bezier(0.25, 1.5, 0.5, 1); }
 .anim-swipe-left  { animation: bounce-left-hint 0.4s cubic-bezier(0.25, 1.5, 0.5, 1); }

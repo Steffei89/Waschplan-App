@@ -44,8 +44,6 @@ export function unsubscribeForNavigation() {
     const unsubscribers = getUnsubscribers();
     
     // Wir stoppen NUR Listener, die spezifisch für eine Unterseite sind.
-    // Die 'quickView' (Meine Buchungen) und 'timer' müssen weiterlaufen!
-    
     if (unsubscribers.overview) { 
         unsubscribers.overview(); 
         setUnsubscriber('overview', null); 
@@ -81,8 +79,12 @@ export const allSections = [
     document.getElementById('maintenanceSection') 
 ];
 
-// Navigation mit View Transitions
-export function navigateTo(sectionElement) {
+// Navigation mit View Transitions und Richtungsangabe
+// direction kann 'forward' (Standard) oder 'back' sein
+export function navigateTo(sectionElement, direction = 'forward') {
+    // Wir setzen ein Attribut am HTML-Tag, damit CSS die Richtung kennt
+    document.documentElement.dataset.transition = direction;
+
     if (document.startViewTransition) {
         document.startViewTransition(() => {
             performNavigation(sectionElement);
@@ -140,7 +142,6 @@ export function updateUserInfo(userData) {
     if (userData) {
         document.getElementById('current-username').textContent = userData.email || 'Unbekannt';
         document.getElementById('current-role').textContent = userIsAdmin ? 'Administrator' : 'Nutzer';
-        // statisticBtn entfernt, da nicht mehr existent
         document.getElementById('admin-btn').style.display = userIsAdmin ? 'block' : 'none';
         const userTheme = userData.theme || 'light';
         setTheme(userTheme, false);

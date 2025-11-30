@@ -75,7 +75,8 @@ export function initProfileView() {
     });
 
     document.getElementById('show-changelog-btn').addEventListener('click', showChangelog);
-    document.getElementById('back-to-menu-btn-4').addEventListener('click', () => navigateTo(dom.mainMenu));
+    // FIX: Back Button mit 'back' Parameter
+    document.getElementById('back-to-menu-btn-4').addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
 }
 
 export async function loadProfileData() {
@@ -109,7 +110,6 @@ export async function loadProfileData() {
     if (userIsAdmin) {
         dom.adminProgramsSection.style.display = 'block';
         // ... (Admin-Logik wie gehabt) ...
-        // (Kürze hier ab für Übersicht, dein Originalcode war korrekt)
         const unsub = loadWashPrograms((programs) => {
              dom.programListContainer.innerHTML = '';
              programs.forEach(prog => {

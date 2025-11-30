@@ -5,7 +5,7 @@ import {
 import * as dom from '../dom.js';
 import { navigateTo } from '../ui.js';
 import { getState, setAllBookingsForMonth, setSelectedCalendarDate, ALL_PARTEIEN, PARTEI_COLORS, getUnsubscribers } from '../state.js';
-import { formatDate, today } from '../utils.js';
+import { formatDate } from '../utils.js';
 import { performBooking, performDeletion } from '../services/booking.js';
 import { handleSwapRequest } from '../services/swap.js';
 import { showMessage } from '../ui.js'; 
@@ -33,8 +33,8 @@ export function initCalendarView(unsubscriberSetter) {
         });
     });
 
-    // ===== "ZURÜCK"-BUTTON HIERHER VERSCHOBEN =====
-    document.getElementById('back-to-menu-btn-3').addEventListener('click', () => navigateTo(dom.mainMenu));
+    // FIX: Back Button mit 'back' Parameter
+    document.getElementById('back-to-menu-btn-3').addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
 }
 
 export function loadBookingsForMonth(year, monthIndex, unsubscriberSetter) {
