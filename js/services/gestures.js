@@ -21,16 +21,16 @@ export function initGestures() {
         handleGesture(touchEndX, touchEndY);
     }, { passive: false });
     
-    console.log("Gestensteuerung (Swipe) aktiv.");
+    console.log("Gestensteuerung (Swipe) + Animationen aktiv.");
 }
 
 function handleGesture(endX, endY) {
     const xDiff = endX - touchStartX;
     const yDiff = endY - touchStartY;
     
-    // Mindeststrecke in Pixeln, damit es als Wischen zählt (verhindert Wischen beim Tippen)
+    // Mindeststrecke in Pixeln, damit es als Wischen zählt
     const threshold = 60; 
-    // Toleranz für schräges Wischen (darf nicht zu vertikal sein, sonst ist es Scrollen)
+    // Toleranz für schräges Wischen
     const yTolerance = 100;
 
     // Nur reagieren, wenn die Bewegung deutlich horizontaler als vertikal war
@@ -49,48 +49,40 @@ function handleGesture(endX, endY) {
 }
 
 function onSwipeRight(startX) {
-    // 1. "Zurück"-Geste (iOS Style Edge Swipe)
-    // Wenn der Wisch ganz links am Rand beginnt (0-40px), ist es immer "Zurück"
+    // 1. "Zurück"-Geste (Edge Swipe)
     if (startX < 40) {
         const activeCard = document.querySelector('.card.active');
         if (activeCard) {
-            // Wir suchen den existierenden "Zurück"-Button und klicken ihn simulativ
             const backBtn = activeCard.querySelector('.back-button');
             if (backBtn) {
-                // Kleines Vibrieren als Feedback (wenn Gerät das unterstützt)
                 if (navigator.vibrate) navigator.vibrate(10); 
                 backBtn.click();
             }
         }
-        return; // Fertig, keine weitere Aktion
+        return; 
     }
 
     // 2. Normale Navigation (Inhalt wechseln)
-    
-    // Kalender: Wisch nach Rechts -> Vorheriger Monat
     if (dom.calendarSection.classList.contains('active')) {
         const btn = document.getElementById('prev-month-btn');
         if(btn) {
-            btn.click(); // Drückt den echten Button
-            animateCard('right'); // Kleine visuelle Bestätigung
+            btn.click(); 
+            animateCard('right'); // Animation auslösen
         }
     } 
-    // Übersicht: Wisch nach Rechts -> Vorherige Woche
     else if (dom.overviewSection.classList.contains('active')) {
         changeOverviewWeek(-1);
     }
 }
 
 function onSwipeLeft() {
-    // Kalender: Wisch nach Links -> Nächster Monat
     if (dom.calendarSection.classList.contains('active')) {
         const btn = document.getElementById('next-month-btn');
         if(btn) {
-            btn.click(); // Drückt den echten Button
-            animateCard('left');
+            btn.click(); 
+            animateCard('left'); // Animation auslösen
         }
     } 
-    // Übersicht: Wisch nach Links -> Nächste Woche
     else if (dom.overviewSection.classList.contains('active')) {
         changeOverviewWeek(1);
     }
@@ -100,32 +92,36 @@ function changeOverviewWeek(direction) {
     const select = dom.kwSelect;
     if (!select) return;
 
-    // Wir ändern einfach den Wert im Dropdown, als hätte der Nutzer es getan
     const newIndex = select.selectedIndex + direction;
     
     if (newIndex >= 0 && newIndex < select.options.length) {
         select.selectedIndex = newIndex;
-        // Event feuern, damit die App merkt, dass sich was geändert hat
         select.dispatchEvent(new Event('change')); 
         
-        animateCard(direction > 0 ? 'left' : 'right');
+        animateCard(direction > 0 ? 'left' : 'right'); // Animation
     }
 }
 
-// Lässt die Karte kurz zucken, damit man merkt, dass der Wisch funktioniert hat
+// Diese Funktion fügt die CSS-Klassen für den "Bounce"-Effekt hinzu
 function animateCard(direction) {
     const card = document.querySelector('.card.active');
     if(!card) return;
     
-    // Wisch-Animation simulieren
-    const moveX = direction === 'left' ? '15px' : '-15px';
+    // Alte Klassen entfernen, falls sie noch da sind (für schnelles Wischen)
+    card.classList.remove('anim-swipe-left', 'anim-swipe-right');
     
-    // Kurz verschieben...
-    card.style.transform = `translateX(${moveX})`;
-    card.style.transition = 'transform 0.15s ease-out';
+    // Browser zwingen, den Style neu zu berechnen (damit die Animation neu startet)
+    void card.offsetWidth; 
     
-    // ... und sofort zurückfedern
+    // Richtige Klasse hinzufügen
+    if (direction === 'left') {
+        card.classList.add('anim-swipe-left');
+    } else {
+        card.classList.add('anim-swipe-right');
+    }
+    
+    // Aufräumen: Klasse nach der Animation wieder entfernen
     setTimeout(() => {
-        card.style.transform = 'translateX(0)';
-    }, 150);
+        card.classList.remove('anim-swipe-left', 'anim-swipe-right');
+    }, 400); // 400ms entspricht der Animationsdauer in CSS
 }

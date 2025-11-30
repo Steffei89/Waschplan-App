@@ -39,7 +39,6 @@ import { startSession, updateSession } from './services/analytics.js';
 import { reportIssue } from './services/maintenance.js'; 
 import { startScanner } from './services/scanner.js';
 import { initPushNotifications } from './services/push.js';
-// NEU: Import der Gestensteuerung
 import { initGestures } from './services/gestures.js';
 
 let allPrograms = []; 
@@ -58,11 +57,12 @@ onAuthStateChanged(auth, async (user) => {
         return; 
     }
 
-    dom.loadingOverlay.style.display = 'none';
-    dom.appContainer.style.display = 'block';
+    // HIER WURDE GEÄNDERT: Wir verstecken den Loader noch NICHT!
+    // Wir warten, bis wir wissen, wer der User ist.
     
     if (user) { 
         try {
+            // Wir warten kurz, um Flackern zu vermeiden und Datenkonsistenz zu sichern
             await new Promise(resolve => setTimeout(resolve, 500));
             await user.reload(); 
             
@@ -85,8 +85,6 @@ onAuthStateChanged(auth, async (user) => {
                 autoCheckoutInterval = setInterval(checkAndAutoCheckoutOldBookings, 60000);
 
                 initPushNotifications();
-                
-                // NEU: Gestensteuerung starten
                 initGestures();
 
                 if (userData.partei) {
@@ -101,6 +99,12 @@ onAuthStateChanged(auth, async (user) => {
                 updateUserInfo(userData);
                 setupMainMenuListeners(); 
                 loadWeather(); 
+                
+                // === UI JETZT ANZEIGEN (Eingeloggt) ===
+                dom.loadingOverlay.style.display = 'none';
+                dom.appContainer.style.display = 'block';
+                // ======================================
+
                 dom.weatherWidget.style.display = 'flex'; 
                 navigateTo(dom.mainMenu);
                 
@@ -125,6 +129,11 @@ onAuthStateChanged(auth, async (user) => {
             }
         }
     } else {
+        // === UI JETZT ANZEIGEN (Nicht eingeloggt) ===
+        dom.loadingOverlay.style.display = 'none';
+        dom.appContainer.style.display = 'block';
+        // ===========================================
+
         unsubscribeAll();
         if(karmaUnsubscribe) karmaUnsubscribe();
         if(machineStatusUnsubscribe) machineStatusUnsubscribe();
