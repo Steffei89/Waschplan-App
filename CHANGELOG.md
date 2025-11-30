@@ -2,6 +2,21 @@
 
 Hier werden alle wichtigen Änderungen an der Waschplan-App festgehalten.
 
+## [2.9.1] - 2025-11-30
+
+### 🔒 Kritisches Sicherheits-Update
+Die Sicherheit der App wurde massiv verstärkt.
+* **Invite-Code Schutz:** Der Einladungscode wird nicht mehr im App-Code ("Client-Side") gespeichert, sondern direkt sicher in der Datenbank ("Server-Side") geprüft. Man kann ihn nicht mehr auslesen.
+* **Datenbank-Regeln:** Die "Türsteher"-Regeln der Datenbank wurden verschärft.
+    * Nutzer können jetzt nur noch ihre **eigenen** Buchungen (oder die ihrer Partei) löschen. Fremde Buchungen sind geschützt.
+    * Admin-Rechte und Profil-Daten sind vor Manipulation geschützt.
+
+### 💅 UI & Animationen
+Die App fühlt sich jetzt noch mehr wie eine echte "native" App an.
+* **Intelligente Navigation:** Die App weiß jetzt, ob du "Vorwärts" oder "Zurück" gehst. Die Seiten wischen entsprechend von rechts oder links herein.
+* **Gesten-Feedback:** Beim Wischen im Kalender oder der Wochenübersicht gibt es jetzt einen visuellen "Bounce"-Effekt, der die Aktion bestätigt.
+* **Scrollbares Changelog:** Dieses Fenster hier ist jetzt scrollbar, damit der "Verstanden"-Button auch auf kleinen Bildschirmen immer erreichbar ist.
+
 ## [2.9.0] - 2025-11-23
 
 ### 🎨 Modernes Design & UI

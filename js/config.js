@@ -1,8 +1,8 @@
-// ===== HIER FESTLEGEN =====
-export const SECRET_INVITE_CODE = "FamRei2025"; 
-// ==========================
+// js/config.js
 
-export const APP_VERSION = "2.9.0"; // Stats Update
+// Der Einladungscode wurde entfernt und in die Sicherheitsregeln verschoben.
+
+export const APP_VERSION = "2.9.1"; // Security Update
 
 // ===== Wasch-Karma Einstellungen =====
 export const KARMA_START = 100;       
@@ -43,9 +43,7 @@ export const MINIGAME_SKY_COLORS = {
     night: { top: [25, 25, 112], bottom: [75, 0, 130] }        
 };
 
-// ===== NEU: FEATURE TOGGLES (Freischaltung) =====
-// Setze diese auf TRUE, um sie für ALLE sichtbar zu machen.
-// Solange sie FALSE sind, sieht sie nur der Admin.
+// ===== FEATURE TOGGLES =====
 export const FEATURE_PUBLIC_HEATMAP = false;     
 export const FEATURE_PUBLIC_USER_STATS = false;  
 export const FEATURE_PUBLIC_GAME_STATS = false;

@@ -31,7 +31,7 @@ import { initCalendarView, loadBookingsForMonth } from './views/calendar.js';
 import { initOverviewView, setupWeekDropdown, loadBookingsForWeek } from './views/overview.js';
 import { initProfileView, loadProfileData } from './views/profile.js';
 import { initAdminView, loadAdminUserData } from './views/admin.js';
-import { SECRET_INVITE_CODE, APP_VERSION } from './config.js';
+import { APP_VERSION } from './config.js'; // SECRET_INVITE_CODE entfernt
 import { loadWashPrograms, listenToActiveTimer, startWashTimer, stopWashTimer } from './services/timers.js';
 import { initKarmaForParty } from './services/karma.js';
 import { initMinigame } from './services/minigame.js'; 
@@ -59,7 +59,6 @@ onAuthStateChanged(auth, async (user) => {
 
     if (user) { 
         try {
-            // Wir warten kurz, um Flackern zu vermeiden und Datenkonsistenz zu sichern
             await new Promise(resolve => setTimeout(resolve, 500));
             await user.reload(); 
             
@@ -76,7 +75,6 @@ onAuthStateChanged(auth, async (user) => {
                 
                 startSession();
                 
-                // Auto-Checkout Check
                 checkAndAutoCheckoutOldBookings();
                 if (autoCheckoutInterval) clearInterval(autoCheckoutInterval);
                 autoCheckoutInterval = setInterval(checkAndAutoCheckoutOldBookings, 60000);
@@ -97,10 +95,8 @@ onAuthStateChanged(auth, async (user) => {
                 setupMainMenuListeners(); 
                 loadWeather(); 
                 
-                // === UI JETZT ANZEIGEN (Eingeloggt) ===
                 dom.loadingOverlay.style.display = 'none';
                 dom.appContainer.style.display = 'block';
-                // ======================================
 
                 dom.weatherWidget.style.display = 'flex'; 
                 navigateTo(dom.mainMenu);
@@ -126,10 +122,8 @@ onAuthStateChanged(auth, async (user) => {
             }
         }
     } else {
-        // === UI JETZT ANZEIGEN (Nicht eingeloggt) ===
         dom.loadingOverlay.style.display = 'none';
         dom.appContainer.style.display = 'block';
-        // ===========================================
 
         unsubscribeAll();
         if(karmaUnsubscribe) karmaUnsubscribe();
@@ -212,6 +206,7 @@ function setupKarmaHeaderListener(parteiName) {
     });
 }
 
+// ... handleLoadNextBookings ... (unverändert)
 function handleLoadNextBookings() {
     dom.myBookingsList.innerHTML = `
         <div class="skeleton-item"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line short"></div></div>
@@ -296,6 +291,7 @@ function handleLoadNextBookings() {
     setUnsubscriber('quickView', unsub);
 }
 
+// ... handleLoadIncomingRequests, handleLoadOutgoingRequests, handleLoadOutgoingSuccess ... (diese Abschnitte unverändert übernehmen)
 function handleLoadIncomingRequests() {
     const unsub = loadIncomingRequests(
         (pendingRequests) => {
@@ -684,16 +680,23 @@ function checkPasswordMatch() {
         regPassConfirm.classList.remove('input-valid');
     }
 }
+
+// ----------------------------------------------------
+// UI LOGIK: Wir zeigen das Dropdown an, sobald etwas getippt wurde.
+// Keine Prüfung gegen das Secret mehr hier!
 function checkInviteCode() {
     const inviteCodeField = document.getElementById('register-invite-code');
     const parteiWrapper = document.getElementById('partei-selection-wrapper');
     if (!inviteCodeField || !parteiWrapper) return;
-    if (inviteCodeField.value.trim() === SECRET_INVITE_CODE) {
+    
+    // Einfache Logik: Sobald etwas da steht, zeigen wir das Dropdown
+    if (inviteCodeField.value.trim().length > 0) {
         parteiWrapper.classList.remove('hidden');
     } else {
         parteiWrapper.classList.add('hidden');
     }
 }
+// ----------------------------------------------------
 
 document.getElementById("register-btn").addEventListener("click", handleRegister);
 document.getElementById("login-btn").addEventListener("click", handleLogin);
@@ -734,9 +737,9 @@ document.getElementById('show-reset-password').addEventListener('click', () => {
     navigateTo(dom.resetPasswordForm);
     document.getElementById('reset-email').value = ''; 
 });
-document.getElementById('back-to-login-btn').addEventListener('click', () => navigateTo(dom.loginForm));
+document.getElementById('back-to-login-btn').addEventListener('click', () => navigateTo(dom.loginForm, 'back'));
 document.getElementById('reset-password-btn').addEventListener('click', handlePasswordReset);
-document.getElementById('back-to-login-from-verify-btn').addEventListener('click', () => navigateTo(dom.loginForm));
+document.getElementById('back-to-login-from-verify-btn').addEventListener('click', () => navigateTo(dom.loginForm, 'back'));
 document.getElementById('logout-btn').addEventListener('click', handleLogout);
 
 dom.themeIcon.addEventListener('click', () => {
@@ -825,7 +828,7 @@ function setupMainMenuListeners() {
             try {
                 await reportIssue(reason, details);
                 showMessage('maintenance-message', 'Problem gemeldet! Der Admin wurde benachrichtigt.', 'success');
-                setTimeout(() => navigateTo(dom.mainMenu), 2000);
+                setTimeout(() => navigateTo(dom.mainMenu, 'back'), 2000);
             } catch(e) {
                 showMessage('maintenance-message', 'Fehler beim Senden.', 'error');
             } finally {
@@ -835,7 +838,6 @@ function setupMainMenuListeners() {
     }
 }
 
-// Hier ist der Fix für den ersten Button
 document.getElementById('back-to-menu-btn-1').addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
 
 dom.bookSubmitBtn.addEventListener("click", async () => {

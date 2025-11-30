@@ -16,7 +16,8 @@ import {
 import { showMessage, navigateTo } from '../ui.js';
 import * as dom from '../dom.js';
 import { setIsRegistering, getIsRegistering } from '../state.js';
-import { SECRET_INVITE_CODE } from '../config.js'; 
+
+// Wir importieren den Code NICHT mehr aus der Config!
 
 export async function handleRegister() {
     
@@ -25,7 +26,7 @@ export async function handleRegister() {
     const password = document.getElementById("register-password").value;
     const confirmPassword = document.getElementById("register-password-confirm").value; 
     const partei = document.getElementById("register-partei").value;
-    const inviteCode = document.getElementById("register-invite-code").value; 
+    const inviteCode = document.getElementById("register-invite-code").value.trim(); 
 
     // 2. Validierung der Eingaben
     if (!email || !password ) {
@@ -41,8 +42,9 @@ export async function handleRegister() {
         showMessage('register-error', 'Die Passwörter stimmen nicht überein.', 'error');
         return;
     }
-    if (inviteCode.trim() !== SECRET_INVITE_CODE) {
-        showMessage('register-error', 'Der Einladungscode ist ungültig.', 'error');
+    // WICHTIG: Keine Client-seitige Prüfung des Codes mehr!
+    if (!inviteCode) {
+        showMessage('register-error', 'Bitte Einladungscode eingeben.', 'error');
         return;
     }
     if (!partei) {
@@ -53,31 +55,45 @@ export async function handleRegister() {
     // 3. Button & Flag setzen
     const registerBtn = document.getElementById('register-btn');
     registerBtn.disabled = true;
-    registerBtn.textContent = 'Registriere...';
+    registerBtn.textContent = 'Prüfe Code...';
     
     setIsRegistering(true); 
     showMessage('register-error', '', 'error');
 
+    let userCredential = null;
+
     try {
         // 4. Firebase-Benutzer erstellen
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const uid = userCredential.user.uid;
         
-        // 5. Verifizierungs-E-Mail senden
+        // 5. Benutzerprofil in Firestore speichern (INKLUSIVE Code zur Prüfung)
+        // Wenn der Code falsch ist, blockiert die Firestore-Regel diesen Schritt!
         try {
-            await sendEmailVerification(userCredential.user);
+            await setDoc(getUserProfileDocRef(uid), {
+                uid: uid,
+                email: email,
+                partei: partei,
+                isAdmin: false,
+                theme: 'light',
+                inviteCode: inviteCode // Wird von firestore.rules geprüft
+            });
+        } catch (firestoreError) {
+            // Falls Firestore den Zugriff verweigert, war der Code falsch.
+            // Wir löschen den eben erstellten Auth-User sofort wieder.
+            if (userCredential && userCredential.user) {
+                await deleteUser(userCredential.user);
+            }
+            throw new Error("Der Einladungscode ist ungültig.");
+        }
+        
+        // 6. Verifizierungs-E-Mail senden (nur wenn Code korrekt war)
+        try {
+            // Hinweis: Da wir userCredential.user evtl. neu holen müssten, nutzen wir auth.currentUser
+            if (auth.currentUser) await sendEmailVerification(auth.currentUser);
         } catch (e) {
             console.error("Fehler beim Senden der Verifizierungs-E-Mail:", e);
         }
-        
-        // 6. Benutzerprofil in Firestore speichern
-        await setDoc(getUserProfileDocRef(uid), {
-            uid: uid,
-            email: email,
-            partei: partei,
-            isAdmin: false,
-            theme: 'light' 
-        });
         
         // 7. Benutzer direkt wieder ausloggen
         await signOut(auth);
@@ -87,24 +103,28 @@ export async function handleRegister() {
         if (emailDisplay) emailDisplay.textContent = email;
         
         showMessage('verify-email-success', 'Registrierung erfolgreich!', 'success');
-        
         navigateTo(dom.verifyEmailMessage); 
         
     } catch (err) {
         // 9. Fehler-Handling
-        let errorMessage = `Registrierungsfehler: ${err.message}`;
+        console.error("Reg Error:", err);
+        let errorMessage = `${err.message}`;
+        
         if (err.code === 'auth/email-already-in-use') {
             errorMessage = 'Diese E-Mail-Adresse ist bereits registriert.';
         } else if (err.code === 'auth/weak-password') {
             errorMessage = 'Das Passwort ist zu schwach (mind. 6 Zeichen).';
+        } else if (err.message.includes("Einladungscode")) {
+            errorMessage = "Falscher Einladungscode! Zugriff verweigert.";
+        } else if (err.code && err.code.includes("permission-denied")) {
+             errorMessage = "Falscher Einladungscode! Zugriff verweigert.";
         }
+
         showMessage('register-error', errorMessage);
         
-        // WICHTIG: Flag bei Fehler zurücksetzen
         setIsRegistering(false);
 
     } finally {
-        // 10. Button-Zustand nur zurücksetzen, WENN ein Fehler aufgetreten ist
         if (getIsRegistering() === false) { 
             registerBtn.disabled = false;
             registerBtn.textContent = 'Registrieren';
@@ -112,8 +132,7 @@ export async function handleRegister() {
     }
 }
 
-
-// Alle anderen Funktionen bleiben unverändert
+// ... (Restliche Funktionen handleLogin, handleLogout etc. bleiben unverändert)
 export async function handleLogin() {
     const email = document.getElementById("login-identifier").value.trim();
     const password = document.getElementById("login-password").value;
@@ -129,174 +148,97 @@ export async function handleLogin() {
         if (!userCredential.user.emailVerified) {
             try {
                 await sendEmailVerification(userCredential.user);
-            } catch(e) {
-                console.error("Fehler beim erneuten Senden der E-Mail:", e);
-            }
-            
-            showMessage('login-error', 'Login fehlgeschlagen: E-Mail-Adresse ist nicht bestätigt. Wir haben eine neue E-Mail gesendet (bitte Spam prüfen).', 'error', 8000);
-            
+            } catch(e) { console.error(e); }
+            showMessage('login-error', 'Login fehlgeschlagen: E-Mail-Adresse ist nicht bestätigt. Wir haben eine neue E-Mail gesendet.', 'error', 8000);
             await signOut(auth); 
             return; 
         }
 
     } catch (err) {
         let errorMessage = "Login fehlgeschlagen: E-Mail oder Passwort ist falsch.";
-        if (err.code === 'auth/invalid-email') {
-            errorMessage = "Ungültiges E-Mail-Format.";
-        }
+        if (err.code === 'auth/invalid-email') errorMessage = "Ungültiges E-Mail-Format.";
         showMessage('login-error', errorMessage);
     }
 }
         
 export async function handleLogout() {
-    try {
-        await signOut(auth);
-    } catch (error) {
-        console.error("Logout-Fehler:", error);
-    }
+    try { await signOut(auth); } catch (error) { console.error("Logout-Fehler:", error); }
 }
 
-// ===== HIER BEGINNEN DIE ÄNDERUNGEN =====
 export async function handleChangePassword() {
-    // 1. Felder auslesen
     const newPassword = dom.newPasswordInput.value;
     const confirmPassword = document.getElementById('new-password-confirm').value;
 
-    // 2. Validierung
-    if (newPassword.length < 6) {
-        showMessage('profile-message', "Das Passwort muss mindestens 6 Zeichen lang sein.", 'error');
-        return;
-    }
-    if (newPassword !== confirmPassword) {
-        showMessage('profile-message', 'Die Passwörter stimmen nicht überein.', 'error');
-        return;
-    }
-
-    if (!auth.currentUser) {
-        showMessage('profile-message', "Fehler: Nicht angemeldet.", 'error');
-        return;
-    }
+    if (newPassword.length < 6) { showMessage('profile-message', "Passwort zu kurz (min 6 Zeichen).", 'error'); return; }
+    if (newPassword !== confirmPassword) { showMessage('profile-message', 'Passwörter stimmen nicht überein.', 'error'); return; }
+    if (!auth.currentUser) { showMessage('profile-message', "Nicht angemeldet.", 'error'); return; }
     
-    // 3. Firebase-Aktion
     try {
         await updatePassword(auth.currentUser, newPassword);
         showMessage('profile-message', "Passwort erfolgreich aktualisiert!", 'success');
-        
-        // 4. Felder zurücksetzen
         dom.newPasswordInput.value = '';
         document.getElementById('new-password-confirm').value = '';
-        // Klassen entfernen
         dom.newPasswordInput.classList.remove('input-valid', 'input-invalid');
         document.getElementById('new-password-confirm').classList.remove('input-valid', 'input-invalid');
-
     } catch (error) {
-         let msg = "Fehler beim Aktualisieren des Passworts. Bitte melden Sie sich neu an.";
-         if (error.code === 'auth/weak-password') {
-             msg = "Das neue Passwort ist zu schwach.";
-         }
+         let msg = "Fehler beim Aktualisieren. Bitte neu anmelden.";
+         if (error.code === 'auth/weak-password') msg = "Passwort zu schwach.";
          showMessage('profile-message', msg, 'error');
     }
 }
-// ===== HIER ENDEN DIE ÄNDERUNGEN =====
 
 export async function handlePasswordReset() {
     const emailInput = document.getElementById('reset-email');
     const email = emailInput.value.trim();
-
-    if (!email) {
-        showMessage('reset-message', 'Bitte geben Sie Ihre E-Mail-Adresse ein.', 'error');
-        return;
-    }
+    if (!email) { showMessage('reset-message', 'Bitte E-Mail eingeben.', 'error'); return; }
 
     const button = document.getElementById('reset-password-btn');
-    button.disabled = true;
-    button.textContent = 'Sende...';
+    button.disabled = true; button.textContent = 'Sende...';
 
     try {
         await sendPasswordResetEmail(auth, email);
-        showMessage('reset-message', 'Link gesendet! Bitte überprüfen Sie Ihr E-Mail-Postfach (auch Spam).', 'success', 10000);
+        showMessage('reset-message', 'Link gesendet! Bitte Postfach prüfen.', 'success', 10000);
         emailInput.value = '';
     } catch (error) {
-        let msg = 'Fehler beim Senden der E-Mail.';
-        if (error.code === 'auth/user-not-found') {
-            msg = 'Diese E-Mail-Adresse ist nicht in unserem System registriert.';
-        } else if (error.code === 'auth/invalid-email') {
-            msg = 'Ungültiges E-Mail-Format.';
-        }
+        let msg = 'Fehler beim Senden.';
+        if (error.code === 'auth/user-not-found') msg = 'E-Mail nicht bekannt.';
         showMessage('reset-message', msg, 'error');
     } finally {
-        button.disabled = false;
-        button.textContent = 'Link anfordern';
+        button.disabled = false; button.textContent = 'Link anfordern';
     }
 }
 
 export async function handleDeleteAccount(password) {
     const user = auth.currentUser;
-    if (!user) {
-        showMessage('delete-account-message', 'Fehler: Nicht angemeldet.', 'error');
-        return;
-    }
-    
-    if (!password) {
-        showMessage('delete-account-message', 'Bitte geben Sie Ihr Passwort ein.', 'error');
-        return;
-    }
+    if (!user || !password) { showMessage('delete-account-message', 'Bitte Passwort eingeben.', 'error'); return; }
 
     const button = dom.confirmDeleteAccountBtn;
-    button.disabled = true;
-    button.textContent = 'Lösche...';
+    button.disabled = true; button.textContent = 'Lösche...';
 
     try {
-        // 1. Re-Authentifizierung (Sicherheitsprüfung)
         const credential = EmailAuthProvider.credential(user.email, password);
         await reauthenticateWithCredential(user, credential);
-
-        // 2. Firestore-Dokument löschen (User-Profil)
         await deleteDoc(getUserProfileDocRef(user.uid));
-
-        // 3. Auth-Konto löschen
         await deleteUser(user);
-        
         dom.deleteAccountModal.style.display = 'none';
-
     } catch (error) {
-        let msg = 'Ein Fehler ist aufgetreten.';
-        if (error.code === 'auth/wrong-password') {
-            msg = 'Falsches Passwort. Das Konto wurde nicht gelöscht.';
-        } else if (error.code === 'auth/requires-recent-login') {
-            msg = 'Sitzung abgelaufen. Bitte loggen Sie sich neu an und versuchen Sie es erneut.';
-        } else {
-            msg = `Fehler: ${error.message}`;
-        }
+        let msg = 'Fehler.';
+        if (error.code === 'auth/wrong-password') msg = 'Falsches Passwort.';
+        else msg = error.message;
         showMessage('delete-account-message', msg, 'error');
     } finally {
-        button.disabled = false;
-        button.textContent = 'Konto endgültig löschen';
+        button.disabled = false; button.textContent = 'Konto endgültig löschen';
     }
 }
 
-// ===== NEUE ADMIN-FUNKTION =====
-/**
- * Sendet einen Passwort-Reset-Link an eine beliebige E-Mail (nur für Admins).
- * @param {string} email - Die Ziel-E-Mail.
- * @param {string} messageElementId - Die ID des Message-Elements für Feedback.
- */
 export async function handleAdminPasswordReset(email, messageElementId) {
-    if (!email) {
-        showMessage(messageElementId, 'Keine E-Mail zum Zurücksetzen angegeben.', 'error');
-        return false;
-    }
-
+    if (!email) { showMessage(messageElementId, 'Keine E-Mail angegeben.', 'error'); return false; }
     try {
         await sendPasswordResetEmail(auth, email);
-        showMessage(messageElementId, `Passwort-Reset-Link an ${email} gesendet!`, 'success', 7000);
+        showMessage(messageElementId, `Reset-Link an ${email} gesendet!`, 'success');
         return true;
     } catch (error) {
-        let msg = `Fehler beim Senden an ${email}.`;
-        if (error.code === 'auth/user-not-found') {
-            msg = `Fehler: Nutzer ${email} nicht in Firebase Auth gefunden.`;
-        }
-        showMessage(messageElementId, msg, 'error', 7000);
+        showMessage(messageElementId, `Fehler: ${error.message}`, 'error');
         return false;
     }
 }
