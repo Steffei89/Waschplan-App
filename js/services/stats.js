@@ -1,4 +1,4 @@
-import { getDocs, query, orderBy, getBookingsCollectionRef, doc, setDoc, increment, db, collection } from '../firebase.js';
+import { getDocs, query, orderBy, getBookingsCollectionRef, doc, setDoc, increment, db, collection, where } from '../firebase.js';
 import * as dom from '../dom.js';
 import { navigateTo } from '../ui.js';
 import { getState } from '../state.js';
@@ -56,7 +56,6 @@ export async function trackMenuClick(counterName) {
     }
 }
 
-// Helper um aktuelle CSS Variablen auszulesen (für Dark/Light Mode)
 function getChartColors() {
     const style = getComputedStyle(document.body);
     return {
@@ -66,9 +65,8 @@ function getChartColors() {
         primary: style.getPropertyValue('--primary-color').trim() || '#007AFF',
         success: style.getPropertyValue('--success-color').trim() || '#34c759',
         error: style.getPropertyValue('--error-color').trim() || '#ff3b30',
-        // Transparente Varianten für Fills
         primaryTransparent: style.getPropertyValue('--primary-color-transparent').trim() || 'rgba(0, 122, 255, 0.5)',
-        secondary: '#8e8e93' // Fallback Grau
+        secondary: '#8e8e93'
     };
 }
 
@@ -94,7 +92,6 @@ export async function loadStatistics(useCachedData = false) {
         }
 
         await loadKarmaStats();
-
         await loadAdvancedStats(allBookings, userIsAdmin);
 
         if (allBookings.length === 0) {
@@ -173,14 +170,12 @@ async function loadAdvancedStats(allBookings, isAdmin) {
 }
 
 function renderUserLists(bookings, sessions, games, userMap) {
-    // 1. Top Wäscher
     const bookingCounts = {};
     bookings.forEach(b => bookingCounts[b.partei] = (bookingCounts[b.partei] || 0) + 1);
     const sortedBookers = Object.entries(bookingCounts).sort((a,b) => b[1] - a[1]).slice(0,3);
     let htmlBookers = sortedBookers.map((entry, i) => `${i+1}. ${entry[0]} (${entry[1]})`).join('<br>');
     document.getElementById('list-top-washers').innerHTML = htmlBookers || '-';
 
-    // 2. App Suchtis
     const sessionCounts = {};
     sessions.forEach(s => {
         if (s.userId) {
@@ -202,7 +197,6 @@ function renderUserLists(bookings, sessions, games, userMap) {
     }).join('<br>');
     document.getElementById('list-top-users').innerHTML = htmlUsers || '-';
 
-    // 3. Minigame Profis
     const userGameScores = {}; 
     games.forEach(g => {
         const uid = g.userId;
@@ -231,7 +225,7 @@ function renderUserLists(bookings, sessions, games, userMap) {
 
 function renderGameBalancingChart(games) {
     const ctx = document.getElementById('gameBalancingChart').getContext('2d');
-    const colors = getChartColors(); // Farben laden
+    const colors = getChartColors(); 
     
     const scatterData = games.map(g => ({
         x: g.duration_seconds || 0,
@@ -244,7 +238,7 @@ function renderGameBalancingChart(games) {
             datasets: [{
                 label: 'Spielrunden',
                 data: scatterData,
-                backgroundColor: colors.primary // Theme Color
+                backgroundColor: colors.primary 
             }]
         },
         options: {
@@ -252,7 +246,7 @@ function renderGameBalancingChart(games) {
             scales: {
                 x: { 
                     type: 'linear', position: 'bottom', 
-                    title: { display: true, text: 'Dauer (Sekunden)', color: colors.textColor },
+                    title: { display: true, text: 'Dauer (Sek)', color: colors.textColor },
                     ticks: { color: colors.textColor },
                     grid: { color: colors.gridColor }
                 },
@@ -301,7 +295,6 @@ function renderHeatmap(bookings) {
             const val = data[r][c];
             const intensity = val / maxVal;
             const alpha = Math.max(0.1, intensity); 
-            // Rotton für Heatmap
             const color = `rgba(255, 59, 48, ${alpha})`; 
             html += `<td style="background:${color}; color:${intensity > 0.6 ? 'white' : colors.textColor}; text-align:center; padding:8px; border:1px solid ${colors.gridColor}; border-radius:4px;">
                         ${val > 0 ? val : ''}
@@ -437,7 +430,7 @@ function renderSlotChart(slotCounts) {
             datasets: [{ 
                 label: 'Anzahl Buchungen', 
                 data: dataValues, 
-                backgroundColor: [colors.primary, colors.secondary], // Dynamische Farben
+                backgroundColor: [colors.primary, colors.secondary], 
                 borderWidth: 1 
             }] 
         },
@@ -484,7 +477,7 @@ function renderBookingsOverTimeChart(monthCounts, filterValue) {
                 label: 'Buchungen pro Monat', 
                 data: dataValues, 
                 fill: false, 
-                borderColor: colors.primary, // Dynamisch
+                borderColor: colors.primary, 
                 tension: 0.1 
             }] 
         },
@@ -519,7 +512,7 @@ function renderDayOfWeekChart(dayOfWeekCounts) {
             datasets: [{ 
                 label: 'Wochentage', 
                 data: dataValues, 
-                backgroundColor: colors.success, // Dynamisch
+                backgroundColor: colors.success, 
                 borderWidth: 1 
             }] 
         },
@@ -539,4 +532,58 @@ function renderDayOfWeekChart(dayOfWeekCounts) {
             plugins: { legend: { display: false } } 
         }
     });
+}
+
+// ========== HIER IST DIE NEUE FUNKTION ==========
+/**
+ * Lädt die persönlichen Statistiken für den aktuellen User.
+ * @param {string} userId - Die ID des aktuellen Nutzers.
+ * @returns {Promise<object>} Objekt mit { totalBookings, favoriteDay }
+ */
+export async function getPersonalStats(userId) {
+    if (!userId) return null;
+
+    try {
+        const q = query(collection(db, "bookings"), where("userId", "==", userId));
+        const snapshot = await getDocs(q);
+        const bookings = [];
+        snapshot.forEach(d => bookings.push(d.data()));
+
+        // Filter: Nur aktuelles Jahr
+        const currentYear = new Date().getFullYear();
+        const thisYearBookings = bookings.filter(b => new Date(b.date).getFullYear() === currentYear);
+
+        // 1. Anzahl
+        const totalCount = thisYearBookings.length;
+
+        // 2. Lieblingstag ermitteln
+        const dayCounts = { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 };
+        thisYearBookings.forEach(b => {
+            const date = new Date(b.date);
+            const day = date.getDay(); // 0 = Sonntag, 1 = Montag...
+            dayCounts[day]++;
+        });
+
+        // Tag mit den meisten Buchungen finden
+        let maxVal = -1;
+        let favDayIndex = -1;
+        for (let i = 0; i <= 6; i++) {
+            if (dayCounts[i] > maxVal) {
+                maxVal = dayCounts[i];
+                favDayIndex = i;
+            }
+        }
+
+        const dayNames = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
+        const favoriteDay = maxVal > 0 ? dayNames[favDayIndex] : "-";
+
+        return {
+            totalBookings: totalCount,
+            favoriteDay: favoriteDay
+        };
+
+    } catch (e) {
+        console.error("Fehler beim Laden der persönlichen Statistik:", e);
+        return null;
+    }
 }

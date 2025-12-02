@@ -2,6 +2,22 @@
 
 Hier werden alle wichtigen Änderungen an der Waschplan-App festgehalten.
 
+## [3.0.0] - 2025-12-01
+
+### 🔒 Massive Sicherheits-Überarbeitung ("Fort Knox")
+Die App wurde einer vollständigen Sicherheits-Auditierung unterzogen und massiv gehärtet. Dies ist das sicherste Update in der Geschichte der App.
+
+* **Datenbank-Firewall (Firestore Rules):**
+    * Ein komplett neues, strenges Regelwerk wurde implementiert.
+    * **Identitäts-Schutz:** Es ist technisch nun unmöglich, Buchungen im Namen anderer Parteien zu erstellen oder fremde Buchungen zu löschen.
+    * **Karma-Schutz:** Nutzer können sich nicht mehr selbst Karma ercheaten. Nur valide Aktionen (oder der Admin) dürfen den Punktestand ändern.
+* **Anti-Hacker Schutz (XSS):**
+    * Sämtliche Text-Ausgaben in der App (Admin-Tickets, Wochenübersicht, Tauschanfragen, Minigame-Rangliste) wurden gegen Code-Injektion abgesichert.
+    * Selbst wenn ein Angreifer versucht, Schadcode als Benutzernamen einzugeben, wird dieser nur als harmloser Text angezeigt.
+
+### 🎮 Minigame Updates
+* **Grafik-Fix:** Ein Fehler wurde behoben, durch den die fallenden Gegenstände (Socken, Rotwein) fälschlicherweise transparent dargestellt wurden. Die Grafik ist nun wieder kontrastreich und gut erkennbar.
+
 ## [2.9.1] - 2025-11-30
 
 ### 🔒 Kritisches Sicherheits-Update
