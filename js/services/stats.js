@@ -534,17 +534,18 @@ function renderDayOfWeekChart(dayOfWeekCounts) {
     });
 }
 
-// ========== HIER IST DIE NEUE FUNKTION ==========
+// ========== GEÄNDERTE FUNKTION ==========
 /**
- * Lädt die persönlichen Statistiken für den aktuellen User.
- * @param {string} userId - Die ID des aktuellen Nutzers.
+ * Lädt die Statistik für die PARTEI des Users.
+ * @param {string} parteiName - Der Name der Partei.
  * @returns {Promise<object>} Objekt mit { totalBookings, favoriteDay }
  */
-export async function getPersonalStats(userId) {
-    if (!userId) return null;
+export async function getPartyStats(parteiName) {
+    if (!parteiName) return null;
 
     try {
-        const q = query(collection(db, "bookings"), where("userId", "==", userId));
+        // HIER WURDE GEÄNDERT: 'where("partei", "==", parteiName)' statt 'userId'
+        const q = query(collection(db, "bookings"), where("partei", "==", parteiName));
         const snapshot = await getDocs(q);
         const bookings = [];
         snapshot.forEach(d => bookings.push(d.data()));
@@ -560,7 +561,7 @@ export async function getPersonalStats(userId) {
         const dayCounts = { 0:0, 1:0, 2:0, 3:0, 4:0, 5:0, 6:0 };
         thisYearBookings.forEach(b => {
             const date = new Date(b.date);
-            const day = date.getDay(); // 0 = Sonntag, 1 = Montag...
+            const day = date.getDay(); 
             dayCounts[day]++;
         });
 
@@ -583,7 +584,7 @@ export async function getPersonalStats(userId) {
         };
 
     } catch (e) {
-        console.error("Fehler beim Laden der persönlichen Statistik:", e);
+        console.error("Fehler beim Laden der Partei-Statistik:", e);
         return null;
     }
 }

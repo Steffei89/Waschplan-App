@@ -7,8 +7,8 @@ import { loadWashPrograms, addWashProgram, deleteWashProgram } from '../services
 import { getKarmaStatus, getPartyKarma } from '../services/karma.js';
 import { KARMA_START } from '../config.js';
 import { initPushNotifications } from '../services/push.js';
-// Importiere die neue Statistik-Funktion
-import { getPersonalStats } from '../services/stats.js';
+// GEÄNDERT: Importiere getPartyStats statt getPersonalStats
+import { getPartyStats } from '../services/stats.js';
 
 function getSettingsDocRef() { return doc(db, 'app_settings', 'config'); }
 
@@ -57,7 +57,6 @@ export function initProfileView() {
         if (await addWashProgram(name, duration)) { dom.programNameInput.value = ''; dom.programDurationInput.value = ''; }
     });
 
-    // --- DER WICHTIGE BUTTON ---
     const notifBtn = document.getElementById('enable-notifications-btn');
     const newBtn = notifBtn.cloneNode(true);
     notifBtn.parentNode.replaceChild(newBtn, notifBtn);
@@ -98,31 +97,29 @@ export async function loadProfileData() {
         let statusColor = status === 'VIP' ? '#34c759' : (status === 'Eingeschränkt' ? '#ff3b30' : 'var(--text-color)');
         karmaContainer.innerHTML = `<p style="margin:0; font-size:1.1em;"><strong>Karma:</strong> ${karma}</p><p style="margin:5px 0; font-size:0.9em; color:${statusColor}">Status: <strong>${label}</strong></p>`;
         
-        // --- NEU: PERSÖNLICHE STATISTIK BOX ---
+        // --- NEU: PARTEI STATISTIK BOX ---
         let statsContainer = document.getElementById('profile-personal-stats');
         if (!statsContainer) {
             statsContainer = document.createElement('div');
             statsContainer.id = 'profile-personal-stats';
-            // Styling angepasst an die App (Secondary Color)
             statsContainer.style.marginTop = '15px';
             statsContainer.style.marginBottom = '20px';
             statsContainer.style.padding = '15px';
             statsContainer.style.backgroundColor = 'var(--secondary-color)';
             statsContainer.style.borderRadius = '12px';
             statsContainer.style.border = '1px solid var(--border-color)';
-            // Box unter Karma einfügen
             karmaContainer.after(statsContainer);
         }
         
         // Lade-Status
         statsContainer.innerHTML = '<p class="small-text"><i class="fa-solid fa-spinner fa-spin"></i> Lade Statistik...</p>';
         
-        // Daten holen
-        const stats = await getPersonalStats(currentUser.uid);
+        // GEÄNDERT: Daten für die PARTEI holen
+        const stats = await getPartyStats(currentUser.userData.partei);
         if (stats) {
             const currentYear = new Date().getFullYear();
             statsContainer.innerHTML = `
-                <h3 style="margin-top:0; font-size:1.1em; border-bottom:1px solid var(--border-color); padding-bottom:5px;">Deine Statistik ${currentYear} 📊</h3>
+                <h3 style="margin-top:0; font-size:1.1em; border-bottom:1px solid var(--border-color); padding-bottom:5px;">Partei-Statistik ${currentYear} 📊</h3>
                 <div style="display:flex; justify-content: space-between; align-items:center; margin-top:10px;">
                     <div style="text-align:center;">
                         <span class="small-text">Wäschen</span><br>
