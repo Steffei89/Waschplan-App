@@ -31,7 +31,7 @@ import { initCalendarView, loadBookingsForMonth } from './views/calendar.js';
 import { initOverviewView, setupWeekDropdown, loadBookingsForWeek } from './views/overview.js';
 import { initProfileView, loadProfileData } from './views/profile.js';
 import { initAdminView, loadAdminUserData } from './views/admin.js';
-import { APP_VERSION } from './config.js'; 
+import { APP_VERSION, COST_SLOT_NORMAL, COST_SLOT_PRIME } from './config.js'; 
 import { loadWashPrograms, listenToActiveTimer, startWashTimer, stopWashTimer } from './services/timers.js';
 import { initKarmaForParty } from './services/karma.js';
 import { initMinigame } from './services/minigame.js'; 
@@ -185,6 +185,22 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
+// TUTORIAL CHECK
+function checkTutorialSeen() {
+    const hasSeenTutorial = localStorage.getItem('tutorial_accepted_v1');
+    if (!hasSeenTutorial) {
+        const tutModal = document.getElementById('tutorialModal');
+        const tutBtn = document.getElementById('tutorial-confirm-btn');
+        if (tutModal && tutBtn) {
+            tutModal.style.display = 'flex';
+            tutBtn.onclick = () => {
+                localStorage.setItem('tutorial_accepted_v1', 'true');
+                tutModal.style.display = 'none';
+            };
+        }
+    }
+}
+
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === 'hidden') updateSession();
 });
@@ -215,7 +231,21 @@ function setupKarmaHeaderListener(parteiName) {
     const headerValue = document.getElementById('header-karma-value');
     const headerIcon = document.getElementById('header-karma-icon');
     if (!headerDisplay || !headerValue || !headerIcon) return;
+    
     headerDisplay.style.display = 'flex';
+    
+    // NEU: Klick-Listener für das neue Info-Modal
+    headerDisplay.onclick = () => {
+        const modal = document.getElementById('karmaGuideModal');
+        const closeBtn = document.getElementById('close-karma-guide-btn');
+        if(modal) {
+            modal.style.display = 'flex';
+            if(closeBtn) {
+                closeBtn.onclick = () => modal.style.display = 'none';
+            }
+        }
+    };
+
     karmaUnsubscribe = onSnapshot(doc(db, "parties", parteiName), (docSnap) => {
         if (docSnap.exists()) {
             const karma = docSnap.data().karma;
@@ -250,8 +280,6 @@ function handleLoadNextBookings() {
                 const item = document.createElement('div');
                 item.className = 'my-booking-item';
 
-                // --- SICHERHEITS-UPDATE START ---
-                // Details sicher zusammenbauen (ohne innerHTML für User-Input)
                 const detailsDiv = document.createElement('div');
                 detailsDiv.className = 'booking-details';
                 
@@ -262,13 +290,12 @@ function handleLoadNextBookings() {
                 
                 const parteiSpan = document.createElement('span');
                 parteiSpan.className = 'small-text ml-10';
-                parteiSpan.textContent = booking.partei; // SAFE
+                parteiSpan.textContent = booking.partei; 
 
                 detailsDiv.appendChild(dateStrong);
                 detailsDiv.appendChild(slotText);
                 detailsDiv.appendChild(parteiSpan);
 
-                // Status Text hinzufügen (sicher, da hardcoded Strings)
                 if (isMyParteiBooking || userIsAdmin) {
                      if (booking.isReleased) {
                          const statusSpan = document.createElement('span');
@@ -288,7 +315,6 @@ function handleLoadNextBookings() {
                      }
                 }
                 item.appendChild(detailsDiv);
-                // --- SICHERHEITS-UPDATE ENDE ---
 
                 if (isMyParteiBooking || userIsAdmin) {
                     const icsBtn = document.createElement('button');
@@ -340,7 +366,6 @@ function handleLoadIncomingRequests() {
                 const item = document.createElement('div'); 
                 item.className = 'request-item';
                 
-                // --- SICHERHEITS-UPDATE ---
                 const detailsDiv = document.createElement('div'); 
                 detailsDiv.className = 'request-details';
                 
@@ -349,11 +374,10 @@ function handleLoadIncomingRequests() {
                 
                 const fromSpan = document.createElement('span');
                 fromSpan.className = 'small-text ml-10';
-                fromSpan.textContent = `von: ${req.requesterPartei}`; // SAFE
+                fromSpan.textContent = `von: ${req.requesterPartei}`; 
                 
                 detailsDiv.appendChild(dateStrong);
                 detailsDiv.appendChild(fromSpan);
-                // --------------------------
 
                 const actionsDiv = document.createElement('div'); actionsDiv.className = 'request-actions';
                 const acceptBtn = document.createElement('button'); acceptBtn.className = 'button-small button-success'; acceptBtn.textContent = 'Annehmen';
@@ -385,7 +409,6 @@ function handleLoadOutgoingRequests() {
                 const dateStr = new Date(req.targetDate + "T00:00:00").toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
                 const item = document.createElement('div'); item.className = 'request-item rejected'; 
                 
-                // --- SICHERHEITS-UPDATE ---
                 const detailsDiv = document.createElement('div');
                 detailsDiv.className = 'request-details';
                 
@@ -394,12 +417,11 @@ function handleLoadOutgoingRequests() {
                 
                 const infoSpan = document.createElement('span');
                 infoSpan.className = 'small-text ml-10';
-                infoSpan.textContent = `Anfrage an ${req.targetPartei} wurde abgelehnt.`; // SAFE
+                infoSpan.textContent = `Anfrage an ${req.targetPartei} wurde abgelehnt.`;
                 
                 detailsDiv.appendChild(dateStrong);
                 detailsDiv.appendChild(infoSpan);
                 item.appendChild(detailsDiv);
-                // --------------------------
 
                 const actionsDiv = document.createElement('div'); actionsDiv.className = 'request-actions';
                 const okBtn = document.createElement('button'); okBtn.className = 'button-small button-secondary dismiss-notification-btn'; okBtn.textContent = 'OK';
@@ -425,7 +447,6 @@ function handleLoadOutgoingSuccess() {
                 const dateStr = new Date(req.targetDate + "T00:00:00").toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
                 const item = document.createElement('div'); item.className = 'request-item accepted'; 
                 
-                // --- SICHERHEITS-UPDATE ---
                 const detailsDiv = document.createElement('div');
                 detailsDiv.className = 'request-details';
                 
@@ -434,12 +455,11 @@ function handleLoadOutgoingSuccess() {
                 
                 const infoSpan = document.createElement('span');
                 infoSpan.className = 'small-text ml-10';
-                infoSpan.textContent = `Tausch mit ${req.targetPartei} war erfolgreich!`; // SAFE
+                infoSpan.textContent = `Tausch mit ${req.targetPartei} war erfolgreich!`;
                 
                 detailsDiv.appendChild(dateStrong);
                 detailsDiv.appendChild(infoSpan);
                 item.appendChild(detailsDiv);
-                // --------------------------
 
                 const actionsDiv = document.createElement('div'); actionsDiv.className = 'request-actions';
                 const okBtn = document.createElement('button'); okBtn.className = 'button-small button-secondary dismiss-notification-btn'; okBtn.textContent = 'OK';
@@ -565,7 +585,23 @@ dom.themeIcon.addEventListener('click', () => { const newTheme = getState().curr
 document.getElementById('refresh-app-btn').addEventListener('click', () => { const btn = document.getElementById('refresh-app-btn'); btn.classList.add('fa-spin'); location.reload(true); setTimeout(() => btn.classList.remove('fa-spin'), 1500); });
 
 function setupMainMenuListeners() {
-    document.getElementById('book-btn').addEventListener('click', () => { trackMenuClick('btn_book'); unsubscribeForNavigation(); dom.bookingDateInput.value = getFormattedDate(tomorrow); dom.dateValidationMessage.textContent = ''; dom.bookingSlotSelect.value = ''; navigateTo(dom.bookingSection); dom.bookingDateInput.dispatchEvent(new Event('change')); });
+    document.getElementById('book-btn').addEventListener('click', () => { 
+        trackMenuClick('btn_book'); unsubscribeForNavigation(); 
+        dom.bookingDateInput.value = getFormattedDate(tomorrow); 
+        dom.dateValidationMessage.textContent = ''; 
+        dom.bookingSlotSelect.value = ''; 
+        // Kostenanzeige zurücksetzen
+        const costPreview = document.getElementById('booking-cost-display');
+        const bookBtn = dom.bookSubmitBtn;
+        if(costPreview) costPreview.style.display = 'none';
+        if(bookBtn) {
+            const btnText = document.getElementById("book-text");
+            if(btnText) btnText.textContent = "Buchen";
+        }
+        
+        navigateTo(dom.bookingSection); 
+        dom.bookingDateInput.dispatchEvent(new Event('change')); 
+    });
     document.getElementById('overview-btn').addEventListener('click', () => { trackMenuClick('btn_week'); unsubscribeForNavigation(); setupWeekDropdown(); loadBookingsForWeek(dom.kwSelect.value, setUnsubscriber); navigateTo(dom.overviewSection); });
     document.getElementById('calendar-btn').addEventListener('click', () => { trackMenuClick('btn_calendar'); unsubscribeForNavigation(); dom.calendarDayActions.style.display = 'none'; setSelectedCalendarDate(null); const now = new Date(); loadBookingsForMonth(now.getFullYear(), now.getMonth(), setUnsubscriber); navigateTo(dom.calendarSection); });
     document.getElementById('admin-btn').addEventListener('click', () => { unsubscribeForNavigation(); loadAdminUserData(); navigateTo(dom.adminSection); });
@@ -577,15 +613,63 @@ function setupMainMenuListeners() {
     const submitMaintBtn = document.getElementById('submit-maintenance-btn'); if (submitMaintBtn) { submitMaintBtn.addEventListener('click', async () => { const reason = document.getElementById('maintenance-reason').value; const details = document.getElementById('maintenance-details').value; submitMaintBtn.disabled = true; try { await reportIssue(reason, details); showMessage('maintenance-message', 'Problem gemeldet! Der Admin wurde benachrichtigt.', 'success'); setTimeout(() => navigateTo(dom.mainMenu, 'back'), 2000); } catch(e) { showMessage('maintenance-message', 'Fehler beim Senden.', 'error'); } finally { submitMaintBtn.disabled = false; } }); }
 }
 
+// ===== UPDATE: Live-Update der Kostenanzeige & Button-Text =====
+function updateBookingCostPreview() {
+    const dateStr = dom.bookingDateInput.value;
+    const slot = dom.bookingSlotSelect.value;
+    const displayBox = document.getElementById('booking-cost-display');
+    const textEl = document.getElementById('cost-value-text');
+    const bookBtnText = document.getElementById('book-text');
+
+    if (!dateStr) {
+        if(displayBox) displayBox.style.display = 'none';
+        if(bookBtnText) bookBtnText.textContent = "Buchen";
+        return;
+    }
+
+    const dateObj = new Date(dateStr);
+    const isWeekend = (dateObj.getDay() === 0 || dateObj.getDay() === 6);
+    
+    // Kosten positiv
+    const cost = Math.abs(isWeekend ? COST_SLOT_PRIME : COST_SLOT_NORMAL);
+    
+    if (displayBox && textEl) {
+        displayBox.style.display = 'block';
+        if (isWeekend) {
+            textEl.innerHTML = `<span style="color: var(--error-color);">-${cost} Karma</span> 🔥 (Wochenende)`;
+            displayBox.style.borderColor = 'var(--error-color)';
+            displayBox.style.background = 'rgba(255, 59, 48, 0.1)';
+        } else {
+            textEl.innerHTML = `<span style="color: var(--primary-color);">-${cost} Karma</span> (Werktag)`;
+            displayBox.style.borderColor = 'var(--primary-color)';
+            displayBox.style.background = 'rgba(0, 122, 255, 0.1)';
+        }
+    }
+
+    // NEU: Auch den Button-Text ändern!
+    if(bookBtnText) {
+        bookBtnText.textContent = `Buchen (-${cost} Karma)`;
+    }
+}
+// ===============================================================
+
 document.getElementById('back-to-menu-btn-1').addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
-dom.bookSubmitBtn.addEventListener("click", async () => { const date = dom.bookingDateInput.value; const slot = dom.bookingSlotSelect.value; const button = dom.bookSubmitBtn; const bookText = document.getElementById("book-text"); const bookIcon = document.getElementById("book-success-icon"); const originalText = "Buchen"; button.disabled = true; if (bookText) bookText.textContent = "Buche..."; if (bookIcon) bookIcon.style.display = 'none'; let success = false; try { success = await performBooking(date, slot, 'booking-error'); } catch (e) { console.error(e); showMessage('booking-error', 'Ein unerwarteter Fehler ist aufgetreten.', 'error'); success = false; } finally { if (success) { button.classList.add('booking-success'); if(bookText) bookText.style.display = 'none'; if(bookIcon) bookIcon.style.display = 'block'; setTimeout(() => { button.classList.remove('booking-success'); if(bookIcon) bookIcon.style.display = 'none'; if(bookText) { bookText.style.display = 'block'; bookText.textContent = originalText; } button.disabled = false; dom.bookingDateInput.dispatchEvent(new Event('change')); }, 2000); } else { if(bookText) bookText.textContent = originalText; button.disabled = false; } } });
-dom.bookingDateInput.addEventListener('change', async () => { const selectedDateStr = dom.bookingDateInput.value; const selectedDate = new Date(selectedDateStr); selectedDate.setHours(0, 0, 0, 0); const isPast = selectedDate < today; dom.dateValidationMessage.textContent = isPast ? 'Buchungen können nicht für vergangene Tage vorgenommen werden.' : ''; if (isPast) { updateSlotDropdownUI({ "07:00-13:00": { status: 'disabled-duplicate', text: '07:00 - 13:00' }, "13:00-19:00": { status: 'disabled-duplicate', text: '13:00 - 19:00' } }); return; } try { const options = dom.bookingSlotSelect.querySelectorAll('option'); options.forEach(opt => { if (opt.value) { opt.textContent = `${opt.value} (Prüfe...)`; opt.disabled = true; } }); const availability = await checkSlotAvailability(selectedDateStr); if (availability) { updateSlotDropdownUI(availability); } } catch (e) { console.error(e); showMessage('booking-error', 'Fehler beim Prüfen der Verfügbarkeit.', 'error'); } });
+dom.bookSubmitBtn.addEventListener("click", async () => { const date = dom.bookingDateInput.value; const slot = dom.bookingSlotSelect.value; const button = dom.bookSubmitBtn; const bookText = document.getElementById("book-text"); const bookIcon = document.getElementById("book-success-icon"); const originalText = bookText ? bookText.textContent : "Buchen"; button.disabled = true; if (bookText) bookText.textContent = "Buche..."; if (bookIcon) bookIcon.style.display = 'none'; let success = false; try { success = await performBooking(date, slot, 'booking-error'); } catch (e) { console.error(e); showMessage('booking-error', 'Ein unerwarteter Fehler ist aufgetreten.', 'error'); success = false; } finally { if (success) { button.classList.add('booking-success'); if(bookText) bookText.style.display = 'none'; if(bookIcon) bookIcon.style.display = 'block'; setTimeout(() => { button.classList.remove('booking-success'); if(bookIcon) bookIcon.style.display = 'none'; if(bookText) { bookText.style.display = 'block'; bookText.textContent = "Buchen"; } button.disabled = false; dom.bookingDateInput.dispatchEvent(new Event('change')); }, 2000); } else { if(bookText) bookText.textContent = "Buchen"; button.disabled = false; } } });
+
+dom.bookingDateInput.addEventListener('change', async () => { 
+    updateBookingCostPreview(); // NEU: Update beim Datum
+    const selectedDateStr = dom.bookingDateInput.value; const selectedDate = new Date(selectedDateStr); selectedDate.setHours(0, 0, 0, 0); const isPast = selectedDate < today; dom.dateValidationMessage.textContent = isPast ? 'Buchungen können nicht für vergangene Tage vorgenommen werden.' : ''; if (isPast) { updateSlotDropdownUI({ "07:00-13:00": { status: 'disabled-duplicate', text: '07:00 - 13:00' }, "13:00-19:00": { status: 'disabled-duplicate', text: '13:00 - 19:00' } }); return; } try { const options = dom.bookingSlotSelect.querySelectorAll('option'); options.forEach(opt => { if (opt.value) { opt.textContent = `${opt.value} (Prüfe...)`; opt.disabled = true; } }); const availability = await checkSlotAvailability(selectedDateStr); if (availability) { updateSlotDropdownUI(availability); } } catch (e) { console.error(e); showMessage('booking-error', 'Fehler beim Prüfen der Verfügbarkeit.', 'error'); } 
+});
+
+// NEU: Update beim Slot-Wechsel
+dom.bookingSlotSelect.addEventListener('change', updateBookingCostPreview);
+
 dom.bookingDateInput.setAttribute('min', getFormattedDate(today)); dom.bookingDateInput.value = getFormattedDate(tomorrow);
 document.getElementById('confirm-cancel').addEventListener('click', hideConfirmation);
 dom.cancelDeleteAccountBtn.addEventListener('click', () => { dom.deleteAccountModal.style.display = 'none'; dom.deleteAccountPasswordInput.value = ''; showMessage('delete-account-message', '', 'error'); });
 dom.confirmDeleteAccountBtn.addEventListener('click', async () => { const password = dom.deleteAccountPasswordInput.value; await handleDeleteAccount(password); });
 dom.changelogCloseBtn.addEventListener('click', () => { dom.changelogModal.style.display = 'none'; localStorage.setItem('waschplan_version', APP_VERSION); });
-function checkAppVersion() { const seenVersion = localStorage.getItem('waschplan_version'); if (seenVersion !== APP_VERSION) { showChangelog(); } }
+function checkAppVersion() { const seenVersion = localStorage.getItem('waschplan_version'); if (seenVersion !== APP_VERSION) { showChangelog(); } checkTutorialSeen(); }
 
 initCalendarView(setUnsubscriber);
 initOverviewView(setUnsubscriber);

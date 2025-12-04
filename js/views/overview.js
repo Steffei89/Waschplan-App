@@ -8,6 +8,8 @@ import { getState } from '../state.js';
 import { formatDate, getWeekNumber, getMonday } from '../utils.js';
 import { performDeletion } from '../services/booking.js';
 import { handleSwapRequest } from '../services/swap.js';
+// NEU: Kosten importieren
+import { COST_SLOT_NORMAL, COST_SLOT_PRIME } from '../config.js';
 
 export function initOverviewView(unsubscriberSetter) {
     dom.kwSelect.addEventListener('change', (e) => {
@@ -114,23 +116,20 @@ export async function loadBookingsForWeek(kwString, unsubscriberSetter) {
 
             const isMyParteiBooking = booking.partei === currentUser.userData.partei;
             
-            // --- SICHERHEITS-UPDATE: Elemente sicher erstellen (kein innerHTML String-Basteln) ---
             const item = document.createElement('div');
             item.className = 'booking-item';
 
-            // Linker Teil: Slot und Partei
             const infoDiv = document.createElement('div');
             const slotStrong = document.createElement('strong');
             slotStrong.textContent = booking.slot;
             
             const parteiSpan = document.createElement('span');
             parteiSpan.className = 'small-text ml-10';
-            parteiSpan.textContent = booking.partei; // Safe Text
+            parteiSpan.textContent = booking.partei; 
 
             infoDiv.appendChild(slotStrong);
             infoDiv.appendChild(parteiSpan);
 
-            // Rechter Teil: Buttons
             const actionsDiv = document.createElement('div');
             actionsDiv.className = 'booking-actions';
 
@@ -138,7 +137,6 @@ export async function loadBookingsForWeek(kwString, unsubscriberSetter) {
                 const delBtn = document.createElement('button');
                 delBtn.className = 'button-small button-danger delete-overview-btn';
                 delBtn.textContent = 'Löschen';
-                // Daten sicher anhängen
                 delBtn.dataset.date = booking.date;
                 delBtn.dataset.slot = booking.slot;
                 
@@ -153,7 +151,13 @@ export async function loadBookingsForWeek(kwString, unsubscriberSetter) {
                 const hasDuplicate = myPartyBookedDates.has(booking.date);
                 const swapBtn = document.createElement('button');
                 swapBtn.className = `button-small ${hasDuplicate ? 'button-secondary' : 'button-primary'} swap-request-btn`;
-                swapBtn.textContent = 'Slot anfragen';
+                
+                // NEU: Kosten berechnen
+                const dateObj = new Date(booking.date);
+                const isWeekend = (dateObj.getDay() === 0 || dateObj.getDay() === 6);
+                const cost = Math.abs(isWeekend ? COST_SLOT_PRIME : COST_SLOT_NORMAL);
+                
+                swapBtn.textContent = `Slot anfragen (-${cost})`;
                 
                 if (hasDuplicate) {
                     swapBtn.disabled = true;
@@ -163,7 +167,6 @@ export async function loadBookingsForWeek(kwString, unsubscriberSetter) {
                 swapBtn.onclick = async (e) => {
                     e.target.disabled = true;
                     e.target.textContent = 'Angefragt...';
-                    // Sicherer Aufruf mit Objekt-Daten
                     await handleSwapRequest({ 
                         id: booking.id, 
                         date: booking.date, 
@@ -174,7 +177,7 @@ export async function loadBookingsForWeek(kwString, unsubscriberSetter) {
                     setTimeout(() => {
                         if (e.target) { 
                             e.target.disabled = false;
-                            e.target.textContent = 'Slot anfragen';
+                            e.target.textContent = `Slot anfragen (-${cost})`;
                         }
                     }, 3000); 
                 };

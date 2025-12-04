@@ -24,7 +24,7 @@
 
   <div class="header-container">
     <div class="header-controls-wrapper">
-        <div id="header-karma-display" class="karma-badge" style="display:none;" title="Dein Wasch-Karma">
+        <div id="header-karma-display" class="karma-badge" style="display:none; cursor: pointer;" title="Tippen für Erklärung">
             <i id="header-karma-icon" class="fa-solid fa-circle-check"></i>
             <span id="header-karma-value">--</span>
         </div> 
@@ -199,6 +199,19 @@
       <option value="07:00-13:00">07:00 - 13:00</option>
       <option value="13:00-19:00">13:00 - 19:00</option>
     </select>
+
+    <div id="booking-cost-display" style="
+        background: rgba(0, 122, 255, 0.1); 
+        padding: 12px; 
+        border-radius: 12px; 
+        margin-bottom: 15px; 
+        display: none; 
+        text-align: center;
+        border: 1px solid var(--primary-color);">
+        <span class="small-text">Kosten für diesen Termin:</span><br>
+        <strong id="cost-value-text" style="font-size: 1.2em;">--</strong>
+    </div>
+
     <button id="book-submit"><span id="book-text">Buchen</span><i id="book-success-icon" class="fa-solid fa-check" style="display:none;"></i></button>
   </div>
 
@@ -468,6 +481,71 @@
           <option value="Admin">Admin (Test)</option>
       </select>
       <button id="setup-partei-save-btn" class="button-primary">Speichern & Starten</button>
+    </div>
+  </div>
+
+  <div id="karmaGuideModal" class="modal" style="display:none; z-index: 9999;">
+    <div class="modal-content" style="max-width: 450px; width: 90%; max-height: 90vh; display: flex; flex-direction: column; padding: 20px;">
+        
+        <h2 style="margin-top:0; color: var(--primary-color); text-align: center; flex-shrink: 0;">✨ Wasch-Karma Guide</h2>
+        
+        <div style="overflow-y: auto; flex-grow: 1; text-align: left; padding-right: 5px;">
+            <p style="margin-bottom: 20px;">Das System sorgt dafür, dass jeder fair drankommt. Hier sind alle Regeln im Detail:</p>
+            
+            <div style="margin-bottom: 15px; background: var(--secondary-color); padding: 15px; border-radius: 12px; border-left: 4px solid var(--primary-color);">
+                <h4 style="margin:0 0 5px 0;">💰 Punkte & Kosten</h4>
+                <ul style="margin:0; padding-left: 20px;">
+                    <li><strong>Startguthaben:</strong> 100 Punkte</li>
+                    <li><strong>Werktags buchen:</strong> -10 Punkte</li>
+                    <li><strong>Wochenende buchen:</strong> -20 Punkte (Prime Time)</li>
+                    <li><strong>Aufladung:</strong> +20 Punkte jeden Montag (automatisch)</li>
+                </ul>
+            </div>
+
+            <div style="margin-bottom: 15px; background: var(--secondary-color); padding: 15px; border-radius: 12px; border-left: 4px solid var(--success-color);">
+                <h4 style="margin:0 0 5px 0;">🎁 Boni verdienen</h4>
+                <ul style="margin:0; padding-left: 20px;">
+                    <li><strong>Früher fertig?</strong> Checke aus und erhalte <strong>+5 Punkte</strong> zurück.</li>
+                    <li><strong>Sozial sein:</strong> Nimm eine Tauschanfrage an und erhalte <strong>+15 Punkte</strong> Bonus!</li>
+                </ul>
+            </div>
+
+            <div style="margin-bottom: 15px; background: var(--secondary-color); padding: 15px; border-radius: 12px; border-left: 4px solid #FF9500;">
+                <h4 style="margin:0 0 5px 0;">🏆 Dein Status</h4>
+                <p style="font-size: 0.9em; margin: 0;">Dein Punktestand bestimmt, wie weit im Voraus du buchen darfst:</p>
+                <ul style="margin:5px 0 0 0; padding-left: 20px; font-size: 0.9em;">
+                    <li><strong>💎 VIP (>80):</strong> 4 Wochen Vorausbuchung</li>
+                    <li><strong>🙂 Standard (40-80):</strong> 2 Wochen Vorausbuchung</li>
+                    <li><strong>⚠️ Eingeschränkt (<40):</strong> 1 Woche Vorausbuchung</li>
+                </ul>
+            </div>
+        </div>
+
+        <div style="flex-shrink: 0; margin-top: 15px;">
+            <button id="close-karma-guide-btn" class="button-primary" style="width: 100%;">Alles klar! 👍</button>
+        </div>
+    </div>
+  </div>
+  <div id="tutorialModal" class="modal" style="display:none; z-index: 9999;">
+    <div class="modal-content" style="max-width: 400px; text-align: left;">
+        <h2 style="margin-top:0; color: var(--primary-color);">✨ Neustart & Fairness</h2>
+        <p>Hallo! Wir haben das System vereinfacht und für alle gerecht gemacht.</p>
+        
+        <div style="margin: 15px 0; background: var(--secondary-color); padding: 15px; border-radius: 12px;">
+            <p><strong>1. Dein Startguthaben</strong><br>
+            Jeder startet ab sofort wieder mit <span style="color:green">100 Punkten</span>.</p>
+            
+            <p><strong>2. Was kostet Waschen?</strong><br>
+            • Werktags: <span style="color:#007AFF">-10 Punkte</span><br>
+            • Wochenende: <span style="color:red">-20 Punkte</span></p>
+            
+            <p><strong>3. Aufladung</strong><br>
+            Jeden Montag bekommst du automatisch <span style="color:green">+20 Punkte</span> geschenkt.</p>
+        </div>
+
+        <p class="small-text" style="text-align:center;">Ziel: Wer viel wäscht, lässt anderen am Wochenende den Vortritt.</p>
+
+        <button id="tutorial-confirm-btn" class="button-primary">Verstanden & Akzeptiert 👍</button>
     </div>
   </div>
 

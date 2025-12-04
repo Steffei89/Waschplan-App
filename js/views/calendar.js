@@ -9,6 +9,8 @@ import { formatDate } from '../utils.js';
 import { performBooking, performDeletion } from '../services/booking.js';
 import { handleSwapRequest } from '../services/swap.js';
 import { showMessage } from '../ui.js'; 
+// NEU: Kosten importieren
+import { COST_SLOT_NORMAL, COST_SLOT_PRIME } from '../config.js';
 
 let currentCalendarDate = new Date(); 
 
@@ -33,7 +35,6 @@ export function initCalendarView(unsubscriberSetter) {
         });
     });
 
-    // FIX: Back Button mit 'back' Parameter
     document.getElementById('back-to-menu-btn-3').addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
 }
 
@@ -187,6 +188,10 @@ function updateCalendarDayActions(dateString) {
     const todayFormatted = formatDate(new Date());
     const hasDuplicateOnThisDay = bookingsOnDay.some(b => b.partei === currentUser.userData.partei);
 
+    // NEU: Kosten berechnen
+    const isWeekend = (date.getDay() === 0 || date.getDay() === 6);
+    const cost = Math.abs(isWeekend ? COST_SLOT_PRIME : COST_SLOT_NORMAL);
+
     const slots = [
         { id: '07', slot: '07:00-13:00' },
         { id: '13', slot: '13:00-19:00' }
@@ -204,6 +209,10 @@ function updateCalendarDayActions(dateString) {
         requestBtn.style.display = 'none';
         requestBtn.disabled = false;
         requestBtn.title = '';
+
+        // NEU: Preis im Button
+        bookBtn.textContent = `Buchen (-${cost} Karma)`;
+        requestBtn.textContent = `Slot anfragen (-${cost} Karma)`;
 
         const booking = bookingsOnDay.find(b => b.slot === slotInfo.slot);
 
@@ -276,7 +285,7 @@ async function onCalendarActionClick(e) {
         
         if (booking) {
             await handleSwapRequest(booking, 'calendar-action-message');
-            success = true; // 'handleSwapRequest' zeigt eigene Meldungen
+            success = true; 
         } else {
             showMessage('calendar-action-message', 'Fehler: Buchung nicht gefunden.', 'error');
             success = false;
@@ -292,7 +301,8 @@ async function onCalendarActionClick(e) {
             setTimeout(() => {
                 if (button) { 
                     button.disabled = false;
-                    button.textContent = originalText;
+                    // Kalender lädt sich eh neu, aber sicherheitshalber:
+                    if(action === 'delete') button.textContent = originalText;
                 }
             }, 2000); 
 

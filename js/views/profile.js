@@ -1,14 +1,14 @@
 import * as dom from '../dom.js';
 import { getState, setUnsubscriber } from '../state.js';
 import { handleChangePassword } from '../services/auth.js';
-import { db, getDoc, setDoc, doc } from '../firebase.js';
+import { db, getDoc, setDoc, doc, collection, query, where, getDocs } from '../firebase.js'; 
 import { showMessage, navigateTo, showChangelog, checkNotificationPermission } from '../ui.js';
 import { loadWashPrograms, addWashProgram, deleteWashProgram } from '../services/timers.js';
 import { getKarmaStatus, getPartyKarma } from '../services/karma.js';
-import { KARMA_START } from '../config.js';
+import { KARMA_START, COST_SLOT_NORMAL, COST_SLOT_PRIME } from '../config.js'; 
 import { initPushNotifications } from '../services/push.js';
-// GEÄNDERT: Importiere getPartyStats statt getPersonalStats
 import { getPartyStats } from '../services/stats.js';
+import { formatDate } from '../utils.js'; 
 
 function getSettingsDocRef() { return doc(db, 'app_settings', 'config'); }
 
@@ -79,6 +79,65 @@ export function initProfileView() {
     document.getElementById('back-to-menu-btn-4').addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
 }
 
+// ===== HILFSFUNKTION: KARMA BILANZ (TOTAL - Historie & Zukunft) =====
+async function getDetailedKarmaBill(parteiName) {
+    if (!parteiName) return { past: [], future: [], totalCost: 0, minigame: 0 };
+    
+    const todayStr = formatDate(new Date());
+    
+    // 1. Minigame Infos holen
+    const partyRef = doc(db, "parties", parteiName);
+    const partySnap = await getDoc(partyRef);
+    const minigame = (partySnap.exists() ? partySnap.data().minigame_earned_this_week : 0) || 0;
+
+    // 2. ALLE Buchungen holen (kein Datum-Filter!)
+    const q = query(collection(db, "bookings"), where("partei", "==", parteiName));
+    const snapshot = await getDocs(q);
+    
+    const past = [];
+    const future = [];
+    let totalCost = 0; // Summe der Abzüge (negativ) plus Boni
+
+    snapshot.forEach(docSnap => {
+        const b = docSnap.data();
+        
+        const dateObj = new Date(b.date);
+        const isWeekend = (dateObj.getDay() === 0 || dateObj.getDay() === 6);
+        const cost = Math.abs(isWeekend ? COST_SLOT_PRIME : COST_SLOT_NORMAL);
+        
+        let impact = -cost;
+        let note = "";
+
+        // Bonus für Checkout?
+        if (b.checkOutTime || b.isReleased) {
+            impact += 5; 
+            note = "(inkl. +5 Bonus)";
+        }
+
+        totalCost += impact;
+
+        const entry = {
+            date: new Date(b.date).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'}),
+            slot: b.slot,
+            val: impact,
+            note: note
+        };
+
+        if (b.date < todayStr) {
+            past.push(entry);
+        } else {
+            future.push(entry);
+        }
+    });
+    
+    // Sortieren
+    past.sort((a,b) => b.date.localeCompare(a.date)); // Neueste zuerst
+    future.sort((a,b) => a.date.localeCompare(b.date)); // Nächste zuerst
+    
+    return { past, future, totalCost, minigame };
+}
+// ===================================================================
+
 export async function loadProfileData() {
     const { currentUser, userIsAdmin } = getState();
     if (currentUser) {
@@ -95,9 +154,96 @@ export async function loadProfileData() {
             dom.profilePartei.parentElement.after(karmaContainer);
         }
         let statusColor = status === 'VIP' ? '#34c759' : (status === 'Eingeschränkt' ? '#ff3b30' : 'var(--text-color)');
-        karmaContainer.innerHTML = `<p style="margin:0; font-size:1.1em;"><strong>Karma:</strong> ${karma}</p><p style="margin:5px 0; font-size:0.9em; color:${statusColor}">Status: <strong>${label}</strong></p>`;
         
-        // --- NEU: PARTEI STATISTIK BOX ---
+        karmaContainer.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <p style="margin:0; font-size:1.1em;"><strong>Karma:</strong> ${karma}</p>
+                    <p style="margin:5px 0; font-size:0.9em; color:${statusColor}">Status: <strong>${label}</strong></p>
+                </div>
+                <button class="button-small button-secondary" id="profile-karma-help-btn" style="width:auto; margin:0;"><i class="fa-solid fa-circle-question"></i> Regeln</button>
+            </div>
+        `;
+        
+        const helpBtn = document.getElementById('profile-karma-help-btn');
+        if(helpBtn) {
+            helpBtn.onclick = () => {
+                const modal = document.getElementById('karmaGuideModal');
+                const closeBtn = document.getElementById('close-karma-guide-btn');
+                if(modal) {
+                    modal.style.display = 'flex';
+                    if(closeBtn) closeBtn.onclick = () => modal.style.display = 'none';
+                }
+            };
+        }
+        
+        // --- KARMA BILANZ BOX ---
+        let billContainer = document.getElementById('profile-karma-bill');
+        if (!billContainer) {
+            billContainer = document.createElement('div');
+            billContainer.id = 'profile-karma-bill';
+            billContainer.style.marginTop = '15px';
+            billContainer.style.marginBottom = '20px';
+            billContainer.style.padding = '15px';
+            billContainer.style.backgroundColor = 'var(--secondary-color)';
+            billContainer.style.borderRadius = '12px';
+            billContainer.style.border = '1px solid var(--border-color)';
+            karmaContainer.after(billContainer);
+        }
+        
+        billContainer.innerHTML = '<p class="small-text"><i class="fa-solid fa-spinner fa-spin"></i> Lade Bilanz...</p>';
+        
+        const bill = await getDetailedKarmaBill(currentUser.userData.partei);
+        
+        const renderRow = (item) => `
+            <div style="display:flex; justify-content:space-between; font-size:0.85em; margin-bottom:3px;">
+                <span>${item.date} (${item.slot})</span>
+                <span style="color:${item.val >= 0 ? 'var(--success-color)' : 'var(--error-color)'};">${item.val > 0 ? '+' : ''}${item.val} ${item.note}</span>
+            </div>`;
+
+        let pastHtml = bill.past.length ? bill.past.map(renderRow).join('') : '<span class="small-text" style="opacity:0.5;">Keine.</span>';
+        let futureHtml = bill.future.length ? bill.future.map(renderRow).join('') : '<span class="small-text" style="opacity:0.5;">Keine.</span>';
+
+        // GAP CLOSER: Berechnen ob Differenz besteht
+        const calculatedTotal = 100 + bill.minigame + bill.totalCost;
+        const diff = karma - calculatedTotal;
+        
+        let adjustmentRow = '';
+        if (diff !== 0) {
+            adjustmentRow = `
+            <div style="display:flex; justify-content:space-between; font-size:0.9em; font-weight:bold; margin-bottom:10px; border-bottom:1px dashed #ccc; padding-bottom:5px;">
+                <span>Historische Anpassung / Sonstiges:</span>
+                <span style="color:${diff >= 0 ? 'var(--success-color)' : 'var(--error-color)'};">${diff > 0 ? '+' : ''}${diff}</span>
+            </div>`;
+        }
+
+        billContainer.innerHTML = `
+            <h3 style="margin-top:0; font-size:1.1em; border-bottom:1px solid var(--border-color); padding-bottom:5px;">Deine Karma-Bilanz 🧾</h3>
+            
+            <div style="display:flex; justify-content:space-between; font-size:0.9em; font-weight:bold; margin-bottom:5px;">
+                <span>Startguthaben:</span>
+                <span style="color:var(--success-color);">100</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:0.9em; font-weight:bold; margin-bottom:10px; border-bottom:1px dashed #ccc; padding-bottom:5px;">
+                <span>Minigame (Woche):</span>
+                <span style="color:var(--success-color);">+${bill.minigame}</span>
+            </div>
+
+            <strong style="font-size:0.9em; opacity:0.8;">Geplant (Zukunft):</strong>
+            <div style="margin-bottom:10px; padding-left:5px;">${futureHtml}</div>
+
+            <strong style="font-size:0.9em; opacity:0.8;">Verlauf (Vergangenheit):</strong>
+            <div style="margin-bottom:10px; padding-left:5px;">${pastHtml}</div>
+            
+            ${adjustmentRow}
+            
+            <div style="display:flex; justify-content:space-between; font-weight:bold; margin-top:10px; border-top:2px solid var(--text-color); padding-top:5px; font-size:1.1em;">
+                <span>Ergebnis:</span>
+                <span>${karma}</span>
+            </div>
+        `;
+        // ------------------------
+
         let statsContainer = document.getElementById('profile-personal-stats');
         if (!statsContainer) {
             statsContainer = document.createElement('div');
@@ -108,18 +254,15 @@ export async function loadProfileData() {
             statsContainer.style.backgroundColor = 'var(--secondary-color)';
             statsContainer.style.borderRadius = '12px';
             statsContainer.style.border = '1px solid var(--border-color)';
-            karmaContainer.after(statsContainer);
+            billContainer.after(statsContainer);
         }
         
-        // Lade-Status
-        statsContainer.innerHTML = '<p class="small-text"><i class="fa-solid fa-spinner fa-spin"></i> Lade Statistik...</p>';
-        
-        // GEÄNDERT: Daten für die PARTEI holen
+        statsContainer.innerHTML = '<p class="small-text">Lade Statistik...</p>';
         const stats = await getPartyStats(currentUser.userData.partei);
         if (stats) {
             const currentYear = new Date().getFullYear();
             statsContainer.innerHTML = `
-                <h3 style="margin-top:0; font-size:1.1em; border-bottom:1px solid var(--border-color); padding-bottom:5px;">Partei-Statistik ${currentYear} 📊</h3>
+                <h3 style="margin-top:0; font-size:1.1em; border-bottom:1px solid var(--border-color); padding-bottom:5px;">Statistik ${currentYear} 📊</h3>
                 <div style="display:flex; justify-content: space-between; align-items:center; margin-top:10px;">
                     <div style="text-align:center;">
                         <span class="small-text">Wäschen</span><br>
@@ -132,10 +275,7 @@ export async function loadProfileData() {
                     </div>
                 </div>
             `;
-        } else {
-            statsContainer.innerHTML = '<p class="small-text">Keine Statistik verfügbar.</p>';
         }
-        // ---------------------------------------
 
         const notifBtn = document.getElementById('enable-notifications-btn');
         notifBtn.style.display = 'block';
