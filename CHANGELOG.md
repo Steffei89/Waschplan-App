@@ -15,6 +15,11 @@ Hier werden alle wichtigen Änderungen an der Waschplan-App festgehalten.
 * **Karma-Bilanz:** Im Profil gibt es jetzt einen detaillierten "Kassenbon". Er zeigt dir genau: Startguthaben (100) + Minigame-Gewinne - deine Buchungen = Dein aktueller Stand. Alles ist auf den Punkt genau nachvollziehbar.
 * **Kulanz-Anzeige:** Falls der Admin dir Punkte geschenkt hat oder das System korrigiert wurde, wird dies nun transparent als "Fairness-Bonus" ausgewiesen.
 
+### 🚀 Performance & Speed (Lazy Loading)
+* **Blitzschneller Start:** Die App startet jetzt deutlich schneller! Große Bereiche wie das Minigame, der QR-Scanner und die Admin-Konsole werden erst geladen, wenn du sie wirklich anklickst ("Lazy Loading").
+* **Offline-Turbo:** Der neue Service Worker (v6.0) speichert die App intelligent auf deinem Handy. Selbst bei schlechtem Netz ist sie beim zweiten Öffnen sofort da.
+* **Flüssiger Aufbau:** Technische Optimierungen (`defer`) sorgen dafür, dass die Benutzeroberfläche nicht mehr blockiert wird, während im Hintergrund Daten geladen werden.
+
 ### 🔔 Komfort
 * **Erinnerung:** Hast du für morgen gebucht? Die App schickt dir am Vorabend um 20:00 Uhr automatisch eine Push-Benachrichtigung, damit du deinen Termin nicht vergisst.
 

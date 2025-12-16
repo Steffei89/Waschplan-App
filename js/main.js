@@ -32,15 +32,13 @@ import {
 import { initCalendarView, loadBookingsForMonth } from './views/calendar.js';
 import { initOverviewView, setupWeekDropdown, loadBookingsForWeek } from './views/overview.js';
 import { initProfileView, loadProfileData } from './views/profile.js';
-import { initAdminView, loadAdminUserData } from './views/admin.js';
-// WICHTIG: Kosten-Variablen importieren
+// LAZY LOAD: Admin View wird jetzt dynamisch importiert
+// LAZY LOAD: Minigame wird jetzt dynamisch importiert
+// LAZY LOAD: Maintenance/Scanner/Admin ebenfalls
 import { APP_VERSION, COST_SLOT_NORMAL, COST_SLOT_PRIME, COST_SLOT_ECO } from './config.js'; 
 import { loadWashPrograms, listenToActiveTimer, startWashTimer, stopWashTimer } from './services/timers.js';
 import { initKarmaForParty } from './services/karma.js';
-import { initMinigame } from './services/minigame.js'; 
 import { startSession, updateSession } from './services/analytics.js';
-import { reportIssue } from './services/maintenance.js'; 
-import { startScanner } from './services/scanner.js';
 import { initPushNotifications } from './services/push.js';
 import { initGestures } from './services/gestures.js';
 
@@ -517,9 +515,12 @@ function renderTimerUI() {
             const fillEl = document.getElementById('timer-progress-fill'); if (fillEl) fillEl.style.width = `${percent}%`;
         };
         activeTimerInterval = setInterval(updateCountdown, 1000); updateCountdown(); 
+        
+        // LAZY LOAD SCANNER
         document.getElementById('timer-stop-btn').addEventListener('click', async () => {
             if (confirm('Möchtest du auschecken und den Timer stoppen?')) {
                 const correctCode = await getStoredQrCode();
+                const { startScanner } = await import('./services/scanner.js');
                 startScanner((scannedCode) => { if (scannedCode === correctCode) { stopWashTimer(currentUser.userData.partei); showMessage('main-menu-message', 'Check-out erfolgreich! ✅', 'success'); } else { alert("Falscher QR-Code! ❌"); } }, (error) => {});
             }
         });
@@ -534,7 +535,13 @@ function renderTimerUI() {
                     if (msUntilStart > 0 && msUntilStart < 24 * 60 * 60 * 1000) { activeTimerInterval = setTimeout(() => { renderTimerUI(); showMessage('main-menu-message', 'Deine Zeit beginnt jetzt! Check-in ist freigeschaltet.', 'success'); }, msUntilStart); }
                 } else {
                     dom.liveTimerSection.innerHTML = `<div class="timer-start-container" style="text-align:center;"><h3 style="margin:0 0 10px 0;">Dein Slot: ${myCurrentBooking.slot}</h3><p style="margin-bottom:15px;">Bitte einchecken, wenn du an der Maschine bist.</p><button id="check-in-btn" class="button-primary" style="font-size:1.2em; padding:15px;"><i class="fa-solid fa-qrcode"></i> Check-in (Scan)</button></div>`;
-                    document.getElementById('check-in-btn').addEventListener('click', async () => { const correctCode = await getStoredQrCode(); startScanner(async (code) => { if (code === correctCode) { await performCheckIn(myCurrentBooking.id, 'main-menu-message'); } else { alert("Falscher QR-Code!"); } }); });
+                    
+                    // LAZY LOAD SCANNER
+                    document.getElementById('check-in-btn').addEventListener('click', async () => { 
+                        const correctCode = await getStoredQrCode(); 
+                        const { startScanner } = await import('./services/scanner.js');
+                        startScanner(async (code) => { if (code === correctCode) { await performCheckIn(myCurrentBooking.id, 'main-menu-message'); } else { alert("Falscher QR-Code!"); } }); 
+                    });
                 }
             } else {
                 let buttonsHTML = ''; if(allPrograms.length > 0) { buttonsHTML = '<p style="margin-top:15px; font-weight:bold;">Programm-Timer starten (optional):</p><div class="timer-button-row">' + allPrograms.map(prog => `<button class="timer-start-btn" data-id="${prog.id}">${prog.name} (${prog.durationMinutes} min)</button>`).join('') + '</div>'; }
@@ -591,7 +598,6 @@ function setupMainMenuListeners() {
         dom.bookingDateInput.value = getFormattedDate(tomorrow); 
         dom.dateValidationMessage.textContent = ''; 
         dom.bookingSlotSelect.value = ''; 
-        // Kostenanzeige zurücksetzen
         const costPreview = document.getElementById('booking-cost-display');
         const bookBtn = dom.bookSubmitBtn;
         if(costPreview) costPreview.style.display = 'none';
@@ -605,13 +611,51 @@ function setupMainMenuListeners() {
     });
     document.getElementById('overview-btn').addEventListener('click', () => { trackMenuClick('btn_week'); unsubscribeForNavigation(); setupWeekDropdown(); loadBookingsForWeek(dom.kwSelect.value, setUnsubscriber); navigateTo(dom.overviewSection); });
     document.getElementById('calendar-btn').addEventListener('click', () => { trackMenuClick('btn_calendar'); unsubscribeForNavigation(); dom.calendarDayActions.style.display = 'none'; setSelectedCalendarDate(null); const now = new Date(); loadBookingsForMonth(now.getFullYear(), now.getMonth(), setUnsubscriber); navigateTo(dom.calendarSection); });
-    document.getElementById('admin-btn').addEventListener('click', () => { unsubscribeForNavigation(); loadAdminUserData(); navigateTo(dom.adminSection); });
+    
+    // LAZY LOAD ADMIN
+    let adminInitialized = false;
+    document.getElementById('admin-btn').addEventListener('click', async () => { 
+        unsubscribeForNavigation(); 
+        const { loadAdminUserData, initAdminView } = await import('./views/admin.js');
+        if (!adminInitialized) { initAdminView(); adminInitialized = true; }
+        loadAdminUserData(); 
+        navigateTo(dom.adminSection); 
+    });
+
     document.getElementById('profile-btn').addEventListener('click', () => { unsubscribeForNavigation(); loadProfileData(); navigateTo(dom.profileSection); });
-    const minigameBtn = document.getElementById('minigame-btn'); if (minigameBtn) { minigameBtn.addEventListener('click', () => { trackMenuClick('btn_minigame'); unsubscribeForNavigation(); initMinigame(); navigateTo(dom.minigameSection); }); }
+    
+    // LAZY LOAD MINIGAME
+    const minigameBtn = document.getElementById('minigame-btn'); if (minigameBtn) { minigameBtn.addEventListener('click', async () => { 
+        trackMenuClick('btn_minigame'); unsubscribeForNavigation(); 
+        const { initMinigame } = await import('./services/minigame.js');
+        initMinigame(); 
+        navigateTo(dom.minigameSection); 
+    }); }
+    
     const backGameBtn = document.getElementById('back-to-menu-btn-game'); if (backGameBtn) { backGameBtn.addEventListener('click', () => navigateTo(dom.mainMenu, 'back')); }
+    
+    // LAZY LOAD REPORT ISSUE
     const reportBtn = document.getElementById('report-issue-btn'); if (reportBtn) { reportBtn.addEventListener('click', () => { const maintSec = document.getElementById('maintenanceSection'); if (maintSec) navigateTo(maintSec); }); }
     const maintBackBtn = document.getElementById('back-to-menu-btn-maint'); if (maintBackBtn) maintBackBtn.addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
-    const submitMaintBtn = document.getElementById('submit-maintenance-btn'); if (submitMaintBtn) { submitMaintBtn.addEventListener('click', async () => { const reason = document.getElementById('maintenance-reason').value; const details = document.getElementById('maintenance-details').value; submitMaintBtn.disabled = true; try { await reportIssue(reason, details); showMessage('maintenance-message', 'Problem gemeldet! Der Admin wurde benachrichtigt.', 'success'); setTimeout(() => navigateTo(dom.mainMenu, 'back'), 2000); } catch(e) { showMessage('maintenance-message', 'Fehler beim Senden.', 'error'); } finally { submitMaintBtn.disabled = false; } }); }
+    
+    const submitMaintBtn = document.getElementById('submit-maintenance-btn'); 
+    if (submitMaintBtn) { 
+        submitMaintBtn.addEventListener('click', async () => { 
+            const reason = document.getElementById('maintenance-reason').value; 
+            const details = document.getElementById('maintenance-details').value; 
+            submitMaintBtn.disabled = true; 
+            try { 
+                const { reportIssue } = await import('./services/maintenance.js');
+                await reportIssue(reason, details); 
+                showMessage('maintenance-message', 'Problem gemeldet! Der Admin wurde benachrichtigt.', 'success'); 
+                setTimeout(() => navigateTo(dom.mainMenu, 'back'), 2000); 
+            } catch(e) { 
+                showMessage('maintenance-message', 'Fehler beim Senden.', 'error'); 
+            } finally { 
+                submitMaintBtn.disabled = false; 
+            } 
+        }); 
+    }
 }
 
 // ===== UPDATE: Live-Update der Kostenanzeige & Button-Text (INKL. ECO) =====
@@ -628,7 +672,6 @@ async function updateBookingCostPreview() {
         return;
     }
 
-    // Eco-Check
     const isEco = await isEcoDay(dateStr);
     
     let cost;
@@ -674,11 +717,10 @@ document.getElementById('back-to-menu-btn-1').addEventListener('click', () => na
 dom.bookSubmitBtn.addEventListener("click", async () => { const date = dom.bookingDateInput.value; const slot = dom.bookingSlotSelect.value; const button = dom.bookSubmitBtn; const bookText = document.getElementById("book-text"); const bookIcon = document.getElementById("book-success-icon"); const originalText = bookText ? bookText.textContent : "Buchen"; button.disabled = true; if (bookText) bookText.textContent = "Buche..."; if (bookIcon) bookIcon.style.display = 'none'; let success = false; try { success = await performBooking(date, slot, 'booking-error'); } catch (e) { console.error(e); showMessage('booking-error', 'Ein unerwarteter Fehler ist aufgetreten.', 'error'); success = false; } finally { if (success) { button.classList.add('booking-success'); if(bookText) bookText.style.display = 'none'; if(bookIcon) bookIcon.style.display = 'block'; setTimeout(() => { button.classList.remove('booking-success'); if(bookIcon) bookIcon.style.display = 'none'; if(bookText) { bookText.style.display = 'block'; bookText.textContent = "Buchen"; } button.disabled = false; dom.bookingDateInput.dispatchEvent(new Event('change')); }, 2000); } else { if(bookText) bookText.textContent = "Buchen"; button.disabled = false; } } });
 
 dom.bookingDateInput.addEventListener('change', async () => { 
-    updateBookingCostPreview(); // Update
+    updateBookingCostPreview(); 
     const selectedDateStr = dom.bookingDateInput.value; const selectedDate = new Date(selectedDateStr); selectedDate.setHours(0, 0, 0, 0); const isPast = selectedDate < today; dom.dateValidationMessage.textContent = isPast ? 'Buchungen können nicht für vergangene Tage vorgenommen werden.' : ''; if (isPast) { updateSlotDropdownUI({ "07:00-13:00": { status: 'disabled-duplicate', text: '07:00 - 13:00' }, "13:00-19:00": { status: 'disabled-duplicate', text: '13:00 - 19:00' } }); return; } try { const options = dom.bookingSlotSelect.querySelectorAll('option'); options.forEach(opt => { if (opt.value) { opt.textContent = `${opt.value} (Prüfe...)`; opt.disabled = true; } }); const availability = await checkSlotAvailability(selectedDateStr); if (availability) { updateSlotDropdownUI(availability); } } catch (e) { console.error(e); showMessage('booking-error', 'Fehler beim Prüfen der Verfügbarkeit.', 'error'); } 
 });
 
-// Update
 dom.bookingSlotSelect.addEventListener('change', updateBookingCostPreview);
 
 dom.bookingDateInput.setAttribute('min', getFormattedDate(today)); dom.bookingDateInput.value = getFormattedDate(tomorrow);
@@ -692,4 +734,4 @@ initCalendarView(setUnsubscriber);
 initOverviewView(setUnsubscriber);
 initProfileView();
 initStatsView();
-initAdminView();
+// initAdminView() wurde entfernt, da es jetzt lazy geladen wird
