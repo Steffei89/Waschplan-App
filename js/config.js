@@ -2,7 +2,7 @@
 
 // Der Einladungscode wurde entfernt und in die Sicherheitsregeln verschoben.
 
-export const APP_VERSION = "2.9.1"; // Security Update
+export const APP_VERSION = "3.2.0"; 
 
 // ===== Wasch-Karma Einstellungen =====
 export const KARMA_START = 100;       
@@ -12,7 +12,8 @@ export const KARMA_REGEN_INTERVAL = 7 * 24 * 60 * 60 * 1000;
 
 // Kosten & Boni
 export const COST_SLOT_NORMAL = -10;
-export const COST_SLOT_PRIME = -20;   
+export const COST_SLOT_PRIME = -20;
+export const COST_SLOT_ECO = -5;      // <--- DAS WAR DER FEHLENDE TEIL!
 export const BONUS_SWAP_ACCEPT = 15;  
 export const BONUS_CANCEL_EARLY = 5;  
 export const PENALTY_CANCEL_LATE = -5;

@@ -7,8 +7,9 @@ import { showMessage } from '../ui.js';
 import { today, formatDate } from '../utils.js';
 import * as dom from '../dom.js';
 import { checkBookingPermission, updateKarma } from './karma.js'; 
-import { BONUS_CANCEL_EARLY, PENALTY_CANCEL_LATE, COST_SLOT_NORMAL, COST_SLOT_PRIME } from '../config.js';
+import { BONUS_CANCEL_EARLY, PENALTY_CANCEL_LATE, COST_SLOT_NORMAL, COST_SLOT_PRIME, COST_SLOT_ECO } from '../config.js';
 import { getSystemStatus } from './maintenance.js';
+import { isEcoDay } from './weather.js'; // NEU: Import
 
 export async function checkDuplicateBooking(selectedDate, partei) {
     const q = query(getBookingsCollectionRef(), where('date', '==', selectedDate), where('partei', '==', partei));
@@ -45,43 +46,30 @@ export async function checkSlotAvailability(selectedDate) {
     return availability;
 }
 
-// ===== NEUE FUNKTION: STATUS-LISTENER =====
 export function subscribeToMachineStatus(onStatusUpdate) {
-    // Wir hören auf alle Buchungen für HEUTE
     const todayStr = formatDate(new Date());
     const q = query(getBookingsCollectionRef(), where("date", "==", todayStr));
     
     return onSnapshot(q, (snapshot) => {
         const bookings = [];
         snapshot.forEach(d => bookings.push(d.data()));
-        
-        // Berechne Status
         const now = new Date();
         const hour = now.getHours();
         let currentSlot = null;
-        
         if (hour >= 7 && hour < 13) currentSlot = "07:00-13:00";
         else if (hour >= 13 && hour < 19) currentSlot = "13:00-19:00";
-        
-        let status = 'free'; // Default: Frei
-        
+        let status = 'free'; 
         if (currentSlot) {
-            // Suche Buchung für den aktuellen Slot
             const activeBooking = bookings.find(b => b.slot === currentSlot);
-            
-            if (activeBooking) {
-                // Wenn Buchung existiert, ist sie belegt, ES SEI DENN sie wurde freigegeben (Checkout)
-                if (!activeBooking.isReleased) {
-                    status = 'busy';
-                }
+            if (activeBooking && !activeBooking.isReleased) {
+                status = 'busy';
             }
         }
-        
         onStatusUpdate(status);
     });
 }
 
-// ===== HIER IST DIE KORRIGIERTE FUNKTION =====
+// ===== HIER IST DIE PREIS-LOGIK (PERFORM BOOKING) =====
 export async function performBooking(date, slot, messageElementId) { 
     if (!date || !slot) { showMessage(messageElementId, "Datum/Slot wählen!", 'error'); return false; }
     const { currentUser, currentUserId, userIsAdmin } = getState();
@@ -92,31 +80,34 @@ export async function performBooking(date, slot, messageElementId) {
     if (selectedDate < today) { showMessage(messageElementId, "Vergangenheit!", 'error'); return false; }
     
     let cost = 0;
+    
+    // NEU: Kostenberechnung mit Eco-Check
     if (!userIsAdmin) {
+        // Erst Basis-Check (Darf er buchen?)
         const check = await checkBookingPermission(date, slot);
         if (!check.allowed) { showMessage(messageElementId, check.error, 'error'); return false; }
-        cost = check.cost;
+        
+        // Standard-Kosten aus dem Check
+        cost = check.cost; 
+
+        // Eco-Rabatt anwenden?
+        // Wenn es "Standard" (Werktag) oder "Prime" (Wochenende) ist, prüfen wir auf Eco-Wetter
+        if (await isEcoDay(date)) {
+            cost = COST_SLOT_ECO; // Überschreibe mit günstigem Eco-Preis
+        }
     }
 
     try {
         await runTransaction(db, async (transaction) => {
-            // 1. REFERENZEN VORBEREITEN
-            // Wir erstellen eine ID aus Datum und Slot, um Doppelbuchungen technisch unmöglich zu machen.
             const uniqueBookingId = `${date}_${slot.replace(':', '-')}`;
             const bookingRef = doc(db, "bookings", uniqueBookingId);
             const partyRef = doc(db, "parties", currentUser.userData.partei);
 
-            // 2. ALLE LESE-OPERATIONEN (Müssen VOR Schreib-Operationen kommen!)
-            
-            // A) Slot prüfen (Transaktional)
             const bookingDoc = await transaction.get(bookingRef);
-            
-            // B) Duplikate prüfen (Vorab-Check per Query)
             const bookingsRef = getBookingsCollectionRef();
             const qDup = query(bookingsRef, where("date", "==", date), where("partei", "==", currentUser.userData.partei));
             const dupSnap = await getDocs(qDup); 
 
-            // C) Karma lesen (Transaktional)
             let currentKarma = 0;
             if (!userIsAdmin && cost !== 0) {
                 const partyDoc = await transaction.get(partyRef);
@@ -124,31 +115,22 @@ export async function performBooking(date, slot, messageElementId) {
                 currentKarma = partyDoc.data().karma || 100;
             }
 
-            // 3. LOGIK-CHECKS
-            
-            // Check: Ist Slot belegt?
             if (bookingDoc.exists()) {
                 const existing = bookingDoc.data();
-                // Wenn sie NICHT released ist, ist der Slot voll.
                 if (!existing.isReleased) {
                     throw "Dieser Slot wurde gerade von jemand anderem gebucht.";
                 }
             }
 
-            // Check: Hat Partei heute schon gebucht?
             const hasActiveBooking = dupSnap.docs.some(d => !d.data().isReleased && d.id !== uniqueBookingId);
             if (hasActiveBooking) {
                 throw "Eure Partei hat an diesem Tag bereits gebucht.";
             }
 
-            // Check: Karma
             if (!userIsAdmin && (currentKarma + cost < 0)) {
-                throw "Nicht genug Karma (während Transaktion geprüft).";
+                throw "Nicht genug Karma.";
             }
 
-            // 4. SCHREIB-OPERATIONEN
-            
-            // Buchung anlegen / überschreiben
             transaction.set(bookingRef, {
                 date: date, 
                 slot: slot, 
@@ -158,10 +140,10 @@ export async function performBooking(date, slot, messageElementId) {
                 isSwap: false, 
                 checkInTime: null, 
                 checkOutTime: null, 
-                isReleased: false
+                isReleased: false,
+                isEco: (cost === COST_SLOT_ECO) // Wir speichern, dass es ein Eco-Slot war!
             });
 
-            // Karma abziehen
             if (!userIsAdmin && cost !== 0) {
                 transaction.update(partyRef, { karma: currentKarma + cost });
             }
@@ -178,15 +160,11 @@ export async function performBooking(date, slot, messageElementId) {
         return false;
     }
 }
-// ===========================================
 
 export async function performDeletion(date, slot, messageElementId) {
     const { currentUserId, currentUser, userIsAdmin } = getState();
     if (!date || !slot || !currentUser) return false;
     
-    // Für die Löschung müssen wir die ID rekonstruieren oder per Query suchen.
-    // Da wir die ID jetzt deterministisch machen, könnten wir auch direkt zugreifen,
-    // aber die Query-Methode ist sicherer für alte Buchungen (Rückwärtskompatibilität).
     const bookingsColRef = getBookingsCollectionRef();
     let q = userIsAdmin ? query(bookingsColRef, where("date", "==", date), where("slot", "==", slot)) : query(bookingsColRef, where("date", "==", date), where("slot", "==", slot), where("partei", "==", currentUser.userData.partei));
     
@@ -200,8 +178,17 @@ export async function performDeletion(date, slot, messageElementId) {
         if (data.userId === currentUserId || (!userIsAdmin && data.partei === currentUser.userData.partei)) {
             const bookingDate = new Date(data.date + "T" + data.slot.substring(0,5));
             const hoursDiff = (bookingDate - new Date()) / (1000 * 60 * 60);
-            const isWeekend = (bookingDate.getDay() === 0 || bookingDate.getDay() === 6);
-            const cost = isWeekend ? Math.abs(COST_SLOT_PRIME) : Math.abs(COST_SLOT_NORMAL);
+            
+            // Rückerstattung berechnen
+            // Wenn es Eco war, erstatten wir Eco
+            let cost;
+            if (data.isEco) {
+                cost = Math.abs(COST_SLOT_ECO);
+            } else {
+                const isWeekend = (bookingDate.getDay() === 0 || bookingDate.getDay() === 6);
+                cost = isWeekend ? Math.abs(COST_SLOT_PRIME) : Math.abs(COST_SLOT_NORMAL);
+            }
+
             let refund = cost;
             if (hoursDiff > 24) refund += BONUS_CANCEL_EARLY; else if (hoursDiff < 4 && hoursDiff > 0) refund += PENALTY_CANCEL_LATE;
             if (refund !== 0) { await updateKarma(currentUser.userData.partei, refund, "Stornierung"); showMessage(messageElementId, `Gelöscht (+${refund} Karma).`, 'success'); return true; }

@@ -1,3 +1,5 @@
+// ... (Die ersten Zeilen bis zu den Imports bleiben gleich, aber der Einfachheit halber wieder der ganze Code)
+
 // ===== WICHTIG: SERVICE WORKER STARTEN =====
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('/sw.js')
@@ -20,7 +22,7 @@ import {
     checkNotificationPermission, showChangelog
 } from './ui.js';
 import { handleRegister, handleLogin, handleLogout, handlePasswordReset, handleDeleteAccount } from './services/auth.js';
-import { loadWeather } from './services/weather.js';
+import { loadWeather, isEcoDay } from './services/weather.js'; // Eco Import
 import { loadStatistics, initStatsView, trackMenuClick } from './services/stats.js';
 import { performBooking, performDeletion, loadNextBookingsOverview, checkSlotAvailability, performCheckIn, performCheckOut, checkAndAutoCheckoutOldBookings, subscribeToMachineStatus } from './services/booking.js';
 import { 
@@ -31,7 +33,8 @@ import { initCalendarView, loadBookingsForMonth } from './views/calendar.js';
 import { initOverviewView, setupWeekDropdown, loadBookingsForWeek } from './views/overview.js';
 import { initProfileView, loadProfileData } from './views/profile.js';
 import { initAdminView, loadAdminUserData } from './views/admin.js';
-import { APP_VERSION, COST_SLOT_NORMAL, COST_SLOT_PRIME } from './config.js'; 
+// WICHTIG: Kosten-Variablen importieren
+import { APP_VERSION, COST_SLOT_NORMAL, COST_SLOT_PRIME, COST_SLOT_ECO } from './config.js'; 
 import { loadWashPrograms, listenToActiveTimer, startWashTimer, stopWashTimer } from './services/timers.js';
 import { initKarmaForParty } from './services/karma.js';
 import { initMinigame } from './services/minigame.js'; 
@@ -233,8 +236,6 @@ function setupKarmaHeaderListener(parteiName) {
     if (!headerDisplay || !headerValue || !headerIcon) return;
     
     headerDisplay.style.display = 'flex';
-    
-    // NEU: Klick-Listener für das neue Info-Modal
     headerDisplay.onclick = () => {
         const modal = document.getElementById('karmaGuideModal');
         const closeBtn = document.getElementById('close-karma-guide-btn');
@@ -613,8 +614,8 @@ function setupMainMenuListeners() {
     const submitMaintBtn = document.getElementById('submit-maintenance-btn'); if (submitMaintBtn) { submitMaintBtn.addEventListener('click', async () => { const reason = document.getElementById('maintenance-reason').value; const details = document.getElementById('maintenance-details').value; submitMaintBtn.disabled = true; try { await reportIssue(reason, details); showMessage('maintenance-message', 'Problem gemeldet! Der Admin wurde benachrichtigt.', 'success'); setTimeout(() => navigateTo(dom.mainMenu, 'back'), 2000); } catch(e) { showMessage('maintenance-message', 'Fehler beim Senden.', 'error'); } finally { submitMaintBtn.disabled = false; } }); }
 }
 
-// ===== UPDATE: Live-Update der Kostenanzeige & Button-Text =====
-function updateBookingCostPreview() {
+// ===== UPDATE: Live-Update der Kostenanzeige & Button-Text (INKL. ECO) =====
+async function updateBookingCostPreview() {
     const dateStr = dom.bookingDateInput.value;
     const slot = dom.bookingSlotSelect.value;
     const displayBox = document.getElementById('booking-cost-display');
@@ -627,41 +628,57 @@ function updateBookingCostPreview() {
         return;
     }
 
-    const dateObj = new Date(dateStr);
-    const isWeekend = (dateObj.getDay() === 0 || dateObj.getDay() === 6);
+    // Eco-Check
+    const isEco = await isEcoDay(dateStr);
     
-    // Kosten positiv
-    const cost = Math.abs(isWeekend ? COST_SLOT_PRIME : COST_SLOT_NORMAL);
+    let cost;
+    let label;
+    let color;
+    let bgColor;
+
+    if (isEco) {
+        cost = Math.abs(COST_SLOT_ECO);
+        label = "🌱 Eco-Tarif (Sonnig)";
+        color = 'var(--success-color)';
+        bgColor = 'rgba(52, 199, 89, 0.1)';
+    } else {
+        const dateObj = new Date(dateStr);
+        const isWeekend = (dateObj.getDay() === 0 || dateObj.getDay() === 6);
+        if (isWeekend) {
+            cost = Math.abs(COST_SLOT_PRIME);
+            label = "🔥 Wochenende";
+            color = 'var(--error-color)';
+            bgColor = 'rgba(255, 59, 48, 0.1)';
+        } else {
+            cost = Math.abs(COST_SLOT_NORMAL);
+            label = "Werktag";
+            color = 'var(--primary-color)';
+            bgColor = 'rgba(0, 122, 255, 0.1)';
+        }
+    }
     
     if (displayBox && textEl) {
         displayBox.style.display = 'block';
-        if (isWeekend) {
-            textEl.innerHTML = `<span style="color: var(--error-color);">-${cost} Karma</span> 🔥 (Wochenende)`;
-            displayBox.style.borderColor = 'var(--error-color)';
-            displayBox.style.background = 'rgba(255, 59, 48, 0.1)';
-        } else {
-            textEl.innerHTML = `<span style="color: var(--primary-color);">-${cost} Karma</span> (Werktag)`;
-            displayBox.style.borderColor = 'var(--primary-color)';
-            displayBox.style.background = 'rgba(0, 122, 255, 0.1)';
-        }
+        displayBox.style.borderColor = color;
+        displayBox.style.background = bgColor;
+        textEl.innerHTML = `<span style="color: ${color};">-${cost} Karma</span> (${label})`;
     }
 
-    // NEU: Auch den Button-Text ändern!
     if(bookBtnText) {
         bookBtnText.textContent = `Buchen (-${cost} Karma)`;
     }
 }
-// ===============================================================
+// ===========================================================================
 
 document.getElementById('back-to-menu-btn-1').addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
 dom.bookSubmitBtn.addEventListener("click", async () => { const date = dom.bookingDateInput.value; const slot = dom.bookingSlotSelect.value; const button = dom.bookSubmitBtn; const bookText = document.getElementById("book-text"); const bookIcon = document.getElementById("book-success-icon"); const originalText = bookText ? bookText.textContent : "Buchen"; button.disabled = true; if (bookText) bookText.textContent = "Buche..."; if (bookIcon) bookIcon.style.display = 'none'; let success = false; try { success = await performBooking(date, slot, 'booking-error'); } catch (e) { console.error(e); showMessage('booking-error', 'Ein unerwarteter Fehler ist aufgetreten.', 'error'); success = false; } finally { if (success) { button.classList.add('booking-success'); if(bookText) bookText.style.display = 'none'; if(bookIcon) bookIcon.style.display = 'block'; setTimeout(() => { button.classList.remove('booking-success'); if(bookIcon) bookIcon.style.display = 'none'; if(bookText) { bookText.style.display = 'block'; bookText.textContent = "Buchen"; } button.disabled = false; dom.bookingDateInput.dispatchEvent(new Event('change')); }, 2000); } else { if(bookText) bookText.textContent = "Buchen"; button.disabled = false; } } });
 
 dom.bookingDateInput.addEventListener('change', async () => { 
-    updateBookingCostPreview(); // NEU: Update beim Datum
+    updateBookingCostPreview(); // Update
     const selectedDateStr = dom.bookingDateInput.value; const selectedDate = new Date(selectedDateStr); selectedDate.setHours(0, 0, 0, 0); const isPast = selectedDate < today; dom.dateValidationMessage.textContent = isPast ? 'Buchungen können nicht für vergangene Tage vorgenommen werden.' : ''; if (isPast) { updateSlotDropdownUI({ "07:00-13:00": { status: 'disabled-duplicate', text: '07:00 - 13:00' }, "13:00-19:00": { status: 'disabled-duplicate', text: '13:00 - 19:00' } }); return; } try { const options = dom.bookingSlotSelect.querySelectorAll('option'); options.forEach(opt => { if (opt.value) { opt.textContent = `${opt.value} (Prüfe...)`; opt.disabled = true; } }); const availability = await checkSlotAvailability(selectedDateStr); if (availability) { updateSlotDropdownUI(availability); } } catch (e) { console.error(e); showMessage('booking-error', 'Fehler beim Prüfen der Verfügbarkeit.', 'error'); } 
 });
 
-// NEU: Update beim Slot-Wechsel
+// Update
 dom.bookingSlotSelect.addEventListener('change', updateBookingCostPreview);
 
 dom.bookingDateInput.setAttribute('min', getFormattedDate(today)); dom.bookingDateInput.value = getFormattedDate(tomorrow);

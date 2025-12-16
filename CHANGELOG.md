@@ -2,6 +2,25 @@
 
 Hier werden alle wichtigen Änderungen an der Waschplan-App festgehalten.
 
+# [3.2.0] - 2025-12-04
+
+### 🌟 Großes Fairness & Eco Update
+
+### 🌱 Eco-Wash (Wetter-Integration)
+* **Sonne tanken:** Die App ist jetzt mit dem Wetterbericht verbunden!
+* **Sparen:** Wenn für den Tag Sonne angesagt ist, werden die Slots automatisch zu **Eco-Slots**. Sie kosten nur noch **-5 Karma** (statt -10). Das lohnt sich für dich und die Umwelt! Achte auf das Blatt-Symbol 🌱.
+
+### 🧾 Totale Transparenz
+* **Preisschilder:** Du siehst jetzt überall (Kalender, Wochenliste, Buchung) *vor* dem Klick, was ein Slot kostet. Keine Überraschungen mehr.
+* **Karma-Bilanz:** Im Profil gibt es jetzt einen detaillierten "Kassenbon". Er zeigt dir genau: Startguthaben (100) + Minigame-Gewinne - deine Buchungen = Dein aktueller Stand. Alles ist auf den Punkt genau nachvollziehbar.
+* **Kulanz-Anzeige:** Falls der Admin dir Punkte geschenkt hat oder das System korrigiert wurde, wird dies nun transparent als "Fairness-Bonus" ausgewiesen.
+
+### 🔔 Komfort
+* **Erinnerung:** Hast du für morgen gebucht? Die App schickt dir am Vorabend um 20:00 Uhr automatisch eine Push-Benachrichtigung, damit du deinen Termin nicht vergisst.
+
+### ⚙️ Für Admins
+* **Smart Reset:** Das System kann nun komplett neu kalibriert werden, ohne dass die Historie verloren geht. Es berechnet den fairen Punktestand für alle Parteien neu.
+
 ## [3.0.0] - 2025-12-01
 
 ### 🔒 Massive Sicherheits-Überarbeitung ("Fort Knox")
