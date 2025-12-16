@@ -1,16 +1,46 @@
-// ... (Die ersten Zeilen bis zu den Imports bleiben gleich, aber der Einfachheit halber wieder der ganze Code)
+// js/main.js - Version 3.2.0 mit Auto-Update & Lazy Loading
 
-// ===== WICHTIG: SERVICE WORKER STARTEN =====
+// ===== INTELLIGENTER SERVICE WORKER (AUTO-UPDATE) =====
 if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js')
-    .then((registration) => {
-      console.log('Service Worker registriert mit Scope:', registration.scope);
-    })
-    .catch((err) => {
+  let refreshing = false;
+  
+  // 1. Wenn das neue Update übernimmt, Seite neu laden
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!refreshing) {
+      refreshing = true;
+      window.location.reload();
+    }
+  });
+
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').then((registration) => {
+      console.log('Service Worker registriert:', registration.scope);
+
+      // 2. Aktiv nach Updates suchen
+      registration.update();
+
+      // 3. Wenn ein Update schon wartet (z.B. im Hintergrund geladen)
+      if (registration.waiting) {
+         // Wir feuern ein Event, damit der SW (sw.js) skipWaiting() macht.
+         // Da wir das im sw.js aber schon beim Install haben, sollte es meist automatisch gehen.
+         // Zur Sicherheit loggen wir es.
+         console.log('Wartendes Update gefunden. Reload wird vorbereitet...');
+      }
+
+      registration.addEventListener('updatefound', () => {
+        const newWorker = registration.installing;
+        newWorker.addEventListener('statechange', () => {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+             console.log('Neues Update fertig installiert.');
+          }
+        });
+      });
+    }).catch((err) => {
       console.error('Service Worker Fehler:', err);
     });
+  });
 }
-// ===========================================
+// ======================================================
 
 import { auth, onAuthStateChanged, getDoc, getUserProfileDocRef, Timestamp, doc, onSnapshot, db, updateDoc } from './firebase.js';
 import * as dom from './dom.js';
@@ -22,7 +52,7 @@ import {
     checkNotificationPermission, showChangelog
 } from './ui.js';
 import { handleRegister, handleLogin, handleLogout, handlePasswordReset, handleDeleteAccount } from './services/auth.js';
-import { loadWeather, isEcoDay } from './services/weather.js'; // Eco Import
+import { loadWeather, isEcoDay } from './services/weather.js'; 
 import { loadStatistics, initStatsView, trackMenuClick } from './services/stats.js';
 import { performBooking, performDeletion, loadNextBookingsOverview, checkSlotAvailability, performCheckIn, performCheckOut, checkAndAutoCheckoutOldBookings, subscribeToMachineStatus } from './services/booking.js';
 import { 
@@ -32,9 +62,7 @@ import {
 import { initCalendarView, loadBookingsForMonth } from './views/calendar.js';
 import { initOverviewView, setupWeekDropdown, loadBookingsForWeek } from './views/overview.js';
 import { initProfileView, loadProfileData } from './views/profile.js';
-// LAZY LOAD: Admin View wird jetzt dynamisch importiert
-// LAZY LOAD: Minigame wird jetzt dynamisch importiert
-// LAZY LOAD: Maintenance/Scanner/Admin ebenfalls
+// (Admin, Minigame, Scanner etc. werden jetzt unten dynamisch geladen)
 import { APP_VERSION, COST_SLOT_NORMAL, COST_SLOT_PRIME, COST_SLOT_ECO } from './config.js'; 
 import { loadWashPrograms, listenToActiveTimer, startWashTimer, stopWashTimer } from './services/timers.js';
 import { initKarmaForParty } from './services/karma.js';
@@ -186,7 +214,6 @@ onAuthStateChanged(auth, async (user) => {
     }
 });
 
-// TUTORIAL CHECK
 function checkTutorialSeen() {
     const hasSeenTutorial = localStorage.getItem('tutorial_accepted_v1');
     if (!hasSeenTutorial) {
@@ -516,7 +543,7 @@ function renderTimerUI() {
         };
         activeTimerInterval = setInterval(updateCountdown, 1000); updateCountdown(); 
         
-        // LAZY LOAD SCANNER
+        // DYNAMIC IMPORT SCANNER
         document.getElementById('timer-stop-btn').addEventListener('click', async () => {
             if (confirm('Möchtest du auschecken und den Timer stoppen?')) {
                 const correctCode = await getStoredQrCode();
@@ -536,7 +563,7 @@ function renderTimerUI() {
                 } else {
                     dom.liveTimerSection.innerHTML = `<div class="timer-start-container" style="text-align:center;"><h3 style="margin:0 0 10px 0;">Dein Slot: ${myCurrentBooking.slot}</h3><p style="margin-bottom:15px;">Bitte einchecken, wenn du an der Maschine bist.</p><button id="check-in-btn" class="button-primary" style="font-size:1.2em; padding:15px;"><i class="fa-solid fa-qrcode"></i> Check-in (Scan)</button></div>`;
                     
-                    // LAZY LOAD SCANNER
+                    // DYNAMIC IMPORT SCANNER
                     document.getElementById('check-in-btn').addEventListener('click', async () => { 
                         const correctCode = await getStoredQrCode(); 
                         const { startScanner } = await import('./services/scanner.js');
@@ -612,7 +639,7 @@ function setupMainMenuListeners() {
     document.getElementById('overview-btn').addEventListener('click', () => { trackMenuClick('btn_week'); unsubscribeForNavigation(); setupWeekDropdown(); loadBookingsForWeek(dom.kwSelect.value, setUnsubscriber); navigateTo(dom.overviewSection); });
     document.getElementById('calendar-btn').addEventListener('click', () => { trackMenuClick('btn_calendar'); unsubscribeForNavigation(); dom.calendarDayActions.style.display = 'none'; setSelectedCalendarDate(null); const now = new Date(); loadBookingsForMonth(now.getFullYear(), now.getMonth(), setUnsubscriber); navigateTo(dom.calendarSection); });
     
-    // LAZY LOAD ADMIN
+    // DYNAMIC IMPORT ADMIN
     let adminInitialized = false;
     document.getElementById('admin-btn').addEventListener('click', async () => { 
         unsubscribeForNavigation(); 
@@ -624,7 +651,7 @@ function setupMainMenuListeners() {
 
     document.getElementById('profile-btn').addEventListener('click', () => { unsubscribeForNavigation(); loadProfileData(); navigateTo(dom.profileSection); });
     
-    // LAZY LOAD MINIGAME
+    // DYNAMIC IMPORT MINIGAME
     const minigameBtn = document.getElementById('minigame-btn'); if (minigameBtn) { minigameBtn.addEventListener('click', async () => { 
         trackMenuClick('btn_minigame'); unsubscribeForNavigation(); 
         const { initMinigame } = await import('./services/minigame.js');
@@ -634,7 +661,7 @@ function setupMainMenuListeners() {
     
     const backGameBtn = document.getElementById('back-to-menu-btn-game'); if (backGameBtn) { backGameBtn.addEventListener('click', () => navigateTo(dom.mainMenu, 'back')); }
     
-    // LAZY LOAD REPORT ISSUE
+    // DYNAMIC IMPORT MAINTENANCE
     const reportBtn = document.getElementById('report-issue-btn'); if (reportBtn) { reportBtn.addEventListener('click', () => { const maintSec = document.getElementById('maintenanceSection'); if (maintSec) navigateTo(maintSec); }); }
     const maintBackBtn = document.getElementById('back-to-menu-btn-maint'); if (maintBackBtn) maintBackBtn.addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
     
@@ -734,4 +761,3 @@ initCalendarView(setUnsubscriber);
 initOverviewView(setUnsubscriber);
 initProfileView();
 initStatsView();
-// initAdminView() wurde entfernt, da es jetzt lazy geladen wird
