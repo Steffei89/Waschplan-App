@@ -2,7 +2,7 @@
 
 Hier werden alle wichtigen Änderungen an der Waschplan-App festgehalten.
 
-# [3.2.0] - 2025-12-04
+# [3.2.1] - 2025-12-04
 
 ### 🌟 Großes Fairness & Eco Update
 
