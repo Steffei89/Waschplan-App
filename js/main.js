@@ -1,42 +1,15 @@
-// js/main.js - Version 3.2.0 mit Auto-Update & Lazy Loading
+// js/main.js - Version 3.3.0 - iOS Style Admin & Live Config
 
 // ===== INTELLIGENTER SERVICE WORKER (AUTO-UPDATE) =====
 if ('serviceWorker' in navigator) {
   let refreshing = false;
-  
-  // 1. Wenn das neue Update übernimmt, Seite neu laden
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!refreshing) {
-      refreshing = true;
-      window.location.reload();
-    }
+    if (!refreshing) { refreshing = true; window.location.reload(); }
   });
-
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then((registration) => {
-      console.log('Service Worker registriert:', registration.scope);
-
-      // 2. Aktiv nach Updates suchen
       registration.update();
-
-      // 3. Wenn ein Update schon wartet (z.B. im Hintergrund geladen)
-      if (registration.waiting) {
-         // Wir feuern ein Event, damit der SW (sw.js) skipWaiting() macht.
-         // Da wir das im sw.js aber schon beim Install haben, sollte es meist automatisch gehen.
-         // Zur Sicherheit loggen wir es.
-         console.log('Wartendes Update gefunden. Reload wird vorbereitet...');
-      }
-
-      registration.addEventListener('updatefound', () => {
-        const newWorker = registration.installing;
-        newWorker.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-             console.log('Neues Update fertig installiert.');
-          }
-        });
-      });
-    }).catch((err) => {
-      console.error('Service Worker Fehler:', err);
+      if (registration.waiting) console.log('Wartendes Update gefunden...');
     });
   });
 }
@@ -62,7 +35,6 @@ import {
 import { initCalendarView, loadBookingsForMonth } from './views/calendar.js';
 import { initOverviewView, setupWeekDropdown, loadBookingsForWeek } from './views/overview.js';
 import { initProfileView, loadProfileData } from './views/profile.js';
-// (Admin, Minigame, Scanner etc. werden jetzt unten dynamisch geladen)
 import { APP_VERSION, COST_SLOT_NORMAL, COST_SLOT_PRIME, COST_SLOT_ECO } from './config.js'; 
 import { loadWashPrograms, listenToActiveTimer, startWashTimer, stopWashTimer } from './services/timers.js';
 import { initKarmaForParty } from './services/karma.js';
@@ -74,6 +46,7 @@ let allPrograms = [];
 let currentTimerData = null; 
 let activeTimerInterval = null; 
 let karmaUnsubscribe = null; 
+let configUnsubscribe = null; // NEU: Listener für Config
 let myCurrentBooking = null;
 let autoCheckoutInterval = null;
 let machineStatusUnsubscribe = null;
@@ -81,20 +54,14 @@ let machineStatusUnsubscribe = null;
 // --- AUTH FLOW ---
 
 onAuthStateChanged(auth, async (user) => {
-    
-    if (getIsRegistering()) {
-        return; 
-    }
+    if (getIsRegistering()) return; 
 
     if (user) { 
         try {
             await new Promise(resolve => setTimeout(resolve, 500));
-            try { await user.reload(); } catch(e) { console.warn("User reload failed (Offline?)", e); }
+            try { await user.reload(); } catch(e) { console.warn("User reload failed", e); }
             
-            if (!user.emailVerified) {
-                await signOut(auth);
-                return;
-            }
+            if (!user.emailVerified) { await signOut(auth); return; }
 
             const userDocSnap = await getDoc(getUserProfileDocRef(user.uid));
             
@@ -102,47 +69,26 @@ onAuthStateChanged(auth, async (user) => {
                 const userData = userDocSnap.data();
                 
                 if (!userData.partei) {
-                    dom.loadingOverlay.style.display = 'none';
-                    dom.appContainer.style.display = 'block';
-                    
-                    if (!dom.setupParteiModal) {
-                        alert("FEHLER: 'index.html' ist veraltet! Bitte die Datei aktualisieren.");
-                        return;
-                    }
-
-                    navigateTo(null);
-                    dom.setupParteiModal.style.display = 'flex';
-                    
+                    dom.loadingOverlay.style.display = 'none'; dom.appContainer.style.display = 'block';
+                    if (!dom.setupParteiModal) { alert("Index.html veraltet!"); return; }
+                    navigateTo(null); dom.setupParteiModal.style.display = 'flex';
                     if (dom.setupParteiSaveBtn) {
                         dom.setupParteiSaveBtn.onclick = async () => {
                             const selected = dom.setupParteiSelect.value;
-                            if (!selected) {
-                                alert("Bitte Partei wählen!");
-                                return;
-                            }
-                            dom.setupParteiSaveBtn.disabled = true;
-                            dom.setupParteiSaveBtn.textContent = 'Speichere...';
-                            
-                            try {
-                                await updateDoc(getUserProfileDocRef(user.uid), { partei: selected });
-                                window.location.reload();
-                            } catch (e) {
-                                alert("Fehler beim Speichern: " + e.message);
-                                dom.setupParteiSaveBtn.disabled = false;
-                            }
+                            if (!selected) { alert("Bitte Partei wählen!"); return; }
+                            dom.setupParteiSaveBtn.disabled = true; dom.setupParteiSaveBtn.textContent = 'Speichere...';
+                            try { await updateDoc(getUserProfileDocRef(user.uid), { partei: selected }); window.location.reload(); } 
+                            catch (e) { alert("Fehler: " + e.message); dom.setupParteiSaveBtn.disabled = false; }
                         };
                     }
                     return; 
                 }
 
                 setCurrentUser({ uid: user.uid, ...user, userData });
-                
                 startSession();
-                
                 checkAndAutoCheckoutOldBookings();
                 if (autoCheckoutInterval) clearInterval(autoCheckoutInterval);
                 autoCheckoutInterval = setInterval(checkAndAutoCheckoutOldBookings, 60000);
-
                 initPushNotifications();
                 initGestures();
 
@@ -150,18 +96,14 @@ onAuthStateChanged(auth, async (user) => {
                     try {
                         await initKarmaForParty(userData.partei);
                         setupKarmaHeaderListener(userData.partei);
-                    } catch (karmaError) {
-                        console.error("Karma Fehler:", karmaError);
-                    }
+                    } catch (karmaError) { console.error("Karma Fehler:", karmaError); }
                 }
 
                 updateUserInfo(userData);
                 setupMainMenuListeners(); 
                 loadWeather(); 
                 
-                dom.loadingOverlay.style.display = 'none';
-                dom.appContainer.style.display = 'block';
-
+                dom.loadingOverlay.style.display = 'none'; dom.appContainer.style.display = 'block';
                 if(dom.weatherWidget) dom.weatherWidget.style.display = 'flex'; 
                 
                 navigateTo(dom.mainMenu);
@@ -175,41 +117,25 @@ onAuthStateChanged(auth, async (user) => {
                 handleMachineStatus();
                 checkAppVersion();
 
-            } else {
-                await handleLogout(); 
-            }
-        } catch (e) {
-            console.error("Critical Auth Error:", e);
-            alert("Ein Fehler ist aufgetreten:\n" + e.message + "\n\nBitte App neu laden.");
-            await handleLogout();
-        }
+            } else { await handleLogout(); }
+        } catch (e) { console.error("Critical Auth Error:", e); alert("Fehler: " + e.message); await handleLogout(); }
     } else {
-        dom.loadingOverlay.style.display = 'none';
-        dom.appContainer.style.display = 'block';
-
+        dom.loadingOverlay.style.display = 'none'; dom.appContainer.style.display = 'block';
         unsubscribeAll();
         if(karmaUnsubscribe) karmaUnsubscribe();
+        if(configUnsubscribe) configUnsubscribe(); // Cleanup
         if(machineStatusUnsubscribe) machineStatusUnsubscribe();
-        
         if (autoCheckoutInterval) clearInterval(autoCheckoutInterval);
         
-        setCurrentUser(null);
-        updateUserInfo(null);
+        setCurrentUser(null); updateUserInfo(null);
         if(dom.weatherWidget) dom.weatherWidget.style.display = 'none';
         if(dom.machineStatusWidget) dom.machineStatusWidget.style.display = 'none';
-        
         if (activeTimerInterval) clearInterval(activeTimerInterval);
-        if(dom.liveTimerSection) {
-            dom.liveTimerSection.style.display = 'none';
-            dom.liveTimerSection.classList.remove('active'); 
-        }
-        allPrograms = [];
-        currentTimerData = null;
-        myCurrentBooking = null;
+        if(dom.liveTimerSection) { dom.liveTimerSection.style.display = 'none'; dom.liveTimerSection.classList.remove('active'); }
+        allPrograms = []; currentTimerData = null; myCurrentBooking = null;
 
         if (dom.deleteAccountModal) dom.deleteAccountModal.style.display = 'none';
         if (dom.setupParteiModal) dom.setupParteiModal.style.display = 'none';
-
         navigateTo(dom.loginForm);
     }
 });
@@ -221,74 +147,73 @@ function checkTutorialSeen() {
         const tutBtn = document.getElementById('tutorial-confirm-btn');
         if (tutModal && tutBtn) {
             tutModal.style.display = 'flex';
-            tutBtn.onclick = () => {
-                localStorage.setItem('tutorial_accepted_v1', 'true');
-                tutModal.style.display = 'none';
-            };
+            tutBtn.onclick = () => { localStorage.setItem('tutorial_accepted_v1', 'true'); tutModal.style.display = 'none'; };
         }
     }
 }
 
-document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === 'hidden') updateSession();
-});
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === 'hidden') updateSession(); });
 
 function handleMachineStatus() {
     if(machineStatusUnsubscribe) machineStatusUnsubscribe();
-    const widget = dom.machineStatusWidget;
-    const icon = document.getElementById('machine-status-icon');
-    const text = document.getElementById('machine-status-text');
+    const widget = dom.machineStatusWidget; const icon = document.getElementById('machine-status-icon'); const text = document.getElementById('machine-status-text');
     if(!widget) return;
     widget.style.display = 'flex';
     machineStatusUnsubscribe = subscribeToMachineStatus((status) => {
-        if (status === 'busy') {
-            widget.className = 'status-widget status-busy';
-            text.textContent = 'Belegt';
-            icon.className = 'fa-solid fa-shirt'; 
-        } else {
-            widget.className = 'status-widget status-free';
-            text.textContent = 'Frei';
-            icon.className = 'fa-regular fa-circle-check';
-        }
+        if (status === 'busy') { widget.className = 'status-widget status-busy'; text.textContent = 'Belegt'; icon.className = 'fa-solid fa-shirt'; } 
+        else { widget.className = 'status-widget status-free'; text.textContent = 'Frei'; icon.className = 'fa-regular fa-circle-check'; }
     });
 }
 
+// ===== UPDATE: Live-Config Listener für den Header =====
 function setupKarmaHeaderListener(parteiName) {
+    if(configUnsubscribe) configUnsubscribe();
     if(karmaUnsubscribe) karmaUnsubscribe();
+    
     const headerDisplay = document.getElementById('header-karma-display');
     const headerValue = document.getElementById('header-karma-value');
     const headerIcon = document.getElementById('header-karma-icon');
-    if (!headerDisplay || !headerValue || !headerIcon) return;
     
-    headerDisplay.style.display = 'flex';
+    if (!headerDisplay || !headerValue || !headerIcon) return;
+
+    // Klick-Listener (immer aktiv, falls sichtbar)
     headerDisplay.onclick = () => {
         const modal = document.getElementById('karmaGuideModal');
         const closeBtn = document.getElementById('close-karma-guide-btn');
         if(modal) {
             modal.style.display = 'flex';
-            if(closeBtn) {
-                closeBtn.onclick = () => modal.style.display = 'none';
-            }
+            if(closeBtn) closeBtn.onclick = () => modal.style.display = 'none';
         }
     };
 
-    karmaUnsubscribe = onSnapshot(doc(db, "parties", parteiName), (docSnap) => {
-        if (docSnap.exists()) {
-            const karma = docSnap.data().karma;
-            headerValue.textContent = karma;
-            if (karma < 40) {
-                headerDisplay.style.background = 'linear-gradient(135deg, #ff3b30, #ff9f0a)';
-                headerIcon.className = 'fa-solid fa-triangle-exclamation';
-            } else if (karma > 80) {
-                headerDisplay.style.background = 'linear-gradient(135deg, #34c759, #f1c40f)';
-                headerIcon.className = 'fa-solid fa-star';
-            } else {
-                headerDisplay.style.background = 'linear-gradient(135deg, var(--primary-color), var(--primary-color-transparent))';
-                headerIcon.className = 'fa-solid fa-circle-check';
+    // 1. Config Listener: Schaltet Anzeige an/aus
+    configUnsubscribe = onSnapshot(doc(db, 'app_settings', 'config'), (configSnap) => {
+        const karmaActive = configSnap.exists() ? (configSnap.data().karmaSystemActive !== false) : true;
+        
+        if (!karmaActive) {
+            headerDisplay.style.display = 'none';
+        } else {
+            headerDisplay.style.display = 'flex';
+            // 2. Party Listener: Nur starten, wenn System aktiv ist (und noch nicht läuft)
+            if (!karmaUnsubscribe) {
+                startPartyListener(parteiName, headerValue, headerDisplay, headerIcon);
             }
         }
     });
 }
+
+function startPartyListener(parteiName, headerValue, headerDisplay, headerIcon) {
+    karmaUnsubscribe = onSnapshot(doc(db, "parties", parteiName), (docSnap) => {
+        if (docSnap.exists()) {
+            const karma = docSnap.data().karma;
+            headerValue.textContent = karma;
+            if (karma < 40) { headerDisplay.style.background = 'linear-gradient(135deg, #ff3b30, #ff9f0a)'; headerIcon.className = 'fa-solid fa-triangle-exclamation'; } 
+            else if (karma > 80) { headerDisplay.style.background = 'linear-gradient(135deg, #34c759, #f1c40f)'; headerIcon.className = 'fa-solid fa-star'; } 
+            else { headerDisplay.style.background = 'linear-gradient(135deg, var(--primary-color), var(--primary-color-transparent))'; headerIcon.className = 'fa-solid fa-circle-check'; }
+        }
+    });
+}
+// ====================================================
 
 function handleLoadNextBookings() {
     dom.myBookingsList.innerHTML = `<div class="skeleton-item"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line short"></div></div>`;
@@ -302,198 +227,100 @@ function handleLoadNextBookings() {
             bookings.forEach(booking => {
                 const formattedDate = new Date(booking.date + "T00:00:00").toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
                 const isMyParteiBooking = booking.partei === currentUser.userData.partei;
-                
-                const item = document.createElement('div');
-                item.className = 'my-booking-item';
-
-                const detailsDiv = document.createElement('div');
-                detailsDiv.className = 'booking-details';
-                
-                const dateStrong = document.createElement('strong');
-                dateStrong.textContent = formattedDate;
-                
+                const item = document.createElement('div'); item.className = 'my-booking-item';
+                const detailsDiv = document.createElement('div'); detailsDiv.className = 'booking-details';
+                const dateStrong = document.createElement('strong'); dateStrong.textContent = formattedDate;
                 const slotText = document.createTextNode(` (${booking.slot})`);
-                
-                const parteiSpan = document.createElement('span');
-                parteiSpan.className = 'small-text ml-10';
-                parteiSpan.textContent = booking.partei; 
-
-                detailsDiv.appendChild(dateStrong);
-                detailsDiv.appendChild(slotText);
-                detailsDiv.appendChild(parteiSpan);
+                const parteiSpan = document.createElement('span'); parteiSpan.className = 'small-text ml-10'; parteiSpan.textContent = booking.partei; 
+                detailsDiv.appendChild(dateStrong); detailsDiv.appendChild(slotText); detailsDiv.appendChild(parteiSpan);
 
                 if (isMyParteiBooking || userIsAdmin) {
                      if (booking.isReleased) {
-                         const statusSpan = document.createElement('span');
-                         statusSpan.style.color = 'var(--success-color)';
-                         statusSpan.style.fontSize = '0.8em';
-                         statusSpan.style.display = 'block';
-                         statusSpan.textContent = '(Abgeschlossen ✅)';
-                         detailsDiv.appendChild(statusSpan);
+                         const statusSpan = document.createElement('span'); statusSpan.style.color = 'var(--success-color)'; statusSpan.style.fontSize = '0.8em'; statusSpan.style.display = 'block'; statusSpan.textContent = '(Abgeschlossen ✅)'; detailsDiv.appendChild(statusSpan);
                      } else if (booking.checkInTime) {
-                         const statusSpan = document.createElement('span');
-                         statusSpan.style.color = 'var(--primary-color)';
-                         statusSpan.style.fontWeight = 'bold';
-                         statusSpan.style.fontSize = '0.8em';
-                         statusSpan.style.display = 'block';
-                         statusSpan.textContent = '(Läuft ▶️)';
-                         detailsDiv.appendChild(statusSpan);
+                         const statusSpan = document.createElement('span'); statusSpan.style.color = 'var(--primary-color)'; statusSpan.style.fontWeight = 'bold'; statusSpan.style.fontSize = '0.8em'; statusSpan.style.display = 'block'; statusSpan.textContent = '(Läuft ▶️)'; detailsDiv.appendChild(statusSpan);
                      }
                 }
                 item.appendChild(detailsDiv);
 
                 if (isMyParteiBooking || userIsAdmin) {
-                    const icsBtn = document.createElement('button');
-                    icsBtn.className = 'button-small export-ics-btn';
-                    icsBtn.title = 'In Kalender speichern';
-                    icsBtn.innerHTML = '<i class="fa-regular fa-calendar-plus"></i>';
-                    icsBtn.onclick = (e) => { e.stopPropagation(); createAndDownloadIcsFile(booking.date, booking.slot); };
-                    
-                    const delBtn = document.createElement('button');
-                    delBtn.className = 'button-small button-danger delete-my-booking-btn';
-                    delBtn.textContent = 'Löschen';
-                    delBtn.onclick = async (e) => {
-                        e.target.disabled = true; e.target.textContent = 'Lösche...';
-                        const success = await performDeletion(booking.date, booking.slot, 'main-menu-message');
-                        if (success && dom.bookingDateInput.value === booking.date) dom.bookingDateInput.dispatchEvent(new Event('change'));
-                    };
-                    
-                    const actionsDiv = document.createElement('div');
-                    actionsDiv.className = 'booking-actions';
-                    actionsDiv.appendChild(icsBtn);
-                    
-                    if (userIsAdmin) actionsDiv.appendChild(delBtn);
-                    else { if (!booking.checkInTime) actionsDiv.appendChild(delBtn); }
-                    
+                    const icsBtn = document.createElement('button'); icsBtn.className = 'button-small export-ics-btn'; icsBtn.title = 'In Kalender speichern'; icsBtn.innerHTML = '<i class="fa-regular fa-calendar-plus"></i>'; icsBtn.onclick = (e) => { e.stopPropagation(); createAndDownloadIcsFile(booking.date, booking.slot); };
+                    const delBtn = document.createElement('button'); delBtn.className = 'button-small button-danger delete-my-booking-btn'; delBtn.textContent = 'Löschen';
+                    delBtn.onclick = async (e) => { e.target.disabled = true; e.target.textContent = 'Lösche...'; const success = await performDeletion(booking.date, booking.slot, 'main-menu-message'); if (success && dom.bookingDateInput.value === booking.date) dom.bookingDateInput.dispatchEvent(new Event('change')); };
+                    const actionsDiv = document.createElement('div'); actionsDiv.className = 'booking-actions'; actionsDiv.appendChild(icsBtn);
+                    if (userIsAdmin) actionsDiv.appendChild(delBtn); else { if (!booking.checkInTime) actionsDiv.appendChild(delBtn); }
                     item.appendChild(actionsDiv);
                 }
                 dom.myBookingsList.appendChild(item);
             });
-        },
-        (error) => { dom.myBookingsList.innerHTML = `<p class="small-text" style="color: var(--error-color);">Fehler beim Laden.</p>`; }
+        }, (error) => { dom.myBookingsList.innerHTML = `<p class="small-text" style="color: var(--error-color);">Fehler beim Laden.</p>`; }
     );
     setUnsubscriber('quickView', unsub);
 }
 
 function handleLoadIncomingRequests() {
-    const unsub = loadIncomingRequests(
-        (pendingRequests) => {
+    const unsub = loadIncomingRequests((pendingRequests) => {
             dom.incomingRequestsContainer.innerHTML = '';
             if (pendingRequests.length === 0) { dom.incomingRequestsContainer.style.display = 'none'; return; }
             dom.incomingRequestsContainer.style.display = 'block'; 
-            const header = document.createElement('h3');
-            header.className = 'request-item-header';
-            header.textContent = `Eingehende Tauschanfragen (${pendingRequests.length})`;
-            dom.incomingRequestsContainer.appendChild(header);
-            
+            const header = document.createElement('h3'); header.className = 'request-item-header'; header.textContent = `Eingehende Tauschanfragen (${pendingRequests.length})`; dom.incomingRequestsContainer.appendChild(header);
             pendingRequests.forEach(req => {
                 const dateStr = new Date(req.targetDate + "T00:00:00").toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
-                
-                const item = document.createElement('div'); 
-                item.className = 'request-item';
-                
-                const detailsDiv = document.createElement('div'); 
-                detailsDiv.className = 'request-details';
-                
-                const dateStrong = document.createElement('strong');
-                dateStrong.textContent = `${dateStr} (${req.targetSlot})`;
-                
-                const fromSpan = document.createElement('span');
-                fromSpan.className = 'small-text ml-10';
-                fromSpan.textContent = `von: ${req.requesterPartei}`; 
-                
-                detailsDiv.appendChild(dateStrong);
-                detailsDiv.appendChild(fromSpan);
-
+                const item = document.createElement('div'); item.className = 'request-item';
+                const detailsDiv = document.createElement('div'); detailsDiv.className = 'request-details';
+                const dateStrong = document.createElement('strong'); dateStrong.textContent = `${dateStr} (${req.targetSlot})`;
+                const fromSpan = document.createElement('span'); fromSpan.className = 'small-text ml-10'; fromSpan.textContent = `von: ${req.requesterPartei}`; 
+                detailsDiv.appendChild(dateStrong); detailsDiv.appendChild(fromSpan);
                 const actionsDiv = document.createElement('div'); actionsDiv.className = 'request-actions';
-                const acceptBtn = document.createElement('button'); acceptBtn.className = 'button-small button-success'; acceptBtn.textContent = 'Annehmen';
-                acceptBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); acceptBtn.disabled = true; acceptBtn.textContent = 'Prüfe...'; confirmSwapTransaction(req.id); };
-                const rejectBtn = document.createElement('button'); rejectBtn.className = 'button-small button-secondary'; rejectBtn.textContent = 'Ablehnen';
-                rejectBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); rejectBtn.disabled = true; rejectBtn.textContent = '...'; rejectSwapRequest(req.id); };
-                actionsDiv.appendChild(acceptBtn); actionsDiv.appendChild(rejectBtn); 
-                
-                item.appendChild(detailsDiv); 
-                item.appendChild(actionsDiv);
-                dom.incomingRequestsContainer.appendChild(item);
+                const acceptBtn = document.createElement('button'); acceptBtn.className = 'button-small button-success'; acceptBtn.textContent = 'Annehmen'; acceptBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); acceptBtn.disabled = true; acceptBtn.textContent = 'Prüfe...'; confirmSwapTransaction(req.id); };
+                const rejectBtn = document.createElement('button'); rejectBtn.className = 'button-small button-secondary'; rejectBtn.textContent = 'Ablehnen'; rejectBtn.onclick = (e) => { e.preventDefault(); e.stopPropagation(); rejectBtn.disabled = true; rejectBtn.textContent = '...'; rejectSwapRequest(req.id); };
+                actionsDiv.appendChild(acceptBtn); actionsDiv.appendChild(rejectBtn); item.appendChild(detailsDiv); item.appendChild(actionsDiv); dom.incomingRequestsContainer.appendChild(item);
             });
-        },
-        (error) => { dom.incomingRequestsContainer.style.display = 'block'; dom.incomingRequestsContainer.innerHTML = '<p class="message-box error">Fehler beim Laden.</p>'; }
+        }, (error) => { dom.incomingRequestsContainer.style.display = 'block'; dom.incomingRequestsContainer.innerHTML = '<p class="message-box error">Fehler beim Laden.</p>'; }
     );
     setUnsubscriber('requests', unsub);
 }
 
 function handleLoadOutgoingRequests() {
-    const unsub = loadOutgoingRequestStatus(
-        (rejectedRequests) => {
-            const container = dom.outgoingRequestsStatusContainer;
-            container.innerHTML = '';
+    const unsub = loadOutgoingRequestStatus((rejectedRequests) => {
+            const container = dom.outgoingRequestsStatusContainer; container.innerHTML = '';
             if (rejectedRequests.length === 0) { container.style.display = 'none'; return; }
             container.style.display = 'block';
             const header = document.createElement('h3'); header.className = 'request-item-header'; header.style.color = 'var(--error-color)'; header.textContent = `Abgelehnte Anfragen (${rejectedRequests.length})`; container.appendChild(header);
-            
             rejectedRequests.forEach(req => {
                 const dateStr = new Date(req.targetDate + "T00:00:00").toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
                 const item = document.createElement('div'); item.className = 'request-item rejected'; 
-                
-                const detailsDiv = document.createElement('div');
-                detailsDiv.className = 'request-details';
-                
-                const dateStrong = document.createElement('strong');
-                dateStrong.textContent = `${dateStr} (${req.targetSlot})`;
-                
-                const infoSpan = document.createElement('span');
-                infoSpan.className = 'small-text ml-10';
-                infoSpan.textContent = `Anfrage an ${req.targetPartei} wurde abgelehnt.`;
-                
-                detailsDiv.appendChild(dateStrong);
-                detailsDiv.appendChild(infoSpan);
-                item.appendChild(detailsDiv);
-
+                const detailsDiv = document.createElement('div'); detailsDiv.className = 'request-details';
+                const dateStrong = document.createElement('strong'); dateStrong.textContent = `${dateStr} (${req.targetSlot})`;
+                const infoSpan = document.createElement('span'); infoSpan.className = 'small-text ml-10'; infoSpan.textContent = `Anfrage an ${req.targetPartei} wurde abgelehnt.`;
+                detailsDiv.appendChild(dateStrong); detailsDiv.appendChild(infoSpan); item.appendChild(detailsDiv);
                 const actionsDiv = document.createElement('div'); actionsDiv.className = 'request-actions';
-                const okBtn = document.createElement('button'); okBtn.className = 'button-small button-secondary dismiss-notification-btn'; okBtn.textContent = 'OK';
-                okBtn.addEventListener('click', async (e) => { e.preventDefault(); okBtn.disabled = true; await dismissRequestNotification(req.id); });
+                const okBtn = document.createElement('button'); okBtn.className = 'button-small button-secondary dismiss-notification-btn'; okBtn.textContent = 'OK'; okBtn.addEventListener('click', async (e) => { e.preventDefault(); okBtn.disabled = true; await dismissRequestNotification(req.id); });
                 actionsDiv.appendChild(okBtn); item.appendChild(actionsDiv); container.appendChild(item);
             });
-        },
-        (error) => console.error(error)
+        }, (error) => console.error(error)
     );
     setUnsubscriber('outgoingRequests', unsub);
 }
 
 function handleLoadOutgoingSuccess() {
-    const unsub = loadOutgoingRequestSuccess(
-        (acceptedRequests) => {
-            const container = dom.outgoingRequestsSuccessContainer;
-            container.innerHTML = '';
+    const unsub = loadOutgoingRequestSuccess((acceptedRequests) => {
+            const container = dom.outgoingRequestsSuccessContainer; container.innerHTML = '';
             if (acceptedRequests.length === 0) { container.style.display = 'none'; return; }
             container.style.display = 'block';
             const header = document.createElement('h3'); header.className = 'request-item-header'; header.style.color = 'var(--success-color)'; header.textContent = `Angenommene Anfragen (${acceptedRequests.length})`; container.appendChild(header);
-            
             acceptedRequests.forEach(req => {
                 const dateStr = new Date(req.targetDate + "T00:00:00").toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' });
                 const item = document.createElement('div'); item.className = 'request-item accepted'; 
-                
-                const detailsDiv = document.createElement('div');
-                detailsDiv.className = 'request-details';
-                
-                const dateStrong = document.createElement('strong');
-                dateStrong.textContent = `${dateStr} (${req.targetSlot})`;
-                
-                const infoSpan = document.createElement('span');
-                infoSpan.className = 'small-text ml-10';
-                infoSpan.textContent = `Tausch mit ${req.targetPartei} war erfolgreich!`;
-                
-                detailsDiv.appendChild(dateStrong);
-                detailsDiv.appendChild(infoSpan);
-                item.appendChild(detailsDiv);
-
+                const detailsDiv = document.createElement('div'); detailsDiv.className = 'request-details';
+                const dateStrong = document.createElement('strong'); dateStrong.textContent = `${dateStr} (${req.targetSlot})`;
+                const infoSpan = document.createElement('span'); infoSpan.className = 'small-text ml-10'; infoSpan.textContent = `Tausch mit ${req.targetPartei} war erfolgreich!`;
+                detailsDiv.appendChild(dateStrong); detailsDiv.appendChild(infoSpan); item.appendChild(detailsDiv);
                 const actionsDiv = document.createElement('div'); actionsDiv.className = 'request-actions';
-                const okBtn = document.createElement('button'); okBtn.className = 'button-small button-secondary dismiss-notification-btn'; okBtn.textContent = 'OK';
-                okBtn.addEventListener('click', async (e) => { e.preventDefault(); okBtn.disabled = true; okBtn.textContent = '...'; await dismissRequestNotification(req.id); });
+                const okBtn = document.createElement('button'); okBtn.className = 'button-small button-secondary dismiss-notification-btn'; okBtn.textContent = 'OK'; okBtn.addEventListener('click', async (e) => { e.preventDefault(); okBtn.disabled = true; okBtn.textContent = '...'; await dismissRequestNotification(req.id); });
                 actionsDiv.appendChild(okBtn); item.appendChild(actionsDiv); container.appendChild(item);
             });
-        },
-        (error) => console.error(error)
+        }, (error) => console.error(error)
     );
     setUnsubscriber('outgoingRequestsSuccess', unsub);
 }
@@ -518,15 +345,9 @@ function renderTimerUI() {
     if (activeTimerInterval) { clearTimeout(activeTimerInterval); clearInterval(activeTimerInterval); }
     activeTimerInterval = null; 
     const { currentUser } = getState();
-    if (!currentUser) { 
-        if(dom.liveTimerSection) { dom.liveTimerSection.style.display = 'none'; dom.liveTimerSection.classList.remove('active'); }
-        return; 
-    }
-    
+    if (!currentUser) { if(dom.liveTimerSection) { dom.liveTimerSection.style.display = 'none'; dom.liveTimerSection.classList.remove('active'); } return; }
     if(!dom.liveTimerSection) return;
-
     dom.liveTimerSection.innerHTML = ''; 
-
     if (currentTimerData) {
         dom.liveTimerSection.style.display = 'block'; setTimeout(() => dom.liveTimerSection.classList.add('active'), 10); 
         const { programName, endTime, startTime, durationMinutes } = currentTimerData;
@@ -542,15 +363,7 @@ function renderTimerUI() {
             const fillEl = document.getElementById('timer-progress-fill'); if (fillEl) fillEl.style.width = `${percent}%`;
         };
         activeTimerInterval = setInterval(updateCountdown, 1000); updateCountdown(); 
-        
-        // DYNAMIC IMPORT SCANNER
-        document.getElementById('timer-stop-btn').addEventListener('click', async () => {
-            if (confirm('Möchtest du auschecken und den Timer stoppen?')) {
-                const correctCode = await getStoredQrCode();
-                const { startScanner } = await import('./services/scanner.js');
-                startScanner((scannedCode) => { if (scannedCode === correctCode) { stopWashTimer(currentUser.userData.partei); showMessage('main-menu-message', 'Check-out erfolgreich! ✅', 'success'); } else { alert("Falscher QR-Code! ❌"); } }, (error) => {});
-            }
-        });
+        document.getElementById('timer-stop-btn').addEventListener('click', async () => { if (confirm('Möchtest du auschecken und den Timer stoppen?')) { const correctCode = await getStoredQrCode(); const { startScanner } = await import('./services/scanner.js'); startScanner((scannedCode) => { if (scannedCode === correctCode) { stopWashTimer(currentUser.userData.partei); showMessage('main-menu-message', 'Check-out erfolgreich! ✅', 'success'); } else { alert("Falscher QR-Code! ❌"); } }, (error) => {}); } });
     } else {
         if (myCurrentBooking) {
             dom.liveTimerSection.style.display = 'block'; setTimeout(() => dom.liveTimerSection.classList.add('active'), 10);
@@ -562,13 +375,7 @@ function renderTimerUI() {
                     if (msUntilStart > 0 && msUntilStart < 24 * 60 * 60 * 1000) { activeTimerInterval = setTimeout(() => { renderTimerUI(); showMessage('main-menu-message', 'Deine Zeit beginnt jetzt! Check-in ist freigeschaltet.', 'success'); }, msUntilStart); }
                 } else {
                     dom.liveTimerSection.innerHTML = `<div class="timer-start-container" style="text-align:center;"><h3 style="margin:0 0 10px 0;">Dein Slot: ${myCurrentBooking.slot}</h3><p style="margin-bottom:15px;">Bitte einchecken, wenn du an der Maschine bist.</p><button id="check-in-btn" class="button-primary" style="font-size:1.2em; padding:15px;"><i class="fa-solid fa-qrcode"></i> Check-in (Scan)</button></div>`;
-                    
-                    // DYNAMIC IMPORT SCANNER
-                    document.getElementById('check-in-btn').addEventListener('click', async () => { 
-                        const correctCode = await getStoredQrCode(); 
-                        const { startScanner } = await import('./services/scanner.js');
-                        startScanner(async (code) => { if (code === correctCode) { await performCheckIn(myCurrentBooking.id, 'main-menu-message'); } else { alert("Falscher QR-Code!"); } }); 
-                    });
+                    document.getElementById('check-in-btn').addEventListener('click', async () => { const correctCode = await getStoredQrCode(); const { startScanner } = await import('./services/scanner.js'); startScanner(async (code) => { if (code === correctCode) { await performCheckIn(myCurrentBooking.id, 'main-menu-message'); } else { alert("Falscher QR-Code!"); } }); });
                 }
             } else {
                 let buttonsHTML = ''; if(allPrograms.length > 0) { buttonsHTML = '<p style="margin-top:15px; font-weight:bold;">Programm-Timer starten (optional):</p><div class="timer-button-row">' + allPrograms.map(prog => `<button class="timer-start-btn" data-id="${prog.id}">${prog.name} (${prog.durationMinutes} min)</button>`).join('') + '</div>'; }
@@ -590,14 +397,9 @@ function checkPasswordMatch() {
 }
 
 function checkInviteCode() { 
-    const inviteCodeField = document.getElementById('register-invite-code');
-    const parteiWrapper = document.getElementById('partei-selection-wrapper');
+    const inviteCodeField = document.getElementById('register-invite-code'); const parteiWrapper = document.getElementById('partei-selection-wrapper');
     if (!inviteCodeField || !parteiWrapper) return;
-    if (inviteCodeField.value.trim().length >= 8) {
-        parteiWrapper.classList.remove('hidden');
-    } else {
-        parteiWrapper.classList.add('hidden');
-    }
+    if (inviteCodeField.value.trim().length >= 8) { parteiWrapper.classList.remove('hidden'); } else { parteiWrapper.classList.add('hidden'); }
 }
 
 document.getElementById("register-btn").addEventListener("click", handleRegister);
@@ -621,25 +423,11 @@ document.getElementById('refresh-app-btn').addEventListener('click', () => { con
 
 function setupMainMenuListeners() {
     document.getElementById('book-btn').addEventListener('click', () => { 
-        trackMenuClick('btn_book'); unsubscribeForNavigation(); 
-        dom.bookingDateInput.value = getFormattedDate(tomorrow); 
-        dom.dateValidationMessage.textContent = ''; 
-        dom.bookingSlotSelect.value = ''; 
-        const costPreview = document.getElementById('booking-cost-display');
-        const bookBtn = dom.bookSubmitBtn;
-        if(costPreview) costPreview.style.display = 'none';
-        if(bookBtn) {
-            const btnText = document.getElementById("book-text");
-            if(btnText) btnText.textContent = "Buchen";
-        }
-        
-        navigateTo(dom.bookingSection); 
-        dom.bookingDateInput.dispatchEvent(new Event('change')); 
+        trackMenuClick('btn_book'); unsubscribeForNavigation(); dom.bookingDateInput.value = getFormattedDate(tomorrow); dom.dateValidationMessage.textContent = ''; dom.bookingSlotSelect.value = ''; const costPreview = document.getElementById('booking-cost-display'); const bookBtn = dom.bookSubmitBtn; if(costPreview) costPreview.style.display = 'none'; if(bookBtn) { const btnText = document.getElementById("book-text"); if(btnText) btnText.textContent = "Buchen"; } navigateTo(dom.bookingSection); dom.bookingDateInput.dispatchEvent(new Event('change')); 
     });
     document.getElementById('overview-btn').addEventListener('click', () => { trackMenuClick('btn_week'); unsubscribeForNavigation(); setupWeekDropdown(); loadBookingsForWeek(dom.kwSelect.value, setUnsubscriber); navigateTo(dom.overviewSection); });
     document.getElementById('calendar-btn').addEventListener('click', () => { trackMenuClick('btn_calendar'); unsubscribeForNavigation(); dom.calendarDayActions.style.display = 'none'; setSelectedCalendarDate(null); const now = new Date(); loadBookingsForMonth(now.getFullYear(), now.getMonth(), setUnsubscriber); navigateTo(dom.calendarSection); });
     
-    // DYNAMIC IMPORT ADMIN
     let adminInitialized = false;
     document.getElementById('admin-btn').addEventListener('click', async () => { 
         unsubscribeForNavigation(); 
@@ -651,97 +439,35 @@ function setupMainMenuListeners() {
 
     document.getElementById('profile-btn').addEventListener('click', () => { unsubscribeForNavigation(); loadProfileData(); navigateTo(dom.profileSection); });
     
-    // DYNAMIC IMPORT MINIGAME
-    const minigameBtn = document.getElementById('minigame-btn'); if (minigameBtn) { minigameBtn.addEventListener('click', async () => { 
-        trackMenuClick('btn_minigame'); unsubscribeForNavigation(); 
-        const { initMinigame } = await import('./services/minigame.js');
-        initMinigame(); 
-        navigateTo(dom.minigameSection); 
-    }); }
-    
+    const minigameBtn = document.getElementById('minigame-btn'); if (minigameBtn) { minigameBtn.addEventListener('click', async () => { trackMenuClick('btn_minigame'); unsubscribeForNavigation(); const { initMinigame } = await import('./services/minigame.js'); initMinigame(); navigateTo(dom.minigameSection); }); }
     const backGameBtn = document.getElementById('back-to-menu-btn-game'); if (backGameBtn) { backGameBtn.addEventListener('click', () => navigateTo(dom.mainMenu, 'back')); }
-    
-    // DYNAMIC IMPORT MAINTENANCE
     const reportBtn = document.getElementById('report-issue-btn'); if (reportBtn) { reportBtn.addEventListener('click', () => { const maintSec = document.getElementById('maintenanceSection'); if (maintSec) navigateTo(maintSec); }); }
     const maintBackBtn = document.getElementById('back-to-menu-btn-maint'); if (maintBackBtn) maintBackBtn.addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
     
     const submitMaintBtn = document.getElementById('submit-maintenance-btn'); 
     if (submitMaintBtn) { 
         submitMaintBtn.addEventListener('click', async () => { 
-            const reason = document.getElementById('maintenance-reason').value; 
-            const details = document.getElementById('maintenance-details').value; 
+            const reason = document.getElementById('maintenance-reason').value; const details = document.getElementById('maintenance-details').value; 
             submitMaintBtn.disabled = true; 
-            try { 
-                const { reportIssue } = await import('./services/maintenance.js');
-                await reportIssue(reason, details); 
-                showMessage('maintenance-message', 'Problem gemeldet! Der Admin wurde benachrichtigt.', 'success'); 
-                setTimeout(() => navigateTo(dom.mainMenu, 'back'), 2000); 
-            } catch(e) { 
-                showMessage('maintenance-message', 'Fehler beim Senden.', 'error'); 
-            } finally { 
-                submitMaintBtn.disabled = false; 
-            } 
+            try { const { reportIssue } = await import('./services/maintenance.js'); await reportIssue(reason, details); showMessage('maintenance-message', 'Problem gemeldet! Der Admin wurde benachrichtigt.', 'success'); setTimeout(() => navigateTo(dom.mainMenu, 'back'), 2000); } 
+            catch(e) { showMessage('maintenance-message', 'Fehler beim Senden.', 'error'); } finally { submitMaintBtn.disabled = false; } 
         }); 
     }
 }
 
-// ===== UPDATE: Live-Update der Kostenanzeige & Button-Text (INKL. ECO) =====
 async function updateBookingCostPreview() {
-    const dateStr = dom.bookingDateInput.value;
-    const slot = dom.bookingSlotSelect.value;
-    const displayBox = document.getElementById('booking-cost-display');
-    const textEl = document.getElementById('cost-value-text');
-    const bookBtnText = document.getElementById('book-text');
-
-    if (!dateStr) {
-        if(displayBox) displayBox.style.display = 'none';
-        if(bookBtnText) bookBtnText.textContent = "Buchen";
-        return;
-    }
-
+    const dateStr = dom.bookingDateInput.value; const slot = dom.bookingSlotSelect.value; const displayBox = document.getElementById('booking-cost-display'); const textEl = document.getElementById('cost-value-text'); const bookBtnText = document.getElementById('book-text');
+    if (!dateStr) { if(displayBox) displayBox.style.display = 'none'; if(bookBtnText) bookBtnText.textContent = "Buchen"; return; }
     const isEco = await isEcoDay(dateStr);
-    
-    let cost;
-    let label;
-    let color;
-    let bgColor;
-
-    if (isEco) {
-        cost = Math.abs(COST_SLOT_ECO);
-        label = "🌱 Eco-Tarif (Sonnig)";
-        color = 'var(--success-color)';
-        bgColor = 'rgba(52, 199, 89, 0.1)';
-    } else {
-        const dateObj = new Date(dateStr);
-        const isWeekend = (dateObj.getDay() === 0 || dateObj.getDay() === 6);
-        if (isWeekend) {
-            cost = Math.abs(COST_SLOT_PRIME);
-            label = "🔥 Wochenende";
-            color = 'var(--error-color)';
-            bgColor = 'rgba(255, 59, 48, 0.1)';
-        } else {
-            cost = Math.abs(COST_SLOT_NORMAL);
-            label = "Werktag";
-            color = 'var(--primary-color)';
-            bgColor = 'rgba(0, 122, 255, 0.1)';
-        }
-    }
-    
-    if (displayBox && textEl) {
-        displayBox.style.display = 'block';
-        displayBox.style.borderColor = color;
-        displayBox.style.background = bgColor;
-        textEl.innerHTML = `<span style="color: ${color};">-${cost} Karma</span> (${label})`;
-    }
-
-    if(bookBtnText) {
-        bookBtnText.textContent = `Buchen (-${cost} Karma)`;
-    }
+    let cost, label, color, bgColor;
+    if (isEco) { cost = Math.abs(COST_SLOT_ECO); label = "🌱 Eco-Tarif (Sonnig)"; color = 'var(--success-color)'; bgColor = 'rgba(52, 199, 89, 0.1)'; } 
+    else { const dateObj = new Date(dateStr); const isWeekend = (dateObj.getDay() === 0 || dateObj.getDay() === 6); if (isWeekend) { cost = Math.abs(COST_SLOT_PRIME); label = "🔥 Wochenende"; color = 'var(--error-color)'; bgColor = 'rgba(255, 59, 48, 0.1)'; } else { cost = Math.abs(COST_SLOT_NORMAL); label = "Werktag"; color = 'var(--primary-color)'; bgColor = 'rgba(0, 122, 255, 0.1)'; } }
+    if (displayBox && textEl) { displayBox.style.display = 'block'; displayBox.style.borderColor = color; displayBox.style.background = bgColor; textEl.innerHTML = `<span style="color: ${color};">-${cost} Karma</span> (${label})`; }
+    if(bookBtnText) { bookBtnText.textContent = `Buchen (-${cost} Karma)`; }
 }
-// ===========================================================================
 
 document.getElementById('back-to-menu-btn-1').addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
-dom.bookSubmitBtn.addEventListener("click", async () => { const date = dom.bookingDateInput.value; const slot = dom.bookingSlotSelect.value; const button = dom.bookSubmitBtn; const bookText = document.getElementById("book-text"); const bookIcon = document.getElementById("book-success-icon"); const originalText = bookText ? bookText.textContent : "Buchen"; button.disabled = true; if (bookText) bookText.textContent = "Buche..."; if (bookIcon) bookIcon.style.display = 'none'; let success = false; try { success = await performBooking(date, slot, 'booking-error'); } catch (e) { console.error(e); showMessage('booking-error', 'Ein unerwarteter Fehler ist aufgetreten.', 'error'); success = false; } finally { if (success) { button.classList.add('booking-success'); if(bookText) bookText.style.display = 'none'; if(bookIcon) bookIcon.style.display = 'block'; setTimeout(() => { button.classList.remove('booking-success'); if(bookIcon) bookIcon.style.display = 'none'; if(bookText) { bookText.style.display = 'block'; bookText.textContent = "Buchen"; } button.disabled = false; dom.bookingDateInput.dispatchEvent(new Event('change')); }, 2000); } else { if(bookText) bookText.textContent = "Buchen"; button.disabled = false; } } });
+dom.bookSubmitBtn.addEventListener("click", async () => { const date = dom.bookingDateInput.value; const slot = dom.bookingSlotSelect.value; const button = dom.bookSubmitBtn; const bookText = document.getElementById("book-text"); const bookIcon = document.getElementById("book-success-icon"); button.disabled = true; if (bookText) bookText.textContent = "Buche..."; if (bookIcon) bookIcon.style.display = 'none'; let success = false; try { success = await performBooking(date, slot, 'booking-error'); } catch (e) { console.error(e); showMessage('booking-error', 'Ein unerwarteter Fehler ist aufgetreten.', 'error'); success = false; } finally { if (success) { button.classList.add('booking-success'); if(bookText) bookText.style.display = 'none'; if(bookIcon) bookIcon.style.display = 'block'; setTimeout(() => { button.classList.remove('booking-success'); if(bookIcon) bookIcon.style.display = 'none'; if(bookText) { bookText.style.display = 'block'; bookText.textContent = "Buchen"; } button.disabled = false; dom.bookingDateInput.dispatchEvent(new Event('change')); }, 2000); } else { if(bookText) bookText.textContent = "Buchen"; button.disabled = false; } } });
 
 dom.bookingDateInput.addEventListener('change', async () => { 
     updateBookingCostPreview(); 
@@ -749,7 +475,6 @@ dom.bookingDateInput.addEventListener('change', async () => {
 });
 
 dom.bookingSlotSelect.addEventListener('change', updateBookingCostPreview);
-
 dom.bookingDateInput.setAttribute('min', getFormattedDate(today)); dom.bookingDateInput.value = getFormattedDate(tomorrow);
 document.getElementById('confirm-cancel').addEventListener('click', hideConfirmation);
 dom.cancelDeleteAccountBtn.addEventListener('click', () => { dom.deleteAccountModal.style.display = 'none'; dom.deleteAccountPasswordInput.value = ''; showMessage('delete-account-message', '', 'error'); });

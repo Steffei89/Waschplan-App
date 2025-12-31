@@ -2,7 +2,7 @@
 
 // Der Einladungscode wurde entfernt und in die Sicherheitsregeln verschoben.
 
-export const APP_VERSION = "3.2.0"; 
+export const APP_VERSION = "3.4.0"; 
 
 // ===== Wasch-Karma Einstellungen =====
 export const KARMA_START = 100;       

@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script> 
-<link rel="stylesheet" href="style.css?v=fix_ios_v2">
+<link rel="stylesheet" href="style.css?v=ios_menu_final">
 </head>
 <body>
 
@@ -74,7 +74,7 @@
     <button id="login-btn">Einloggen</button>
     <p id="switch-register">Noch nicht registriert? <span id="show-register" class="clickable">Registrieren</span></p>
     <p style="text-align: center; margin-top: 10px;" class="small-text"><span id="show-reset-password" class="clickable">Passwort vergessen?</span></p>
-    <div class="app-version">Version 3.2.1</div>
+    <div class="app-version">Version 3.3.1</div>
   </div>
 
   <div id="registerForm" class="card" style="display:none;">
@@ -86,9 +86,18 @@
       <input type="password" id="register-password-confirm" minlength="6" placeholder="Passwort bestätigen" required>
       <input type="text" id="register-invite-code" placeholder="Einladungscode" required>
     </div>
+    <div id="partei-selection-wrapper" class="hidden">
+       <p class="small-text">Bitte wähle deine Partei:</p>
+       <select id="register-partei-select">
+           <option value="" disabled selected>-- Wählen --</option>
+           <option value="Micha & Stefan">Micha & Stefan</option>
+           <option value="Sarah & Florian">Sarah & Florian</option>
+           <option value="Christa & Uli">Christa & Uli</option>
+       </select>
+    </div>
     <button id="register-btn">Registrieren</button>
     <p id="switch-login">Bereits registriert? <span id="show-login" class="clickable">Login</span></p>
-    <div class="app-version">Version 3.2.1</div>
+    <div class="app-version">Version 3.3.1</div>
   </div>
 
   <div id="verifyEmailMessage" class="card" style="display:none;">
@@ -259,160 +268,7 @@
     <h2>Admin-Konsole</h2>
     <div id="admin-message" class="message-box" style="display:none;"></div>
     
-    <details class="admin-group">
-        <summary>🧪 Test-Labor & Debug</summary>
-        <div class="admin-content">
-            <p class="small-text">Simulation von Zuständen für dich (Admin).</p>
-            <div style="display:flex; flex-direction:column; gap:8px;">
-                <button id="debug-create-booking-btn" class="button-secondary">📅 Buchung für HEUTE erzwingen</button>
-                <button id="debug-force-checkin-btn" class="button-secondary">📱 Check-in erzwingen (ohne Scan)</button>
-                <button id="debug-kill-timer-btn" class="button-danger">⏱️ Timer Killen (Löschen)</button>
-                <button id="debug-reset-status-btn" class="button-danger">🔄 Status komplett Reset (Auschecken)</button>
-            </div>
-        </div>
-    </details>
-
-    <details class="admin-group">
-        <summary>Status & Meldungen</summary>
-        <div class="admin-content">
-            <div id="admin-maintenance-controls" style="margin-bottom: 15px; padding: 10px; border: 1px solid var(--error-color); border-radius: 8px; background: rgba(255, 0, 0, 0.05);">
-                <h3 style="color: var(--error-color); margin-top:0; font-size:1em;">🛠️ Technik-Status</h3>
-                <p id="system-status-display">Status: <strong>Lade...</strong></p>
-                <button id="toggle-maintenance-btn" class="button-small button-danger">Wartungsmodus aktivieren</button>
-            </div>
-            <h4 style="margin-top:0;">📩 Offene Tickets</h4>
-            <div id="admin-tickets-container">Lade...</div>
-        </div>
-    </details>
-
-    <details class="admin-group">
-        <summary>Konfiguration (Wetter & QR)</summary>
-        <div class="admin-content">
-            <label>PLZ für Wetter:</label>
-            <div class="input-group" style="display:flex; gap:10px;">
-                <input type="text" id="weather-plz-input" placeholder="z.B. 83471" style="margin-bottom:0;">
-                <button id="save-weather-plz-btn" class="button-secondary" style="width:auto; margin-bottom:0;">Speichern</button>
-            </div>
-            <hr style="margin:15px 0;">
-            <h4 style="margin-top:0;">📱 QR-Code</h4>
-            <p class="small-text">Code für Check-in an der Maschine:</p>
-            <div class="input-group" style="display:flex; gap:10px; align-items:center;">
-                <input type="text" id="qr-secret-input" value="WASCH-START" placeholder="Code" style="margin-bottom:0;">
-                <button id="generate-qr-btn" class="button-primary" style="width:auto; margin-bottom:0;">Generieren</button>
-            </div>
-            <div id="qr-code-display" style="margin-top:15px; text-align:center; display:none;">
-                <img id="qr-image" src="" alt="QR Code" style="border:5px solid white; border-radius:4px;">
-                <p class="small-text">Code: <strong id="qr-code-text-display"></strong></p>
-            </div>
-            <hr style="margin:15px 0;">
-            <button class="button-danger" id="global-karma-reset-btn"><i class="fa-solid fa-rotate-right"></i> Karma Reset (Alle)</button>
-        </div>
-    </details>
-
-    <details class="admin-group">
-        <summary>Waschprogramme</summary>
-        <div class="admin-content">
-            <div class="input-group" style="display: flex; gap: 10px;">
-                <input type="text" id="program-name-input" placeholder="Name" style="flex-grow: 1; margin-bottom: 0;">
-                <input type="number" id="program-duration-input" placeholder="Min" style="width: 80px; margin-bottom: 0;">
-            </div>
-            <button id="add-program-btn" class="button-secondary" style="margin-top:10px;">Hinzufügen</button>
-            <div id="program-list-container" style="margin-top:15px;"></div>
-        </div>
-    </details>
-
-    <details class="admin-group">
-        <summary>Benutzerverwaltung</summary>
-        <div class="admin-content">
-            <div id="user-list-container"></div>
-        </div>
-    </details>
-
-    <details class="admin-group">
-        <summary>Statistiken & Analysen</summary>
-        <div class="admin-content">
-            <div id="stats-message" class="message-box" style="display:none;"></div>
-            <label for="stats-filter" class="small-text" style="margin-bottom: 5px; display: block;">Zeitraum:</label>
-            <select id="stats-filter" style="margin-bottom: 20px;">
-                <option value="all">Gesamte Zeit</option>
-                <option value="ytd">Dieses Jahr</option>
-                <option value="6m">Letzte 6 Monate</option>
-                <option value="30d">Letzte 30 Tage</option>
-            </select>
-
-            <div class="mt-15" style="margin-bottom: 30px;">
-                <h3>Aktueller Karma-Stand</h3>
-                <p class="small-text" style="text-align: center; margin-top: -10px; margin-bottom: 10px;">(Zielwert: 100 Punkte)</p>
-                <div class="chart-container"><canvas id="karmaChart"></canvas></div>
-            </div>
-
-            <div class="kpi-grid" id="stats-kpi-grid">
-                <div class="kpi-item"><span class="kpi-value" id="kpi-total-bookings">--</span><span class="kpi-label">Buchungen</span></div>
-                <div class="kpi-item"><span class="kpi-value" id="kpi-most-active">--</span><span class="kpi-label">Fleißigste Partei</span></div>
-                <div class="kpi-item"><span class="kpi-value" id="kpi-most-popular-day">--</span><span class="kpi-label">Beliebtester Tag</span></div>
-            </div>
-
-            <div id="advanced-stats-container" style="display: none;">
-                <hr style="margin: 30px 0; border-color: var(--primary-color-transparent);">
-                <div id="stats-heatmap-wrapper" style="display: none;">
-                    <h3>🔥 Auslastungs-Heatmap</h3>
-                    <p class="small-text" style="text-align: center;">Je dunkler, desto beliebter.</p>
-                    <div id="heatmap-container" style="overflow-x: auto; margin-bottom: 30px;"></div>
-                </div>
-                <div id="stats-user-lists-wrapper" style="display: none;">
-                    <h3>😇 Ruhm & 😈 Scham</h3>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                        <div class="kpi-item" style="text-align: left;">
-                            <h4 style="margin: 0 0 10px 0; font-size: 0.9em; color: var(--success-color);">🏆 Top Wäscher</h4>
-                            <div id="list-top-washers" class="small-text">Lade...</div>
-                        </div>
-                        <div class="kpi-item" style="text-align: left;">
-                            <h4 style="margin: 0 0 10px 0; font-size: 0.9em; color: var(--primary-color);">📱 App-Suchti</h4>
-                            <div id="list-top-users" class="small-text">Lade...</div>
-                        </div>
-                    </div>
-                    <div class="kpi-item" style="text-align: left; margin-top: 10px;">
-                         <h4 style="margin: 0 0 10px 0; font-size: 0.9em; color: #FF9500;">🎮 Minigame Profis</h4>
-                         <div id="list-top-gamers" class="small-text">Lade...</div>
-                    </div>
-                </div>
-                <div id="stats-game-balancing-wrapper" style="display: none;">
-                    <h3 style="margin-top: 30px;">🎮 Game Balancing</h3>
-                    <p class="small-text" style="text-align: center;">Score vs. Spieldauer (Sekunden)</p>
-                    <div class="chart-container">
-                         <canvas id="gameBalancingChart"></canvas>
-                    </div>
-                </div>
-            </div>
-            <hr style="margin: 30px 0;">
-            <div class="mt-15">
-                <h3>Buchungen pro Partei</h3>
-                <div class="chart-container"><canvas id="parteiChart"></canvas></div>
-            </div>
-            <div class="mt-15">
-                <h3>Auslastung nach Slot</h3>
-                <div class="chart-container"><canvas id="slotChart"></canvas></div>
-                <div id="slot-stats-text" class="small-text mt-10"></div>
-            </div>
-            <div class="mt-15">
-                <h3>Buchungs-Trend (pro Monat)</h3>
-                <div class="chart-container"><canvas id="bookingsOverTimeChart"></canvas></div>
-            </div>
-            <div class="mt-15">
-                <h3>Auslastung nach Wochentag</h3>
-                <div class="chart-container"><canvas id="dayOfWeekChart"></canvas></div>
-            </div>
-        </div>
-    </details>
-    
-    <details class="admin-group">
-        <summary>Minigame Verwaltung</summary>
-        <div class="admin-content">
-            <button id="reset-minigame-btn" class="button-danger" style="margin-bottom: 15px;"><i class="fa-solid fa-rotate-left"></i> Gesamte Rangliste zurücksetzen</button>
-            <h4 style="margin-top: 0;">Aktuelle Highscores:</h4>
-            <div id="minigame-admin-list">Lade...</div>
-        </div>
-    </details>
+    <div id="admin-ui-wrapper" style="margin-top: 15px;"></div>
   </div>
 
   <div id="profileSection" class="card" style="display:none;">
@@ -429,7 +285,7 @@
     <button id="show-changelog-btn" class="button-secondary"><i class="fa-solid fa-gift"></i> Letzte Änderungen anzeigen</button>
     <hr style="margin-top: 25px;">
     <button id="delete-account-btn" class="button-danger">Konto löschen</button>
-    <div class="app-version">Version 3.2.1</div>
+    <div class="app-version">Version 3.3.1</div>
   </div>
 
   <div id="confirmationModal" class="modal" style="display:none;">

@@ -4,11 +4,11 @@ import {
 import { 
     KARMA_START, KARMA_MAX, KARMA_REGEN_AMOUNT, KARMA_REGEN_INTERVAL,
     COST_SLOT_NORMAL, COST_SLOT_PRIME, LIMIT_VIP, LIMIT_LOW,
-    GAME_POINTS_TO_KARMA_RATIO, MAX_KARMA_REWARD_PER_GAME, MAX_MINIGAME_KARMA_PER_WEEK // Neu importiert
+    GAME_POINTS_TO_KARMA_RATIO, MAX_KARMA_REWARD_PER_GAME, MAX_MINIGAME_KARMA_PER_WEEK 
 } from '../config.js';
 import { showMessage } from '../ui.js';
 import { getState } from '../state.js';
-import { getWeekNumber } from '../utils.js'; // Import für Wochenberechnung
+import { getWeekNumber } from '../utils.js'; 
 
 /**
  * Gibt den aktuellen Karma-Stand und den Status zurück.
@@ -53,7 +53,7 @@ export async function initKarmaForParty(parteiName) {
         await setDoc(partyRef, {
             karma: initialKarma,
             last_karma_update: Timestamp.now(),
-            minigame_earned_this_week: 0, // Neu initialisieren
+            minigame_earned_this_week: 0, 
             minigame_last_played_week: ""
         });
         return;
@@ -115,6 +115,14 @@ export async function checkBookingPermission(dateStr, slot) {
     const { currentUser } = getState();
     if (!currentUser) return { allowed: false, error: "Nicht eingeloggt" };
     
+    // --- NEU: Prüfen ob das System global aktiv ist ---
+    const settingsSnap = await getDoc(doc(db, 'app_settings', 'config'));
+    let karmaSystemActive = true; 
+    if (settingsSnap.exists() && settingsSnap.data().karmaSystemActive === false) {
+        karmaSystemActive = false;
+    }
+    // -------------------------------------------------
+
     const parteiName = currentUser.userData.partei;
     const karma = await getPartyKarma(parteiName);
     const { weeks, canPrime } = getKarmaStatus(karma);
@@ -123,6 +131,16 @@ export async function checkBookingPermission(dateStr, slot) {
     const today = new Date();
     today.setHours(0,0,0,0);
     
+    const isWeekend = (bookingDate.getDay() === 0 || bookingDate.getDay() === 6);
+    const cost = isWeekend ? COST_SLOT_PRIME : COST_SLOT_NORMAL;
+
+    // --- BYPASS LOGIK WENN SYSTEM INAKTIV ---
+    if (!karmaSystemActive) {
+        // Wir erlauben ALLES, geben aber die Kosten zurück, damit sie im Hintergrund abgezogen werden
+        return { allowed: true, cost: cost };
+    }
+    // ----------------------------------------
+
     const diffTime = Math.abs(bookingDate - today);
     const diffWeeks = Math.ceil(diffTime / (1000 * 60 * 60 * 24 * 7)); 
 
@@ -130,7 +148,6 @@ export async function checkBookingPermission(dateStr, slot) {
         return { allowed: false, error: `Euer Partei-Karma erlaubt Buchungen nur ${weeks} Woche(n) im Voraus.` };
     }
 
-    const isWeekend = (bookingDate.getDay() === 0 || bookingDate.getDay() === 6);
     if (isWeekend && !canPrime) {
         const diffHours = (bookingDate - new Date()) / (1000 * 60 * 60);
         if (diffHours > 24) {
@@ -138,7 +155,6 @@ export async function checkBookingPermission(dateStr, slot) {
         }
     }
 
-    const cost = isWeekend ? COST_SLOT_PRIME : COST_SLOT_NORMAL;
     if (karma + cost < 0) { 
         return { allowed: false, error: `Nicht genug Karma-Punkte (${karma}). Benötigt: ${Math.abs(cost)}.` };
     }

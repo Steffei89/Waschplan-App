@@ -143,9 +143,12 @@ export async function loadProfileData() {
     if (currentUser) {
         dom.profileEmail.textContent = currentUser.userData.email;
         dom.profilePartei.textContent = currentUser.userData.partei;
-        const karma = await getPartyKarma(currentUser.userData.partei);
-        const { label, status, weeks } = getKarmaStatus(karma);
         
+        // --- NEU: Check ob System aktiv ist ---
+        const settingsSnap = await getDoc(getSettingsDocRef());
+        const karmaActive = settingsSnap.exists() ? (settingsSnap.data().karmaSystemActive !== false) : true;
+        // --------------------------------------
+
         let karmaContainer = document.getElementById('profile-karma-container');
         if (!karmaContainer) {
             karmaContainer = document.createElement('div');
@@ -153,96 +156,111 @@ export async function loadProfileData() {
             karmaContainer.style.marginBottom = '20px'; karmaContainer.style.padding = '10px'; karmaContainer.style.backgroundColor = 'var(--primary-color-light)'; karmaContainer.style.borderRadius = '8px'; karmaContainer.style.border = '1px solid var(--primary-color)';
             dom.profilePartei.parentElement.after(karmaContainer);
         }
-        let statusColor = status === 'VIP' ? '#34c759' : (status === 'Eingeschränkt' ? '#ff3b30' : 'var(--text-color)');
-        
-        karmaContainer.innerHTML = `
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div>
-                    <p style="margin:0; font-size:1.1em;"><strong>Karma:</strong> ${karma}</p>
-                    <p style="margin:5px 0; font-size:0.9em; color:${statusColor}">Status: <strong>${label}</strong></p>
+
+        // --- ENTSCHEIDUNG: ANZEIGEN ODER VERSTECKEN ---
+        if (karmaActive) {
+            karmaContainer.style.display = 'block';
+            const karma = await getPartyKarma(currentUser.userData.partei);
+            const { label, status, weeks } = getKarmaStatus(karma);
+            
+            let statusColor = status === 'VIP' ? '#34c759' : (status === 'Eingeschränkt' ? '#ff3b30' : 'var(--text-color)');
+            
+            karmaContainer.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <p style="margin:0; font-size:1.1em;"><strong>Karma:</strong> ${karma}</p>
+                        <p style="margin:5px 0; font-size:0.9em; color:${statusColor}">Status: <strong>${label}</strong></p>
+                    </div>
+                    <button class="button-small button-secondary" id="profile-karma-help-btn" style="width:auto; margin:0;"><i class="fa-solid fa-circle-question"></i> Regeln</button>
                 </div>
-                <button class="button-small button-secondary" id="profile-karma-help-btn" style="width:auto; margin:0;"><i class="fa-solid fa-circle-question"></i> Regeln</button>
-            </div>
-        `;
-        
-        const helpBtn = document.getElementById('profile-karma-help-btn');
-        if(helpBtn) {
-            helpBtn.onclick = () => {
-                const modal = document.getElementById('karmaGuideModal');
-                const closeBtn = document.getElementById('close-karma-guide-btn');
-                if(modal) {
-                    modal.style.display = 'flex';
-                    if(closeBtn) closeBtn.onclick = () => modal.style.display = 'none';
-                }
-            };
-        }
-        
-        // --- KARMA BILANZ BOX ---
-        let billContainer = document.getElementById('profile-karma-bill');
-        if (!billContainer) {
-            billContainer = document.createElement('div');
-            billContainer.id = 'profile-karma-bill';
-            billContainer.style.marginTop = '15px';
-            billContainer.style.marginBottom = '20px';
-            billContainer.style.padding = '15px';
-            billContainer.style.backgroundColor = 'var(--secondary-color)';
-            billContainer.style.borderRadius = '12px';
-            billContainer.style.border = '1px solid var(--border-color)';
-            karmaContainer.after(billContainer);
-        }
-        
-        billContainer.innerHTML = '<p class="small-text"><i class="fa-solid fa-spinner fa-spin"></i> Lade Bilanz...</p>';
-        
-        const bill = await getDetailedKarmaBill(currentUser.userData.partei);
-        
-        const renderRow = (item) => `
-            <div style="display:flex; justify-content:space-between; font-size:0.85em; margin-bottom:3px;">
-                <span>${item.date} (${item.slot})</span>
-                <span style="color:${item.val >= 0 ? 'var(--success-color)' : 'var(--error-color)'};">${item.val > 0 ? '+' : ''}${item.val} ${item.note}</span>
-            </div>`;
-
-        let pastHtml = bill.past.length ? bill.past.map(renderRow).join('') : '<span class="small-text" style="opacity:0.5;">Keine.</span>';
-        let futureHtml = bill.future.length ? bill.future.map(renderRow).join('') : '<span class="small-text" style="opacity:0.5;">Keine.</span>';
-
-        // GAP CLOSER: Berechnen ob Differenz besteht
-        const calculatedTotal = 100 + bill.minigame + bill.totalCost;
-        const diff = karma - calculatedTotal;
-        
-        let adjustmentRow = '';
-        if (diff !== 0) {
-            adjustmentRow = `
-            <div style="display:flex; justify-content:space-between; font-size:0.9em; font-weight:bold; margin-bottom:10px; border-bottom:1px dashed #ccc; padding-bottom:5px;">
-                <span>Historische Anpassung / Sonstiges:</span>
-                <span style="color:${diff >= 0 ? 'var(--success-color)' : 'var(--error-color)'};">${diff > 0 ? '+' : ''}${diff}</span>
-            </div>`;
-        }
-
-        billContainer.innerHTML = `
-            <h3 style="margin-top:0; font-size:1.1em; border-bottom:1px solid var(--border-color); padding-bottom:5px;">Deine Karma-Bilanz 🧾</h3>
+            `;
             
-            <div style="display:flex; justify-content:space-between; font-size:0.9em; font-weight:bold; margin-bottom:5px;">
-                <span>Startguthaben:</span>
-                <span style="color:var(--success-color);">100</span>
-            </div>
-            <div style="display:flex; justify-content:space-between; font-size:0.9em; font-weight:bold; margin-bottom:10px; border-bottom:1px dashed #ccc; padding-bottom:5px;">
-                <span>Minigame (Woche):</span>
-                <span style="color:var(--success-color);">+${bill.minigame}</span>
-            </div>
-
-            <strong style="font-size:0.9em; opacity:0.8;">Geplant (Zukunft):</strong>
-            <div style="margin-bottom:10px; padding-left:5px;">${futureHtml}</div>
-
-            <strong style="font-size:0.9em; opacity:0.8;">Verlauf (Vergangenheit):</strong>
-            <div style="margin-bottom:10px; padding-left:5px;">${pastHtml}</div>
+            const helpBtn = document.getElementById('profile-karma-help-btn');
+            if(helpBtn) {
+                helpBtn.onclick = () => {
+                    const modal = document.getElementById('karmaGuideModal');
+                    const closeBtn = document.getElementById('close-karma-guide-btn');
+                    if(modal) {
+                        modal.style.display = 'flex';
+                        if(closeBtn) closeBtn.onclick = () => modal.style.display = 'none';
+                    }
+                };
+            }
             
-            ${adjustmentRow}
+            // --- KARMA BILANZ BOX (NUR WENN AKTIV) ---
+            let billContainer = document.getElementById('profile-karma-bill');
+            if (!billContainer) {
+                billContainer = document.createElement('div');
+                billContainer.id = 'profile-karma-bill';
+                billContainer.style.marginTop = '15px';
+                billContainer.style.marginBottom = '20px';
+                billContainer.style.padding = '15px';
+                billContainer.style.backgroundColor = 'var(--secondary-color)';
+                billContainer.style.borderRadius = '12px';
+                billContainer.style.border = '1px solid var(--border-color)';
+                karmaContainer.after(billContainer);
+            }
+            billContainer.style.display = 'block';
             
-            <div style="display:flex; justify-content:space-between; font-weight:bold; margin-top:10px; border-top:2px solid var(--text-color); padding-top:5px; font-size:1.1em;">
-                <span>Ergebnis:</span>
-                <span>${karma}</span>
-            </div>
-        `;
-        // ------------------------
+            billContainer.innerHTML = '<p class="small-text"><i class="fa-solid fa-spinner fa-spin"></i> Lade Bilanz...</p>';
+            
+            const bill = await getDetailedKarmaBill(currentUser.userData.partei);
+            
+            const renderRow = (item) => `
+                <div style="display:flex; justify-content:space-between; font-size:0.85em; margin-bottom:3px;">
+                    <span>${item.date} (${item.slot})</span>
+                    <span style="color:${item.val >= 0 ? 'var(--success-color)' : 'var(--error-color)'};">${item.val > 0 ? '+' : ''}${item.val} ${item.note}</span>
+                </div>`;
+
+            let pastHtml = bill.past.length ? bill.past.map(renderRow).join('') : '<span class="small-text" style="opacity:0.5;">Keine.</span>';
+            let futureHtml = bill.future.length ? bill.future.map(renderRow).join('') : '<span class="small-text" style="opacity:0.5;">Keine.</span>';
+
+            // GAP CLOSER: Berechnen ob Differenz besteht
+            const calculatedTotal = 100 + bill.minigame + bill.totalCost;
+            const diff = karma - calculatedTotal;
+            
+            let adjustmentRow = '';
+            if (diff !== 0) {
+                adjustmentRow = `
+                <div style="display:flex; justify-content:space-between; font-size:0.9em; font-weight:bold; margin-bottom:10px; border-bottom:1px dashed #ccc; padding-bottom:5px;">
+                    <span>Historische Anpassung / Sonstiges:</span>
+                    <span style="color:${diff >= 0 ? 'var(--success-color)' : 'var(--error-color)'};">${diff > 0 ? '+' : ''}${diff}</span>
+                </div>`;
+            }
+
+            billContainer.innerHTML = `
+                <h3 style="margin-top:0; font-size:1.1em; border-bottom:1px solid var(--border-color); padding-bottom:5px;">Deine Karma-Bilanz 🧾</h3>
+                
+                <div style="display:flex; justify-content:space-between; font-size:0.9em; font-weight:bold; margin-bottom:5px;">
+                    <span>Startguthaben:</span>
+                    <span style="color:var(--success-color);">100</span>
+                </div>
+                <div style="display:flex; justify-content:space-between; font-size:0.9em; font-weight:bold; margin-bottom:10px; border-bottom:1px dashed #ccc; padding-bottom:5px;">
+                    <span>Minigame (Woche):</span>
+                    <span style="color:var(--success-color);">+${bill.minigame}</span>
+                </div>
+
+                <strong style="font-size:0.9em; opacity:0.8;">Geplant (Zukunft):</strong>
+                <div style="margin-bottom:10px; padding-left:5px;">${futureHtml}</div>
+
+                <strong style="font-size:0.9em; opacity:0.8;">Verlauf (Vergangenheit):</strong>
+                <div style="margin-bottom:10px; padding-left:5px;">${pastHtml}</div>
+                
+                ${adjustmentRow}
+                
+                <div style="display:flex; justify-content:space-between; font-weight:bold; margin-top:10px; border-top:2px solid var(--text-color); padding-top:5px; font-size:1.1em;">
+                    <span>Ergebnis:</span>
+                    <span>${karma}</span>
+                </div>
+            `;
+        } else {
+            // Wenn inaktiv, Container verstecken
+            karmaContainer.style.display = 'none';
+            // Und Bilanz Container auch verstecken falls vorhanden
+            let billContainer = document.getElementById('profile-karma-bill');
+            if (billContainer) billContainer.style.display = 'none';
+        }
+        // ---------------------------------------------
 
         let statsContainer = document.getElementById('profile-personal-stats');
         if (!statsContainer) {
@@ -254,7 +272,13 @@ export async function loadProfileData() {
             statsContainer.style.backgroundColor = 'var(--secondary-color)';
             statsContainer.style.borderRadius = '12px';
             statsContainer.style.border = '1px solid var(--border-color)';
-            billContainer.after(statsContainer);
+            // Insert position safe check
+            let reference = billContainer || karmaContainer;
+            if(reference && reference.parentNode) {
+                reference.after(statsContainer);
+            } else {
+                dom.profilePartei.parentElement.after(statsContainer);
+            }
         }
         
         statsContainer.innerHTML = '<p class="small-text">Lade Statistik...</p>';
