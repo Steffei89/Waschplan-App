@@ -3,23 +3,28 @@ import {
     getBookingsCollectionRef
 } from '../firebase.js';
 import * as dom from '../dom.js';
-import { navigateTo } from '../ui.js';
 import { getState } from '../state.js';
 import { formatDate, getWeekNumber, getMonday } from '../utils.js';
 import { performDeletion } from '../services/booking.js';
 import { handleSwapRequest } from '../services/swap.js';
-// NEU: Kosten importieren
 import { COST_SLOT_NORMAL, COST_SLOT_PRIME } from '../config.js';
 
 export function initOverviewView(unsubscriberSetter) {
-    dom.kwSelect.addEventListener('change', (e) => {
-        loadBookingsForWeek(e.target.value, unsubscriberSetter);
-    });
-    // Back Button mit 'back' Parameter
-    document.getElementById('back-to-menu-btn-2').addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
+    if (dom.kwSelect) {
+        dom.kwSelect.addEventListener('change', (e) => {
+            loadBookingsForWeek(e.target.value, unsubscriberSetter);
+        });
+    }
+    
+    // WICHTIG: Dropdown füllen und sofort laden!
+    setupWeekDropdown();
+    if (dom.kwSelect && dom.kwSelect.value) {
+        loadBookingsForWeek(dom.kwSelect.value, unsubscriberSetter);
+    }
 }
 
 export function setupWeekDropdown() {
+    if (!dom.kwSelect) return;
     dom.kwSelect.innerHTML = '';
     const numWeeks = 5;
     let current = new Date();
@@ -48,13 +53,12 @@ export async function loadBookingsForWeek(kwString, unsubscriberSetter) {
         unsubscribers.overview();
     }
     
-    // ===== SKELETON LOADING =====
-    dom.bookingsList.innerHTML = `
-        <div class="skeleton-item"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line short"></div></div>
-        <div class="skeleton-item"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line short"></div></div>
-        <div class="skeleton-item"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line short"></div></div>
-    `;
-    // ============================
+    if (dom.bookingsList) {
+        dom.bookingsList.innerHTML = `
+            <div class="skeleton-item"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line short"></div></div>
+            <div class="skeleton-item"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line short"></div></div>
+        `;
+    }
 
     const [yearStr, weekStr] = kwString.split('-W');
     const monday = getMonday(parseInt(yearStr), parseInt(weekStr));
@@ -63,7 +67,6 @@ export async function loadBookingsForWeek(kwString, unsubscriberSetter) {
     const startDate = formatDate(monday);
     const endDate = formatDate(sunday);
 
-    // Vorab-Check für Duplikate
     const myPartyBookedDates = new Set();
     const { currentUser } = getState();
     if (currentUser) {
@@ -90,6 +93,7 @@ export async function loadBookingsForWeek(kwString, unsubscriberSetter) {
     );
 
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
+        if (!dom.bookingsList) return;
         dom.bookingsList.innerHTML = '';
         const bookings = [];
         querySnapshot.forEach(docSnap => bookings.push({id: docSnap.id, ...docSnap.data()}));
@@ -137,8 +141,6 @@ export async function loadBookingsForWeek(kwString, unsubscriberSetter) {
                 const delBtn = document.createElement('button');
                 delBtn.className = 'button-small button-danger delete-overview-btn';
                 delBtn.textContent = 'Löschen';
-                delBtn.dataset.date = booking.date;
-                delBtn.dataset.slot = booking.slot;
                 
                 delBtn.onclick = async (e) => {
                     e.target.disabled = true;
@@ -152,7 +154,6 @@ export async function loadBookingsForWeek(kwString, unsubscriberSetter) {
                 const swapBtn = document.createElement('button');
                 swapBtn.className = `button-small ${hasDuplicate ? 'button-secondary' : 'button-primary'} swap-request-btn`;
                 
-                // NEU: Kosten berechnen
                 const dateObj = new Date(booking.date);
                 const isWeekend = (dateObj.getDay() === 0 || dateObj.getDay() === 6);
                 const cost = Math.abs(isWeekend ? COST_SLOT_PRIME : COST_SLOT_NORMAL);
@@ -190,7 +191,7 @@ export async function loadBookingsForWeek(kwString, unsubscriberSetter) {
         });
 
     }, (error) => {
-        dom.bookingsList.innerHTML = `<p class="small-text" style="color: var(--error-color);">Fehler beim Laden der Wochenbuchungen.</p>`;
+        if(dom.bookingsList) dom.bookingsList.innerHTML = `<p class="small-text" style="color: var(--error-color);">Fehler beim Laden der Wochenbuchungen.</p>`;
     });
     
     unsubscriberSetter('overview', unsubscribe);

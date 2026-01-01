@@ -9,39 +9,49 @@ import { formatDate } from '../utils.js';
 import { performBooking, performDeletion } from '../services/booking.js';
 import { handleSwapRequest } from '../services/swap.js';
 import { showMessage } from '../ui.js'; 
-// NEU: Kosten importieren
 import { COST_SLOT_NORMAL, COST_SLOT_PRIME } from '../config.js';
 
 let currentCalendarDate = new Date(); 
 
 export function initCalendarView(unsubscriberSetter) {
-    document.getElementById('prev-month-btn').addEventListener('click', () => {
-        currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
-        dom.calendarDayActions.style.display = 'none'; 
-        setSelectedCalendarDate(null);
-        loadBookingsForMonth(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth(), unsubscriberSetter);
-    });
+    // Navigation Button Listener
+    const prevBtn = document.getElementById('prev-month-btn');
+    const nextBtn = document.getElementById('next-month-btn');
 
-    document.getElementById('next-month-btn').addEventListener('click', () => {
-        currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
-        dom.calendarDayActions.style.display = 'none';
-        setSelectedCalendarDate(null);
-        loadBookingsForMonth(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth(), unsubscriberSetter);
-    });
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            currentCalendarDate.setMonth(currentCalendarDate.getMonth() - 1);
+            if(dom.calendarDayActions) dom.calendarDayActions.style.display = 'none'; 
+            setSelectedCalendarDate(null);
+            loadBookingsForMonth(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth(), unsubscriberSetter);
+        });
+    }
 
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            currentCalendarDate.setMonth(currentCalendarDate.getMonth() + 1);
+            if(dom.calendarDayActions) dom.calendarDayActions.style.display = 'none';
+            setSelectedCalendarDate(null);
+            loadBookingsForMonth(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth(), unsubscriberSetter);
+        });
+    }
+
+    // Action Buttons (Buchen, Löschen etc.)
     document.querySelectorAll('.calendar-action-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             await onCalendarActionClick(e);
         });
     });
 
-    document.getElementById('back-to-menu-btn-3').addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
+    // WICHTIG: Sofortiges Laden beim Start der App!
+    // (Das hat gefehlt, weshalb der Kalender erst leer war)
+    loadBookingsForMonth(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth(), unsubscriberSetter);
 }
 
 export function loadBookingsForMonth(year, monthIndex, unsubscriberSetter) {
     const unsubscribers = getUnsubscribers();
     if (unsubscribers && unsubscribers.calendar) {
-        unsubscribers.calendar();
+        unsubscribers.calendar(); // Alten Listener stoppen
     }
     
     const startOfMonth = new Date(year, monthIndex, 1);
@@ -49,6 +59,7 @@ export function loadBookingsForMonth(year, monthIndex, unsubscriberSetter) {
     const startDateString = formatDate(startOfMonth);
     const endDateString = formatDate(endOfMonth);
     
+    // Query erstellen
     const q = query(
         getBookingsCollectionRef(),
         where("date", ">=", startDateString), 
@@ -57,6 +68,7 @@ export function loadBookingsForMonth(year, monthIndex, unsubscriberSetter) {
         orderBy("slot")
     );
 
+    // Live-Listener starten
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const newBookings = {};
         querySnapshot.forEach(docSnap => {
@@ -71,6 +83,7 @@ export function loadBookingsForMonth(year, monthIndex, unsubscriberSetter) {
         setAllBookingsForMonth(newBookings);
         renderCalendar(year, monthIndex);
 
+        // Falls ein Tag ausgewählt war, Aktionen aktualisieren
         const { selectedCalendarDate } = getState();
         if (selectedCalendarDate) {
             updateCalendarDayActions(formatDate(selectedCalendarDate));
@@ -84,12 +97,16 @@ export function loadBookingsForMonth(year, monthIndex, unsubscriberSetter) {
 }
 
 function renderCalendar(year, monthIndex) {
+    if (!dom.calendarGrid) return;
+
     const todayFormatted = formatDate(new Date());
     const firstDayOfMonth = new Date(year, monthIndex, 1);
     const lastDayOfMonth = new Date(year, monthIndex + 1, 0);
     const daysInMonth = lastDayOfMonth.getDate();
     
-    dom.currentMonthDisplay.textContent = firstDayOfMonth.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+    if (dom.currentMonthDisplay) {
+        dom.currentMonthDisplay.textContent = firstDayOfMonth.toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+    }
     dom.calendarGrid.innerHTML = ''; 
     
     const dayNames = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"];
@@ -162,6 +179,7 @@ function renderCalendar(year, monthIndex) {
 }
 
 function renderCalendarLegend() {
+    if (!dom.parteiLegend) return;
     dom.parteiLegend.innerHTML = '';
     ALL_PARTEIEN.forEach(partei => {
         const item = document.createElement('div');
@@ -176,32 +194,32 @@ function renderCalendarLegend() {
 
 function updateCalendarDayActions(dateString) {
     const { currentUser, userIsAdmin, allBookingsForMonth } = getState();
-    if (!currentUser) return; 
+    if (!currentUser || !dom.calendarDayActions) return; 
     
-    dom.calendarActionMessage.style.display = 'none';
+    if(dom.calendarActionMessage) dom.calendarActionMessage.style.display = 'none';
     dom.calendarDayActions.style.display = 'block';
     
     const date = new Date(dateString + "T00:00:00");
-    dom.selectedDayTitle.textContent = `Aktionen für: ${date.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}`;
+    if(dom.selectedDayTitle) {
+        dom.selectedDayTitle.textContent = `Aktionen für: ${date.toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' })}`;
+    }
     
     const bookingsOnDay = allBookingsForMonth[dateString] || [];
     const todayFormatted = formatDate(new Date());
     const hasDuplicateOnThisDay = bookingsOnDay.some(b => b.partei === currentUser.userData.partei);
 
-    // NEU: Kosten berechnen
     const isWeekend = (date.getDay() === 0 || date.getDay() === 6);
     const cost = Math.abs(isWeekend ? COST_SLOT_PRIME : COST_SLOT_NORMAL);
 
-    const slots = [
-        { id: '07', slot: '07:00-13:00' },
-        { id: '13', slot: '13:00-19:00' }
-    ];
+    const slots = [ { id: '07', slot: '07:00-13:00' }, { id: '13', slot: '13:00-19:00' } ];
 
     slots.forEach(slotInfo => {
         const statusEl = document.getElementById(`slot-status-${slotInfo.id}`);
         const bookBtn = document.getElementById(`btn-book-${slotInfo.id}`);
         const deleteBtn = document.getElementById(`btn-delete-${slotInfo.id}`);
         const requestBtn = document.getElementById(`btn-request-${slotInfo.id}`); 
+
+        if(!statusEl) return;
 
         statusEl.className = '';
         bookBtn.style.display = 'none';
@@ -210,7 +228,6 @@ function updateCalendarDayActions(dateString) {
         requestBtn.disabled = false;
         requestBtn.title = '';
 
-        // NEU: Preis im Button
         bookBtn.textContent = `Buchen (-${cost} Karma)`;
         requestBtn.textContent = `Slot anfragen (-${cost} Karma)`;
 
@@ -293,33 +310,22 @@ async function onCalendarActionClick(e) {
     }
     
     if (action === 'book' || action === 'delete') {
-        
         if (success) {
             const successText = (action === 'book') ? 'Gebucht!' : 'Gelöscht!';
             button.textContent = successText;
-
             setTimeout(() => {
                 if (button) { 
                     button.disabled = false;
-                    // Kalender lädt sich eh neu, aber sicherheitshalber:
                     if(action === 'delete') button.textContent = originalText;
                 }
             }, 2000); 
-
         } else {
             button.disabled = false;
             button.textContent = originalText;
         }
-
     } else if (action === 'request') {
-        
         if (success) {
-            setTimeout(() => {
-                if(button) {
-                    button.disabled = false;
-                    button.textContent = originalText;
-                }
-            }, 3000);
+            setTimeout(() => { if(button) { button.disabled = false; button.textContent = originalText; } }, 3000);
         } else {
             button.disabled = false;
             button.textContent = originalText;

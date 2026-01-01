@@ -69,16 +69,29 @@ export const allSections = [
     document.getElementById('maintenanceSection') 
 ];
 
+// --- NAVIGATION DOCK LOGIK (mit Callback) ---
+export function initBottomNav(onTabChange) {
+    const navItems = document.querySelectorAll('.nav-item');
+    navItems.forEach(item => {
+        item.addEventListener('click', () => {
+            const targetId = item.dataset.target;
+            const targetEl = document.getElementById(targetId);
+            
+            navItems.forEach(n => n.classList.remove('active'));
+            item.classList.add('active');
+
+            if(targetEl) navigateTo(targetEl);
+            
+            // Callback ausführen (für Minigame Start)
+            if (onTabChange) onTabChange(targetId);
+        });
+    });
+}
+
 export function navigateTo(sectionElement, direction = 'forward') {
     document.documentElement.dataset.transition = direction;
-
-    if (document.startViewTransition) {
-        document.startViewTransition(() => {
-            performNavigation(sectionElement);
-        });
-    } else {
-        performNavigation(sectionElement);
-    }
+    if (document.startViewTransition) { document.startViewTransition(() => performNavigation(sectionElement)); } 
+    else { performNavigation(sectionElement); }
 }
 
 function performNavigation(sectionElement) {
@@ -97,24 +110,41 @@ function performNavigation(sectionElement) {
                        sectionElement === dom.verifyEmailMessage;
     
     const isGame = sectionElement === dom.minigameSection;
-    const isMainMenu = sectionElement === dom.mainMenu;
 
-    // Header Steuerung
+    // Header Steuerung (Im Spiel ausgeblendet)
     if (dom.headerContainer) {
         dom.headerContainer.style.display = isGame ? 'none' : 'flex';
-        
-        // INTELLIGENTER ZURÜCK BUTTON MOVE
-        const globalBackBtn = document.getElementById('global-back-btn');
-        if (globalBackBtn) {
-            // Wenn wir auf einer Unterseite sind (nicht MainMenu, nicht Auth, nicht Game)
-            if (currentUser && !isMainMenu && !isAuthPage && !isGame && sectionElement) {
-                // Button in den aktuellen Container oben einfügen (verschiebt ihn im DOM)
-                sectionElement.prepend(globalBackBtn);
-                globalBackBtn.style.display = 'flex';
-            } else {
-                // Ansonsten verstecken
-                globalBackBtn.style.display = 'none';
-            }
+    }
+
+    // --- DOCK STEUERUNG ---
+    const bottomNav = document.getElementById('bottom-nav');
+    if (bottomNav) {
+        if (currentUser && !isAuthPage) {
+            bottomNav.style.display = 'flex';
+            
+            const navItems = document.querySelectorAll('.nav-item');
+            navItems.forEach(item => {
+                if(item.dataset.target === sectionElement.id) {
+                    item.classList.add('active');
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        } else {
+            bottomNav.style.display = 'none';
+        }
+    }
+    
+    // --- BACK BUTTON ---
+    const isMainTab = ['mainMenu', 'calendarSection', 'profileSection', 'minigameSection'].includes(sectionElement.id);
+    const globalBackBtn = document.getElementById('global-back-btn');
+    
+    if (globalBackBtn) {
+        if (currentUser && !isAuthPage && !isMainTab) {
+            sectionElement.prepend(globalBackBtn);
+            globalBackBtn.style.display = 'flex';
+        } else {
+            globalBackBtn.style.display = 'none';
         }
     }
 
@@ -145,12 +175,15 @@ export function updateUserInfo(userData) {
     const { userIsAdmin } = getState();
     if (userData) {
         document.getElementById('current-username').textContent = userData.email || 'Unbekannt';
-        document.getElementById('current-role').textContent = userIsAdmin ? 'Administrator' : 'Nutzer';
-        document.getElementById('admin-btn').style.display = userIsAdmin ? 'block' : 'none';
+        document.getElementById('profile-email').textContent = userData.email || '';
+        document.getElementById('profile-partei').textContent = userData.partei || '';
+        
+        const adminBtn = document.getElementById('admin-btn');
+        if(adminBtn) adminBtn.style.display = userIsAdmin ? 'block' : 'none';
+
         const userTheme = userData.theme || 'light';
         setTheme(userTheme, false);
     } else {
-        document.getElementById('admin-btn').style.display = 'none';
         setTheme('light', false); 
     }
 }
@@ -239,22 +272,36 @@ export async function showChangelog() {
         const response = await fetch(`CHANGELOG.md?v=${Date.now()}`);
         if (!response.ok) throw new Error('Changelog nicht gefunden.');
         const text = await response.text();
-        const sections = text.split('## [');
-        if (sections.length < 2) throw new Error('Changelog-Format ungültig.');
-        let latestChanges = sections[1].split('## [')[0];
-        const lines = latestChanges.split('\n');
-        const version = lines[0].split(']')[0]; 
-        let htmlContent = `<h4>Version ${version}</h4><ul>`;
-        lines.slice(1).forEach(line => {
-            line = line.trim();
-            if (line.startsWith('###')) htmlContent += `</ul><h5>${line.replace('###', '').trim()}</h5><ul>`;
-            else if (line.startsWith('*')) htmlContent += `<li>${line.replace('*', '').trim()}</li>`;
-        });
-        htmlContent += '</ul>';
+        
+        let htmlContent = '';
+        
+        // Versuche zu parsen
+        try {
+            const sections = text.split('## [');
+            if (sections.length < 2) throw new Error("Format");
+            
+            let latestChanges = sections[1].split('## [')[0];
+            const lines = latestChanges.split('\n');
+            const version = lines[0].split(']')[0]; 
+            
+            htmlContent = `<h4>Version ${version}</h4><ul>`;
+            lines.slice(1).forEach(line => {
+                line = line.trim();
+                if (line.startsWith('###')) htmlContent += `</ul><h5>${line.replace('###', '').trim()}</h5><ul>`;
+                else if (line.startsWith('*')) htmlContent += `<li>${line.replace('*', '').trim()}</li>`;
+            });
+            htmlContent += '</ul>';
+        } catch(parseError) {
+            // Fallback: Einfach den Text anzeigen
+            htmlContent = `<pre style="white-space: pre-wrap; font-family: inherit;">${text}</pre>`;
+        }
+
         dom.changelogContent.innerHTML = htmlContent;
         dom.changelogModal.style.display = 'flex';
     } catch (e) {
         console.error("Fehler beim Anzeigen des Changelogs:", e);
+        dom.changelogContent.innerHTML = "<p>Konnte Neuheiten nicht laden.</p>";
+        dom.changelogModal.style.display = 'flex';
         localStorage.setItem('waschplan_version', APP_VERSION);
     }
 }

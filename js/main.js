@@ -1,35 +1,26 @@
-// js/main.js - Version 3.4.1 - Auto Update & Admin Back Fix
+// js/main.js - Version 3.5.0 (Complete Repair)
 
-// ===== INTELLIGENTER SERVICE WORKER (AUTO-UPDATE) =====
+// 1. Service Worker Update
 if ('serviceWorker' in navigator) {
   let refreshing = false;
-
-  // Wenn der SW sich aktualisiert hat, Seite neu laden
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!refreshing) {
-      refreshing = true;
-      window.location.reload();
-    }
+    if (!refreshing) { refreshing = true; window.location.reload(); }
   });
-
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').then((registration) => {
-      // Bei jedem Start explizit nach Updates suchen
-      registration.update();
-      console.log("Service Worker registriert, suche nach Updates...");
+    navigator.serviceWorker.register('/sw.js').then((reg) => {
+      reg.update();
     });
   });
 }
-// ======================================================
 
-import { auth, onAuthStateChanged, getDoc, getUserProfileDocRef, Timestamp, doc, onSnapshot, db, updateDoc } from './firebase.js';
+// 2. Imports
+import { auth, onAuthStateChanged, getDoc, getUserProfileDocRef, doc, onSnapshot, db, updateDoc } from './firebase.js';
 import * as dom from './dom.js';
-import { getState, setCurrentUser, setUnsubscriber, setSelectedCalendarDate, getIsRegistering } from './state.js';
+import { getState, setCurrentUser, setUnsubscriber, getIsRegistering } from './state.js';
 import { getFormattedDate, today, tomorrow, createAndDownloadIcsFile } from './utils.js';
 import { 
     showMessage, navigateTo, updateUserInfo, setTheme, unsubscribeAll, unsubscribeForNavigation,
-    hideConfirmation, updateSlotDropdownUI,
-    checkNotificationPermission, showChangelog
+    hideConfirmation, updateSlotDropdownUI, initBottomNav
 } from './ui.js';
 import { handleRegister, handleLogin, handleLogout, handlePasswordReset, handleDeleteAccount } from './services/auth.js';
 import { loadWeather, isEcoDay } from './services/weather.js'; 
@@ -50,6 +41,7 @@ import { initPushNotifications } from './services/push.js';
 import { initGestures } from './services/gestures.js';
 import { handleAdminBack } from './views/admin.js'; 
 
+// 3. Globale Variablen
 let allPrograms = []; 
 let currentTimerData = null; 
 let activeTimerInterval = null; 
@@ -59,8 +51,7 @@ let myCurrentBooking = null;
 let autoCheckoutInterval = null;
 let machineStatusUnsubscribe = null;
 
-// --- AUTH FLOW ---
-
+// 4. Auth Flow
 onAuthStateChanged(auth, async (user) => {
     if (getIsRegistering()) return; 
 
@@ -76,9 +67,9 @@ onAuthStateChanged(auth, async (user) => {
             if (userDocSnap.exists()) {
                 const userData = userDocSnap.data();
                 
+                // Check ob Partei gesetzt ist
                 if (!userData.partei) {
                     dom.loadingOverlay.style.display = 'none'; dom.appContainer.style.display = 'block';
-                    if (!dom.setupParteiModal) { alert("Index.html veraltet!"); return; }
                     navigateTo(null); dom.setupParteiModal.style.display = 'flex';
                     if (dom.setupParteiSaveBtn) {
                         dom.setupParteiSaveBtn.onclick = async () => {
@@ -92,11 +83,14 @@ onAuthStateChanged(auth, async (user) => {
                     return; 
                 }
 
+                // User eingeloggt & bereit
                 setCurrentUser({ uid: user.uid, ...user, userData });
                 startSession();
                 checkAndAutoCheckoutOldBookings();
+                
                 if (autoCheckoutInterval) clearInterval(autoCheckoutInterval);
                 autoCheckoutInterval = setInterval(checkAndAutoCheckoutOldBookings, 60000);
+                
                 initPushNotifications();
                 initGestures();
 
@@ -104,18 +98,27 @@ onAuthStateChanged(auth, async (user) => {
                     try {
                         await initKarmaForParty(userData.partei);
                         setupKarmaHeaderListener(userData.partei);
-                    } catch (karmaError) { console.error("Karma Fehler:", karmaError); }
+                    } catch (karmaError) { console.error("Karma Init Fehler:", karmaError); }
                 }
 
                 updateUserInfo(userData);
                 setupMainMenuListeners(); 
-                loadWeather(); 
+                
+                // Wetter laden (mit Fehler-Schutz)
+                try { loadWeather(); } catch(e) { console.warn("Wetter konnte nicht geladen werden."); }
                 
                 dom.loadingOverlay.style.display = 'none'; dom.appContainer.style.display = 'block';
                 if(dom.weatherWidget) dom.weatherWidget.style.display = 'flex'; 
                 
+                // Views initialisieren
+                initCalendarView(setUnsubscriber);
+                initOverviewView(setUnsubscriber);
+                initStatsView();
+
+                // Startseite anzeigen
                 navigateTo(dom.mainMenu);
                 
+                // Daten laden
                 handleLoadNextBookings();
                 handleLoadIncomingRequests();
                 handleLoadOutgoingRequests();
@@ -126,37 +129,41 @@ onAuthStateChanged(auth, async (user) => {
                 checkAppVersion();
 
             } else { await handleLogout(); }
-        } catch (e) { console.error("Critical Auth Error:", e); alert("Fehler: " + e.message); await handleLogout(); }
+        } catch (e) { console.error("Auth Error:", e); alert("Ein Fehler ist aufgetreten: " + e.message); await handleLogout(); }
     } else {
+        // Ausgeloggt
         dom.loadingOverlay.style.display = 'none'; dom.appContainer.style.display = 'block';
         unsubscribeAll();
+        
         if(karmaUnsubscribe) karmaUnsubscribe();
         if(configUnsubscribe) configUnsubscribe(); 
         if(machineStatusUnsubscribe) machineStatusUnsubscribe();
         if (autoCheckoutInterval) clearInterval(autoCheckoutInterval);
         
         setCurrentUser(null); updateUserInfo(null);
+        
         if(dom.weatherWidget) dom.weatherWidget.style.display = 'none';
         if(dom.machineStatusWidget) dom.machineStatusWidget.style.display = 'none';
         if (activeTimerInterval) clearInterval(activeTimerInterval);
         if(dom.liveTimerSection) { dom.liveTimerSection.style.display = 'none'; dom.liveTimerSection.classList.remove('active'); }
+        
         allPrograms = []; currentTimerData = null; myCurrentBooking = null;
 
         if (dom.deleteAccountModal) dom.deleteAccountModal.style.display = 'none';
         if (dom.setupParteiModal) dom.setupParteiModal.style.display = 'none';
+        
         navigateTo(dom.loginForm);
     }
 });
 
+// --- HELPER FUNCTIONS ---
+
 function checkTutorialSeen() {
     const hasSeenTutorial = localStorage.getItem('tutorial_accepted_v1');
-    if (!hasSeenTutorial) {
-        const tutModal = document.getElementById('tutorialModal');
-        const tutBtn = document.getElementById('tutorial-confirm-btn');
-        if (tutModal && tutBtn) {
-            tutModal.style.display = 'flex';
-            tutBtn.onclick = () => { localStorage.setItem('tutorial_accepted_v1', 'true'); tutModal.style.display = 'none'; };
-        }
+    if (!hasSeenTutorial && dom.tutorialModal) {
+        dom.tutorialModal.style.display = 'flex';
+        const btn = document.getElementById('tutorial-confirm-btn');
+        if(btn) btn.onclick = () => { localStorage.setItem('tutorial_accepted_v1', 'true'); dom.tutorialModal.style.display = 'none'; };
     }
 }
 
@@ -164,45 +171,30 @@ document.addEventListener("visibilitychange", () => { if (document.visibilitySta
 
 function handleMachineStatus() {
     if(machineStatusUnsubscribe) machineStatusUnsubscribe();
-    const widget = dom.machineStatusWidget; const icon = document.getElementById('machine-status-icon'); const text = document.getElementById('machine-status-text');
-    if(!widget) return;
-    widget.style.display = 'flex';
+    if(!dom.machineStatusWidget) return;
+    dom.machineStatusWidget.style.display = 'flex';
     machineStatusUnsubscribe = subscribeToMachineStatus((status) => {
-        if (status === 'busy') { widget.className = 'status-widget status-busy'; text.textContent = 'Belegt'; icon.className = 'fa-solid fa-shirt'; } 
-        else { widget.className = 'status-widget status-free'; text.textContent = 'Frei'; icon.className = 'fa-regular fa-circle-check'; }
+        const icon = document.getElementById('machine-status-icon');
+        if (status === 'busy') { dom.machineStatusWidget.className = 'status-widget status-busy'; icon.className = 'fa-solid fa-shirt'; } 
+        else { dom.machineStatusWidget.className = 'status-widget status-free'; icon.className = 'fa-regular fa-circle-check'; }
     });
 }
 
 function setupKarmaHeaderListener(parteiName) {
     if(configUnsubscribe) configUnsubscribe();
     if(karmaUnsubscribe) karmaUnsubscribe();
-    
     const headerDisplay = document.getElementById('header-karma-display');
     const headerValue = document.getElementById('header-karma-value');
     const headerIcon = document.getElementById('header-karma-icon');
-    
-    if (!headerDisplay || !headerValue || !headerIcon) return;
+    if (!headerDisplay) return;
 
-    headerDisplay.onclick = () => {
-        const modal = document.getElementById('karmaGuideModal');
-        const closeBtn = document.getElementById('close-karma-guide-btn');
-        if(modal) {
-            modal.style.display = 'flex';
-            if(closeBtn) closeBtn.onclick = () => modal.style.display = 'none';
-        }
-    };
+    headerDisplay.onclick = () => { if(dom.karmaGuideModal) dom.karmaGuideModal.style.display = 'flex'; };
+    const closeGuide = document.getElementById('close-karma-guide-btn');
+    if(closeGuide) closeGuide.onclick = () => { if(dom.karmaGuideModal) dom.karmaGuideModal.style.display = 'none'; };
 
     configUnsubscribe = onSnapshot(doc(db, 'app_settings', 'config'), (configSnap) => {
         const karmaActive = configSnap.exists() ? (configSnap.data().karmaSystemActive !== false) : true;
-        
-        if (!karmaActive) {
-            headerDisplay.style.display = 'none';
-        } else {
-            headerDisplay.style.display = 'flex';
-            if (!karmaUnsubscribe) {
-                startPartyListener(parteiName, headerValue, headerDisplay, headerIcon);
-            }
-        }
+        if (!karmaActive) { headerDisplay.style.display = 'none'; } else { headerDisplay.style.display = 'flex'; if (!karmaUnsubscribe) { startPartyListener(parteiName, headerValue, headerDisplay, headerIcon); } }
     });
 }
 
@@ -217,6 +209,73 @@ function startPartyListener(parteiName, headerValue, headerDisplay, headerIcon) 
         }
     });
 }
+
+// --- SETUP LISTENERS ---
+
+function setupMainMenuListeners() {
+    // 1. DOCK & MINIGAME & PROFIL
+    initBottomNav(async (targetId) => {
+        if (targetId === 'minigameSection') {
+            trackMenuClick('btn_minigame');
+            unsubscribeForNavigation();
+            try {
+                const module = await import('./services/minigame.js');
+                if(module && module.initMinigame) {
+                    module.initMinigame();
+                } else {
+                    console.error("Minigame Modul konnte nicht geladen werden.");
+                }
+            } catch(e) {
+                console.error("Fehler beim Laden des Minigames:", e);
+            }
+        }
+        
+        if (targetId === 'profileSection') {
+            loadProfileData();
+            initProfileView(); 
+        }
+    });
+
+    // 2. BACK BUTTON MINIGAME
+    const gameBackBtn = document.getElementById('back-to-menu-btn-game');
+    if (gameBackBtn) {
+        gameBackBtn.addEventListener('click', (e) => {
+            e.preventDefault(); e.stopPropagation();
+            navigateTo(dom.mainMenu);
+        });
+    }
+
+    // 3. LOGOUT & ADMIN
+    if(dom.logoutBtn) dom.logoutBtn.addEventListener('click', handleLogout);
+    
+    let adminInitialized = false;
+    if(document.getElementById('admin-btn')) {
+        document.getElementById('admin-btn').addEventListener('click', async () => { 
+            unsubscribeForNavigation(); 
+            const { loadAdminUserData, initAdminView } = await import('./views/admin.js');
+            if (!adminInitialized) { initAdminView(); adminInitialized = true; }
+            loadAdminUserData(); 
+            navigateTo(dom.adminSection); 
+        });
+    }
+
+    // 4. REPORT BUTTON
+    const reportBtn = document.getElementById('report-issue-btn'); 
+    if (reportBtn) { reportBtn.addEventListener('click', () => { const maintSec = document.getElementById('maintenanceSection'); if (maintSec) navigateTo(maintSec); }); }
+
+    // 5. MAINTENANCE SUBMIT
+    const submitMaintBtn = document.getElementById('submit-maintenance-btn'); 
+    if (submitMaintBtn) { 
+        submitMaintBtn.addEventListener('click', async () => { 
+            const reason = document.getElementById('maintenance-reason').value; const details = document.getElementById('maintenance-details').value; 
+            submitMaintBtn.disabled = true; 
+            try { const { reportIssue } = await import('./services/maintenance.js'); await reportIssue(reason, details); showMessage('maintenance-message', 'Gesendet!', 'success'); setTimeout(() => navigateTo(dom.mainMenu, 'back'), 2000); } 
+            catch(e) { showMessage('maintenance-message', 'Fehler.', 'error'); } finally { submitMaintBtn.disabled = false; } 
+        }); 
+    }
+}
+
+// --- DATA LOADING HANDLERS ---
 
 function handleLoadNextBookings() {
     dom.myBookingsList.innerHTML = `<div class="skeleton-item"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line short"></div></div>`;
@@ -340,10 +399,6 @@ function handleListenToTimer() {
     setUnsubscriber('timer', unsub);
 }
 
-async function getStoredQrCode() {
-    try { const snap = await getDoc(doc(db, 'app_settings', 'config')); if (snap.exists() && snap.data().qrCodeSecret) return snap.data().qrCodeSecret; return 'WASCH-START'; } catch(e) { return 'WASCH-START'; }
-}
-
 function renderTimerUI() {
     if (activeTimerInterval) { clearTimeout(activeTimerInterval); clearInterval(activeTimerInterval); }
     activeTimerInterval = null; 
@@ -390,6 +445,11 @@ function renderTimerUI() {
     }
 }
 
+async function getStoredQrCode() {
+    try { const snap = await getDoc(doc(db, 'app_settings', 'config')); if (snap.exists() && snap.data().qrCodeSecret) return snap.data().qrCodeSecret; return 'WASCH-START'; } catch(e) { return 'WASCH-START'; }
+}
+
+// Global Listeners
 function checkPasswordMatch() {
     const regPass = document.getElementById('register-password'); const regPassConfirm = document.getElementById('register-password-confirm');
     if (!regPass || !regPassConfirm) return; 
@@ -420,94 +480,37 @@ document.getElementById('show-reset-password').addEventListener('click', () => {
 document.getElementById('back-to-login-btn').addEventListener('click', () => navigateTo(dom.loginForm, 'back'));
 document.getElementById('reset-password-btn').addEventListener('click', handlePasswordReset);
 document.getElementById('back-to-login-from-verify-btn').addEventListener('click', () => navigateTo(dom.loginForm, 'back'));
-document.getElementById('logout-btn').addEventListener('click', handleLogout);
 dom.themeIcon.addEventListener('click', () => { const newTheme = getState().currentTheme === 'light' ? 'dark' : 'light'; setTheme(newTheme, true); });
 document.getElementById('refresh-app-btn').addEventListener('click', () => { const btn = document.getElementById('refresh-app-btn'); btn.classList.add('fa-spin'); location.reload(true); setTimeout(() => btn.classList.remove('fa-spin'), 1500); });
 
-// --- INTELLIGENTER GLOBALER ZURÜCK BUTTON ---
+// Global Back Button Listener
 const globalBackBtn = document.getElementById('global-back-btn');
 if (globalBackBtn) {
     globalBackBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        
-        // 1. Prüfen, ob wir im Admin-Bereich sind und der Admin-Handler das übernehmen will
         if (dom.adminSection && dom.adminSection.style.display !== 'none') {
-            const handledByAdmin = handleAdminBack(); // Ruft Funktion in admin.js auf
-            if (handledByAdmin) return; // Wenn Admin intern navigiert hat, fertig
+            const handledByAdmin = handleAdminBack(); 
+            if (handledByAdmin) return;
         }
-
-        // 2. Fallback: Zurück zum Hauptmenü
         navigateTo(dom.mainMenu, 'back');
     });
 }
 
-function setupMainMenuListeners() {
-    document.getElementById('book-btn').addEventListener('click', () => { 
-        trackMenuClick('btn_book'); unsubscribeForNavigation(); dom.bookingDateInput.value = getFormattedDate(tomorrow); dom.dateValidationMessage.textContent = ''; dom.bookingSlotSelect.value = ''; const costPreview = document.getElementById('booking-cost-display'); const bookBtn = dom.bookSubmitBtn; if(costPreview) costPreview.style.display = 'none'; if(bookBtn) { const btnText = document.getElementById("book-text"); if(btnText) btnText.textContent = "Buchen"; } navigateTo(dom.bookingSection); dom.bookingDateInput.dispatchEvent(new Event('change')); 
-    });
-    document.getElementById('overview-btn').addEventListener('click', () => { trackMenuClick('btn_week'); unsubscribeForNavigation(); setupWeekDropdown(); loadBookingsForWeek(dom.kwSelect.value, setUnsubscriber); navigateTo(dom.overviewSection); });
-    document.getElementById('calendar-btn').addEventListener('click', () => { trackMenuClick('btn_calendar'); unsubscribeForNavigation(); dom.calendarDayActions.style.display = 'none'; setSelectedCalendarDate(null); const now = new Date(); loadBookingsForMonth(now.getFullYear(), now.getMonth(), setUnsubscriber); navigateTo(dom.calendarSection); });
-    
-    let adminInitialized = false;
-    document.getElementById('admin-btn').addEventListener('click', async () => { 
-        unsubscribeForNavigation(); 
-        const { loadAdminUserData, initAdminView } = await import('./views/admin.js');
-        if (!adminInitialized) { initAdminView(); adminInitialized = true; }
-        loadAdminUserData(); 
-        navigateTo(dom.adminSection); 
-    });
+// Löschen Modal Handler
+if (dom.cancelDeleteAccountBtn) dom.cancelDeleteAccountBtn.addEventListener('click', () => { dom.deleteAccountModal.style.display = 'none'; dom.deleteAccountPasswordInput.value = ''; });
+if (dom.confirmDeleteAccountBtn) dom.confirmDeleteAccountBtn.addEventListener('click', async () => { const password = dom.deleteAccountPasswordInput.value; await handleDeleteAccount(password); });
 
-    document.getElementById('profile-btn').addEventListener('click', () => { unsubscribeForNavigation(); loadProfileData(); navigateTo(dom.profileSection); });
-    
-    const minigameBtn = document.getElementById('minigame-btn'); if (minigameBtn) { minigameBtn.addEventListener('click', async () => { trackMenuClick('btn_minigame'); unsubscribeForNavigation(); const { initMinigame } = await import('./services/minigame.js'); initMinigame(); navigateTo(dom.minigameSection); }); }
-    
-    const reportBtn = document.getElementById('report-issue-btn'); if (reportBtn) { reportBtn.addEventListener('click', () => { const maintSec = document.getElementById('maintenanceSection'); if (maintSec) navigateTo(maintSec); }); }
-    
-    const submitMaintBtn = document.getElementById('submit-maintenance-btn'); 
-    if (submitMaintBtn) { 
-        submitMaintBtn.addEventListener('click', async () => { 
-            const reason = document.getElementById('maintenance-reason').value; const details = document.getElementById('maintenance-details').value; 
-            submitMaintBtn.disabled = true; 
-            try { const { reportIssue } = await import('./services/maintenance.js'); await reportIssue(reason, details); showMessage('maintenance-message', 'Problem gemeldet! Der Admin wurde benachrichtigt.', 'success'); setTimeout(() => navigateTo(dom.mainMenu, 'back'), 2000); } 
-            catch(e) { showMessage('maintenance-message', 'Fehler beim Senden.', 'error'); } finally { submitMaintBtn.disabled = false; } 
-        }); 
-    }
-}
+// Confirmation Modal Handler
+if (document.getElementById('confirm-cancel')) document.getElementById('confirm-cancel').addEventListener('click', hideConfirmation);
 
-async function updateBookingCostPreview() {
-    const dateStr = dom.bookingDateInput.value; const slot = dom.bookingSlotSelect.value; const displayBox = document.getElementById('booking-cost-display'); const textEl = document.getElementById('cost-value-text'); const bookBtnText = document.getElementById('book-text');
-    if (!dateStr) { if(displayBox) displayBox.style.display = 'none'; if(bookBtnText) bookBtnText.textContent = "Buchen"; return; }
-    const isEco = await isEcoDay(dateStr);
-    let cost, label, color, bgColor;
-    if (isEco) { cost = Math.abs(COST_SLOT_ECO); label = "🌱 Eco-Tarif (Sonnig)"; color = 'var(--success-color)'; bgColor = 'rgba(52, 199, 89, 0.1)'; } 
-    else { const dateObj = new Date(dateStr); const isWeekend = (dateObj.getDay() === 0 || dateObj.getDay() === 6); if (isWeekend) { cost = Math.abs(COST_SLOT_PRIME); label = "🔥 Wochenende"; color = 'var(--error-color)'; bgColor = 'rgba(255, 59, 48, 0.1)'; } else { cost = Math.abs(COST_SLOT_NORMAL); label = "Werktag"; color = 'var(--primary-color)'; bgColor = 'rgba(0, 122, 255, 0.1)'; } }
-    if (displayBox && textEl) { displayBox.style.display = 'block'; displayBox.style.borderColor = color; displayBox.style.background = bgColor; textEl.innerHTML = `<span style="color: ${color};">-${cost} Karma</span> (${label})`; }
-    if(bookBtnText) { bookBtnText.textContent = `Buchen (-${cost} Karma)`; }
-}
+// Changelog Close
+if (dom.changelogCloseBtn) dom.changelogCloseBtn.addEventListener('click', () => { dom.changelogModal.style.display = 'none'; localStorage.setItem('waschplan_version', APP_VERSION); });
 
+// App Version Check
+function checkAppVersion() { const seenVersion = localStorage.getItem('waschplan_version'); if (seenVersion !== APP_VERSION) { localStorage.setItem('waschplan_version', APP_VERSION); } checkTutorialSeen(); }
+
+// Legacy Booking Logic (Fallback)
 dom.bookSubmitBtn.addEventListener("click", async () => { const date = dom.bookingDateInput.value; const slot = dom.bookingSlotSelect.value; const button = dom.bookSubmitBtn; const bookText = document.getElementById("book-text"); const bookIcon = document.getElementById("book-success-icon"); button.disabled = true; if (bookText) bookText.textContent = "Buche..."; if (bookIcon) bookIcon.style.display = 'none'; let success = false; try { success = await performBooking(date, slot, 'booking-error'); } catch (e) { console.error(e); showMessage('booking-error', 'Ein unerwarteter Fehler ist aufgetreten.', 'error'); success = false; } finally { if (success) { button.classList.add('booking-success'); if(bookText) bookText.style.display = 'none'; if(bookIcon) bookIcon.style.display = 'block'; setTimeout(() => { button.classList.remove('booking-success'); if(bookIcon) bookIcon.style.display = 'none'; if(bookText) { bookText.style.display = 'block'; bookText.textContent = "Buchen"; } button.disabled = false; dom.bookingDateInput.dispatchEvent(new Event('change')); }, 2000); } else { if(bookText) bookText.textContent = "Buchen"; button.disabled = false; } } });
-
-dom.bookingDateInput.addEventListener('change', async () => { 
-    updateBookingCostPreview(); 
-    const selectedDateStr = dom.bookingDateInput.value; const selectedDate = new Date(selectedDateStr); selectedDate.setHours(0, 0, 0, 0); const isPast = selectedDate < today; dom.dateValidationMessage.textContent = isPast ? 'Buchungen können nicht für vergangene Tage vorgenommen werden.' : ''; if (isPast) { updateSlotDropdownUI({ "07:00-13:00": { status: 'disabled-duplicate', text: '07:00 - 13:00' }, "13:00-19:00": { status: 'disabled-duplicate', text: '13:00 - 19:00' } }); return; } try { const options = dom.bookingSlotSelect.querySelectorAll('option'); options.forEach(opt => { if (opt.value) { opt.textContent = `${opt.value} (Prüfe...)`; opt.disabled = true; } }); const availability = await checkSlotAvailability(selectedDateStr); if (availability) { updateSlotDropdownUI(availability); } } catch (e) { console.error(e); showMessage('booking-error', 'Fehler beim Prüfen der Verfügbarkeit.', 'error'); } 
-});
-
+dom.bookingDateInput.addEventListener('change', async () => { updateBookingCostPreview(); const selectedDateStr = dom.bookingDateInput.value; const selectedDate = new Date(selectedDateStr); selectedDate.setHours(0, 0, 0, 0); const isPast = selectedDate < today; dom.dateValidationMessage.textContent = isPast ? 'Buchungen können nicht für vergangene Tage vorgenommen werden.' : ''; if (isPast) { updateSlotDropdownUI({ "07:00-13:00": { status: 'disabled-duplicate', text: '07:00 - 13:00' }, "13:00-19:00": { status: 'disabled-duplicate', text: '13:00 - 19:00' } }); return; } try { const options = dom.bookingSlotSelect.querySelectorAll('option'); options.forEach(opt => { if (opt.value) { opt.textContent = `${opt.value} (Prüfe...)`; opt.disabled = true; } }); const availability = await checkSlotAvailability(selectedDateStr); if (availability) { updateSlotDropdownUI(availability); } } catch (e) { console.error(e); showMessage('booking-error', 'Fehler beim Prüfen der Verfügbarkeit.', 'error'); } });
 dom.bookingSlotSelect.addEventListener('change', updateBookingCostPreview);
 dom.bookingDateInput.setAttribute('min', getFormattedDate(today)); dom.bookingDateInput.value = getFormattedDate(tomorrow);
-document.getElementById('confirm-cancel').addEventListener('click', hideConfirmation);
-dom.cancelDeleteAccountBtn.addEventListener('click', () => { dom.deleteAccountModal.style.display = 'none'; dom.deleteAccountPasswordInput.value = ''; showMessage('delete-account-message', '', 'error'); });
-dom.confirmDeleteAccountBtn.addEventListener('click', async () => { const password = dom.deleteAccountPasswordInput.value; await handleDeleteAccount(password); });
-dom.changelogCloseBtn.addEventListener('click', () => { dom.changelogModal.style.display = 'none'; localStorage.setItem('waschplan_version', APP_VERSION); });
-
-function checkAppVersion() { 
-    const seenVersion = localStorage.getItem('waschplan_version'); 
-    if (seenVersion !== APP_VERSION) { 
-        localStorage.setItem('waschplan_version', APP_VERSION); 
-    } 
-    checkTutorialSeen(); 
-}
-
-initCalendarView(setUnsubscriber);
-initOverviewView(setUnsubscriber);
-initProfileView();
-initStatsView();
