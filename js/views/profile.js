@@ -1,123 +1,144 @@
 import * as dom from '../dom.js';
-import { getState } from '../state.js';
-import { handleChangePassword } from '../services/auth.js';
-import { showChangelog } from '../ui.js';
+import { getState } from '../state.js'; // KORRIGIERT: getState statt state
+import { handleLogout, handleChangePassword, handleDeleteAccount } from '../services/auth.js';
 import { initPushNotifications } from '../services/push.js';
 
-function checkProfilePasswordMatch() {
-    const p1 = document.getElementById('new-password');
-    const p2 = document.getElementById('new-password-confirm');
-    
-    if (!p1 || !p2) return;
-    
-    const v1 = p1.value; 
-    const v2 = p2.value;
-    
-    if (v1 === "" && v2 === "") { 
-        p1.classList.remove('input-valid', 'input-invalid'); 
-        p2.classList.remove('input-valid', 'input-invalid'); 
-        return; 
-    }
-    
-    if (v1 === v2) { 
-        p1.classList.add('input-valid'); p1.classList.remove('input-invalid');
-        p2.classList.add('input-valid'); p2.classList.remove('input-invalid');
-    } else { 
-        p1.classList.add('input-invalid'); p1.classList.remove('input-valid');
-        p2.classList.add('input-invalid'); p2.classList.remove('input-valid');
-    }
-}
-
 export function initProfileView() {
-    console.log("Profile View wird initialisiert...");
+    console.log("Profile View initialized");
 
-    // 1. Passwort Ändern Toggle (onclick)
-    const toggleBtn = document.getElementById('change-password-btn');
-    const pwContainer = document.getElementById('password-change-container');
-    
-    if (toggleBtn && pwContainer) {
-        toggleBtn.onclick = () => {
-            const isHidden = pwContainer.style.display === 'none';
-            pwContainer.style.display = isHidden ? 'block' : 'none';
-            toggleBtn.innerHTML = isHidden ? '<i class="fa-solid fa-chevron-up"></i> Abbrechen' : '<i class="fa-solid fa-key"></i> Passwort ändern';
-        };
-    }
-
-    // 2. Passwort Speichern
-    const savePwBtn = document.getElementById('save-new-password-btn');
-    if (savePwBtn) {
-        savePwBtn.onclick = () => {
-            const p1 = document.getElementById('new-password').value;
-            const p2 = document.getElementById('new-password-confirm').value;
-            if(p1 && p1 === p2) {
-                handleChangePassword(); 
-            } else {
-                alert("Passwörter stimmen nicht überein oder sind leer.");
+    // 1. Button-Logik: Passwort ändern (Aufklappen)
+    if (dom.changePasswordBtn) {
+        dom.changePasswordBtn.onclick = () => {
+            if (dom.passwordChangeContainer) {
+                const isHidden = dom.passwordChangeContainer.style.display === 'none';
+                dom.passwordChangeContainer.style.display = isHidden ? 'block' : 'none';
+                
+                // Icon ändern für besseres Feedback
+                dom.changePasswordBtn.innerHTML = isHidden 
+                    ? '<i class="fa-solid fa-chevron-up"></i> Abbrechen' 
+                    : '<i class="fa-solid fa-key"></i> Passwort ändern';
             }
         };
     }
 
-    // 3. Live-Validierung
-    const p1 = document.getElementById('new-password');
-    const p2 = document.getElementById('new-password-confirm');
-    if (p1) p1.oninput = checkProfilePasswordMatch;
-    if (p2) p2.oninput = checkProfilePasswordMatch;
-
-    // 4. Konto Löschen Button
-    const delBtn = document.getElementById('delete-account-btn');
-    const modal = document.getElementById('deleteAccountModal');
-    const modalInput = document.getElementById('delete-account-password');
-    
-    if (delBtn && modal) {
-        delBtn.onclick = () => {
-            modal.style.display = 'flex';
-            if(modalInput) modalInput.value = '';
+    // 2. Button-Logik: Passwort speichern
+    if (dom.saveNewPasswordBtn) {
+        dom.saveNewPasswordBtn.onclick = async () => {
+            // Wir rufen die Funktion aus auth.js auf (sie liest die Felder selbst aus)
+            await handleChangePassword();
         };
     }
 
-    // 5. Notifications
-    const notifBtn = document.getElementById('enable-notifications-btn');
-    if (notifBtn) {
-        notifBtn.onclick = async () => {
-            if (Notification.permission === 'granted') {
-                try {
-                    const reg = await navigator.serviceWorker.ready;
-                    await reg.showNotification('Test 🔔', { body: 'Test OK!', icon: 'img/icon-192.png' });
-                    await initPushNotifications(); 
-                    alert("Test-Nachricht gesendet.");
-                } catch(e) { alert("Fehler: " + e.message); }
+    // Live-Validierung der Passwörter
+    if (dom.newPasswordInput && dom.newPasswordConfirmInput) {
+        const validatePasswords = () => {
+            const p1 = dom.newPasswordInput.value;
+            const p2 = dom.newPasswordConfirmInput.value;
+            
+            // Zurücksetzen wenn leer
+            if (p1 === "" && p2 === "") {
+                dom.newPasswordInput.classList.remove('input-valid', 'input-invalid');
+                dom.newPasswordConfirmInput.classList.remove('input-valid', 'input-invalid');
+                return;
+            }
+            
+            // Prüfen ob gleich und lang genug
+            if (p1 === p2 && p1.length >= 6) {
+                dom.newPasswordInput.classList.add('input-valid');
+                dom.newPasswordInput.classList.remove('input-invalid');
+                dom.newPasswordConfirmInput.classList.add('input-valid');
+                dom.newPasswordConfirmInput.classList.remove('input-invalid');
             } else {
-                await initPushNotifications();
-                loadProfileData(); 
+                dom.newPasswordInput.classList.add('input-invalid');
+                dom.newPasswordInput.classList.remove('input-valid');
+                dom.newPasswordConfirmInput.classList.add('input-invalid');
+                dom.newPasswordConfirmInput.classList.remove('input-valid');
+            }
+        };
+        
+        dom.newPasswordInput.oninput = validatePasswords;
+        dom.newPasswordConfirmInput.oninput = validatePasswords;
+    }
+
+    // 3. Button-Logik: Neuigkeiten (Im Popup)
+    if (dom.showChangelogBtn && dom.changelogModal && dom.changelogContent) {
+        dom.showChangelogBtn.onclick = async () => {
+            dom.changelogContent.innerHTML = '<div class="spinner" style="margin: 20px auto;"></div><p style="text-align:center">Lade Neuigkeiten...</p>';
+            dom.changelogModal.style.display = 'flex';
+
+            try {
+                const response = await fetch('CHANGELOG.md?v=' + new Date().getTime());
+                if (!response.ok) throw new Error("Konnte Datei nicht laden");
+                
+                const text = await response.text();
+                
+                let formattedHtml = text
+                    .replace(/^### (.*$)/gim, '<h3>$1</h3>')
+                    .replace(/^## (.*$)/gim, '<h2>$1</h2>')
+                    .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+                    .replace(/^\- (.*$)/gim, '<li>$1</li>')
+                    .replace(/\n/gim, '<br>');
+
+                dom.changelogContent.innerHTML = formattedHtml;
+            } catch (e) {
+                dom.changelogContent.innerHTML = "<p>Keine Neuigkeiten verfügbar.</p>";
+                console.error(e);
             }
         };
     }
 
-    // 6. Changelog
-    const changelogBtn = document.getElementById('show-changelog-btn');
-    if (changelogBtn) {
-        changelogBtn.onclick = () => showChangelog();
+    // Modal Schließen-Button
+    if (dom.changelogCloseBtn && dom.changelogModal) {
+        dom.changelogCloseBtn.onclick = () => {
+            dom.changelogModal.style.display = 'none';
+        };
+    }
+
+    // 4. Button-Logik: Benachrichtigungen
+    if (dom.enableNotificationsBtn) {
+        dom.enableNotificationsBtn.onclick = () => {
+            initPushNotifications();
+            // Button Status aktualisieren
+            setTimeout(loadProfileData, 1000);
+        };
+    }
+
+    // 5. Logout
+    if (dom.logoutBtnProfile) {
+        dom.logoutBtnProfile.onclick = () => {
+            if(confirm("Wirklich abmelden?")) {
+                handleLogout();
+            }
+        };
+    }
+
+    // 6. Konto löschen (Modal öffnen)
+    if (dom.deleteAccountBtn) {
+        dom.deleteAccountBtn.onclick = () => {
+            if (dom.deleteAccountModal) {
+                dom.deleteAccountModal.style.display = 'flex';
+                if(dom.deleteAccountPasswordInput) dom.deleteAccountPasswordInput.value = '';
+            }
+        };
     }
 }
 
-export async function loadProfileData() {
-    const { currentUser } = getState();
-    if (currentUser) {
-        const emailEl = document.getElementById('profile-email');
-        const parteiEl = document.getElementById('profile-partei');
+// Funktion zum Laden der Benutzerdaten (wird von main.js aufgerufen)
+export function loadProfileData() {
+    const { currentUser } = getState(); // KORRIGIERT: getState() aufrufen
+    
+    if (currentUser && currentUser.userData) {
+        if (dom.profileEmail) dom.profileEmail.textContent = currentUser.userData.email || '...';
+        if (dom.profilePartei) dom.profilePartei.textContent = currentUser.userData.partei || '...';
         
-        if(emailEl) emailEl.textContent = currentUser.userData.email || '...';
-        if(parteiEl) parteiEl.textContent = currentUser.userData.partei || '...';
-        
-        const notifBtn = document.getElementById('enable-notifications-btn');
-        if (notifBtn) {
-            notifBtn.style.display = 'block';
+        // Push Button Status
+        if (dom.enableNotificationsBtn) {
             if (Notification.permission === 'granted') {
-                notifBtn.innerHTML = '<i class="fa-solid fa-bell"></i> Push aktiv (Testen)';
-                notifBtn.className = 'button-primary';
+                dom.enableNotificationsBtn.innerHTML = '<i class="fa-solid fa-bell"></i> Push aktiv (Testen)';
+                dom.enableNotificationsBtn.className = 'button-primary';
             } else {
-                notifBtn.innerHTML = '<i class="fa-solid fa-bell"></i> Push aktivieren';
-                notifBtn.className = 'button-secondary';
+                dom.enableNotificationsBtn.innerHTML = '<i class="fa-solid fa-bell"></i> Push aktivieren';
+                dom.enableNotificationsBtn.className = 'button-secondary';
             }
         }
     }

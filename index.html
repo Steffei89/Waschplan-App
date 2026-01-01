@@ -2,12 +2,17 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Waschplan App</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="img/icon-192.png">
 <link rel="apple-touch-icon" href="img/icon-192.png">
 <meta name="theme-color" content="#007AFF">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script> 
@@ -63,15 +68,15 @@
   <div id="outgoingRequestsStatusContainer" style="display:none;"></div>
 
   <div id="loginForm" class="card">
-    <h2>Login</h2>
+    <h2>Willkommen 👋</h2>
     <div id="login-error" class="message-box error" style="display:none;"></div>
     <div class="input-group">
       <input type="email" id="login-identifier" placeholder="E-Mail" required>
       <input type="password" id="login-password" placeholder="Passwort" required>
     </div>
     <button id="login-btn">Einloggen</button>
-    <p id="switch-register">Noch nicht registriert? <span id="show-register" class="clickable">Registrieren</span></p>
-    <p style="text-align: center; margin-top: 10px;" class="small-text"><span id="show-reset-password" class="clickable">Passwort vergessen?</span></p>
+    <p id="switch-register">Noch nicht registriert? <span id="show-register" class="clickable">Konto erstellen</span></p>
+    <p style="text-align: center; margin-top: 15px;" class="small-text"><span id="show-reset-password" class="clickable">Passwort vergessen?</span></p>
     <div class="app-version">Version 3.5.0</div>
   </div>
 
@@ -92,25 +97,25 @@
            <option value="Christa & Uli">Christa & Uli</option>
        </select>
     </div>
-    <button id="register-btn">Registrieren</button>
-    <p id="switch-login">Bereits registriert? <span id="show-login" class="clickable">Login</span></p>
+    <button id="register-btn">Kostenlos registrieren</button>
+    <p id="switch-login">Bereits ein Konto? <span id="show-login" class="clickable">Zum Login</span></p>
   </div>
 
   <div id="verifyEmailMessage" class="card" style="display:none;">
-    <h2>Bitte E-Mail bestätigen</h2>
+    <h2>E-Mail bestätigen 📧</h2>
     <div id="verify-email-success" class="message-box success" style="display:none;"></div>
     <button id="back-to-login-from-verify-btn">Zurück zum Login</button>
   </div>
 
   <div id="resetPasswordForm" class="card" style="display:none;">
     <button id="back-to-login-btn" class="back-button"><i class="fa-solid fa-chevron-left"></i> Zurück</button>
-    <h2>Passwort zurücksetzen</h2>
-    <input type="email" id="reset-email" placeholder="E-Mail" required>
+    <h2>Passwort Reset 🔒</h2>
+    <input type="email" id="reset-email" placeholder="Deine E-Mail Adresse" required>
     <button id="reset-password-btn">Link anfordern</button>
   </div>
 
   <div id="mainMenu" class="card" style="display:none;">
-    <h2 style="text-align:left; margin-bottom:15px; font-size:1.8em;">Hallo 👋</h2>
+    <h2 style="text-align:left; margin-bottom:10px; font-size:1.8em;">Hallo 👋</h2>
     <div id="main-menu-message" class="message-box" style="display:none;"></div>
     
     <div id="my-upcoming-bookings" class="dashboard-widget">
@@ -118,12 +123,12 @@
         <div id="my-bookings-list"></div>
     </div>
 
-    <div id="report-issue-btn" class="dashboard-tile clickable-tile" style="margin-top:15px; background: var(--input-background); color:var(--error-color); border:1px solid rgba(255, 59, 48, 0.3);">
-        <i class="fa-solid fa-triangle-exclamation" style="font-size:1.5em;"></i>
-        <span style="font-weight:bold; margin-top:5px;">Problem melden</span>
+    <div id="report-issue-btn" class="dashboard-tile clickable-tile issue-tile">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span>Problem melden</span>
     </div>
     
-    <button id="admin-btn" class="button-secondary" style="display:none; margin-top:20px; border-color:var(--primary-color); color:var(--primary-color);">
+    <button id="admin-btn" class="button-secondary" style="display:none; margin-top:20px;">
         <i class="fa-solid fa-screwdriver-wrench"></i> Admin-Konsole
     </button>
   </div>
@@ -132,25 +137,27 @@
     <h2 style="text-align:left; margin-bottom:15px;">Buchen 📅</h2>
     <div class="calendar-controls">
       <button id="prev-month-btn"><i class="fa-solid fa-angle-left"></i></button>
-      <span id="current-month-display" class="font-semibold"></span>
+      <span id="current-month-display"></span>
       <button id="next-month-btn"><i class="fa-solid fa-angle-right"></i></button>
     </div>
     <div id="calendar-grid"></div>
     
     <div id="calendar-day-actions" class="mt-15" style="display:none;">
-        <h3 id="selected-day-title" style="border-bottom:1px solid var(--border-color); padding-bottom:5px;">Aktionen:</h3>
+        <h3 id="selected-day-title" style="border-bottom:1px solid var(--border-color); padding-bottom:10px; margin-bottom:15px;">Aktionen:</h3>
         <div id="calendar-action-message" class="message-box" style="display:none;"></div>
+        
         <div id="slot-action-07" class="slot-action-item">
-            <p style="margin:0 0 5px 0;"><strong>07:00 - 13:00</strong> <span id="slot-status-07" style="float:right;">...</span></p>
-            <div style="display:flex; gap:5px;">
+            <p style="margin:0 0 8px 0; font-weight:700;">07:00 - 13:00 <span id="slot-status-07" style="float:right; font-weight:400;">...</span></p>
+            <div style="display:flex; gap:8px;">
                 <button class="calendar-action-btn" data-slot="07:00-13:00" data-action="book" id="btn-book-07">Buchen</button>
                 <button class="calendar-action-btn button-danger" data-slot="07:00-13:00" data-action="delete" id="btn-delete-07" style="display:none;">Stornieren</button>
                 <button class="calendar-action-btn button-primary" data-slot="07:00-13:00" data-action="request" id="btn-request-07" style="display:none;">Anfragen</button>
             </div>
         </div>
+        
         <div id="slot-action-13" class="slot-action-item">
-            <p style="margin:0 0 5px 0;"><strong>13:00 - 19:00</strong> <span id="slot-status-13" style="float:right;">...</span></p>
-            <div style="display:flex; gap:5px;">
+            <p style="margin:0 0 8px 0; font-weight:700;">13:00 - 19:00 <span id="slot-status-13" style="float:right; font-weight:400;">...</span></p>
+            <div style="display:flex; gap:8px;">
                 <button class="calendar-action-btn" data-slot="13:00-19:00" data-action="book" id="btn-book-13">Buchen</button>
                 <button class="calendar-action-btn button-danger" data-slot="13:00-19:00" data-action="delete" id="btn-delete-13" style="display:none;">Stornieren</button>
                 <button class="calendar-action-btn button-primary" data-slot="13:00-19:00" data-action="request" id="btn-request-13" style="display:none;">Anfragen</button>
@@ -197,13 +204,16 @@
     <h2 style="text-align:left; margin-bottom:15px;">Mein Profil 👤</h2>
     <div id="profile-message" class="message-box" style="display:none;"></div>
     
-    <div style="background:var(--secondary-color); padding:15px; border-radius:12px; margin-bottom:15px;">
-        <p style="margin:5px 0;"><strong>E-Mail:</strong> <br><span id="profile-email" style="opacity:0.7;"></span></p>
-        <p style="margin:10px 0 5px 0;"><strong>Partei:</strong> <br><span id="profile-partei" style="font-size:1.1em; font-weight:bold;"></span></p>
+    <div style="background:var(--bg-secondary); padding:20px; border-radius:18px; margin-bottom:20px; border:1px solid var(--border-color);">
+        <p style="margin:5px 0; font-size:0.9em; opacity:0.7;">E-Mail</p>
+        <p style="margin:0 0 15px 0; font-weight:600;"><span id="profile-email"></span></p>
+        
+        <p style="margin:5px 0; font-size:0.9em; opacity:0.7;">Partei</p>
+        <p style="margin:0; font-weight:700; color:var(--primary-color); font-size:1.1em;"><span id="profile-partei"></span></p>
     </div>
 
     <button id="change-password-btn" class="button-secondary"><i class="fa-solid fa-key"></i> Passwort ändern</button>
-    <div id="password-change-container" style="display:none; margin-bottom:10px; background:var(--input-background); padding:10px; border-radius:12px;">
+    <div id="password-change-container" style="display:none; margin-bottom:15px; background:var(--input-background); padding:15px; border-radius:18px;">
         <input type="password" id="new-password" placeholder="Neues Passwort">
         <input type="password" id="new-password-confirm" placeholder="Bestätigen">
         <button id="save-new-password-btn" class="button-success" style="margin-top:5px;">Speichern</button>
@@ -212,7 +222,7 @@
     <button id="enable-notifications-btn" class="button-secondary"><i class="fa-solid fa-bell"></i> Benachrichtigungen</button>
     <button id="show-changelog-btn" class="button-secondary"><i class="fa-solid fa-gift"></i> Neuheiten</button>
     
-    <button id="logout-btn-profile" class="button-danger" style="margin-top:25px; background:rgba(255, 59, 48, 0.1); color:var(--error-color); border:1px solid var(--error-color);">
+    <button id="logout-btn-profile" class="button-danger outline" style="margin-top:30px;">
         <i class="fa-solid fa-power-off"></i> Abmelden
     </button>
     <button id="delete-account-btn" style="background:none; color:var(--text-color); border:none; box-shadow:none; opacity:0.4; font-size:0.8em; margin-top:10px;">Konto löschen</button>

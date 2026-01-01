@@ -23,17 +23,17 @@ import {
     hideConfirmation, updateSlotDropdownUI, initBottomNav
 } from './ui.js';
 import { handleRegister, handleLogin, handleLogout, handlePasswordReset, handleDeleteAccount } from './services/auth.js';
-import { loadWeather, isEcoDay } from './services/weather.js'; 
-import { loadStatistics, initStatsView, trackMenuClick } from './services/stats.js';
+import { loadWeather } from './services/weather.js'; 
+import { initStatsView, trackMenuClick } from './services/stats.js';
 import { performBooking, performDeletion, loadNextBookingsOverview, checkSlotAvailability, performCheckIn, performCheckOut, checkAndAutoCheckoutOldBookings, subscribeToMachineStatus } from './services/booking.js';
 import { 
     loadIncomingRequests, loadOutgoingRequestStatus, loadOutgoingRequestSuccess,
     confirmSwapTransaction, rejectSwapRequest, dismissRequestNotification
 } from './services/swap.js';
-import { initCalendarView, loadBookingsForMonth } from './views/calendar.js';
-import { initOverviewView, setupWeekDropdown, loadBookingsForWeek } from './views/overview.js';
+import { initCalendarView } from './views/calendar.js';
+import { initOverviewView } from './views/overview.js';
 import { initProfileView, loadProfileData } from './views/profile.js';
-import { APP_VERSION, COST_SLOT_NORMAL, COST_SLOT_PRIME, COST_SLOT_ECO } from './config.js'; 
+import { APP_VERSION } from './config.js'; 
 import { loadWashPrograms, listenToActiveTimer, startWashTimer, stopWashTimer } from './services/timers.js';
 import { initKarmaForParty } from './services/karma.js';
 import { startSession, updateSession } from './services/analytics.js';
