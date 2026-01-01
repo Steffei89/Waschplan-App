@@ -1,6 +1,6 @@
 import * as dom from '../dom.js';
-import { getState } from '../state.js'; // KORRIGIERT: getState statt state
-import { handleLogout, handleChangePassword, handleDeleteAccount } from '../services/auth.js';
+import { getState } from '../state.js';
+import { handleLogout, handleChangePassword } from '../services/auth.js';
 import { initPushNotifications } from '../services/push.js';
 
 export function initProfileView() {
@@ -24,7 +24,6 @@ export function initProfileView() {
     // 2. Button-Logik: Passwort speichern
     if (dom.saveNewPasswordBtn) {
         dom.saveNewPasswordBtn.onclick = async () => {
-            // Wir rufen die Funktion aus auth.js auf (sie liest die Felder selbst aus)
             await handleChangePassword();
         };
     }
@@ -94,11 +93,39 @@ export function initProfileView() {
         };
     }
 
-    // 4. Button-Logik: Benachrichtigungen
+    // 4. Button-Logik: Benachrichtigungen (REPARIERT & VERBESSERT)
     if (dom.enableNotificationsBtn) {
-        dom.enableNotificationsBtn.onclick = () => {
-            initPushNotifications();
-            // Button Status aktualisieren
+        dom.enableNotificationsBtn.onclick = async () => {
+            // Fall 1: Push ist schon erlaubt -> Wir machen einen TEST
+            if (Notification.permission === 'granted') {
+                try {
+                    // Wir versuchen, den Service Worker für die Anzeige zu nutzen (zuverlässiger)
+                    const reg = await navigator.serviceWorker.ready;
+                    if (reg) {
+                        reg.showNotification("Push Test 🔔", {
+                            body: "Super! Push-Nachrichten funktionieren.",
+                            icon: './img/icon-192.png',
+                            vibrate: [200, 100, 200]
+                        });
+                    } else {
+                        // Fallback
+                        new Notification("Push Test 🔔", {
+                            body: "Super! Push-Nachrichten funktionieren."
+                        });
+                    }
+                } catch (e) {
+                    alert("Test konnte nicht gesendet werden: " + e);
+                }
+                
+                // Trotzdem nochmal initialisieren, um sicherzugehen, dass der Token aktuell ist
+                initPushNotifications();
+            } 
+            // Fall 2: Push ist noch nicht erlaubt -> Wir fragen an
+            else {
+                initPushNotifications();
+            }
+
+            // Button Status kurz danach aktualisieren
             setTimeout(loadProfileData, 1000);
         };
     }
@@ -123,9 +150,9 @@ export function initProfileView() {
     }
 }
 
-// Funktion zum Laden der Benutzerdaten (wird von main.js aufgerufen)
+// Funktion zum Laden der Benutzerdaten
 export function loadProfileData() {
-    const { currentUser } = getState(); // KORRIGIERT: getState() aufrufen
+    const { currentUser } = getState();
     
     if (currentUser && currentUser.userData) {
         if (dom.profileEmail) dom.profileEmail.textContent = currentUser.userData.email || '...';
@@ -134,11 +161,11 @@ export function loadProfileData() {
         // Push Button Status
         if (dom.enableNotificationsBtn) {
             if (Notification.permission === 'granted') {
-                dom.enableNotificationsBtn.innerHTML = '<i class="fa-solid fa-bell"></i> Push aktiv (Testen)';
-                dom.enableNotificationsBtn.className = 'button-primary';
+                dom.enableNotificationsBtn.innerHTML = '<i class="fa-solid fa-bell"></i> Push testen 🔔';
+                dom.enableNotificationsBtn.className = 'button-primary'; // Grün oder hervorgehoben
             } else {
-                dom.enableNotificationsBtn.innerHTML = '<i class="fa-solid fa-bell"></i> Push aktivieren';
-                dom.enableNotificationsBtn.className = 'button-secondary';
+                dom.enableNotificationsBtn.innerHTML = '<i class="fa-solid fa-bell-slash"></i> Push aktivieren';
+                dom.enableNotificationsBtn.className = 'button-secondary'; // Grau oder neutral
             }
         }
     }
