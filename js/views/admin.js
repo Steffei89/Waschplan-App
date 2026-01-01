@@ -12,11 +12,41 @@ import { KARMA_START, COST_SLOT_NORMAL, COST_SLOT_PRIME } from '../config.js';
 import { updateKarma, getPartyKarma } from '../services/karma.js';
 import { getSystemStatus, setSystemStatus, subscribeToTickets, toggleTicketStatus } from '../services/maintenance.js';
 import { loadWashPrograms, addWashProgram, deleteWashProgram } from '../services/timers.js';
-import { loadStatistics } from '../services/stats.js';
 import { deleteMinigameScore, resetMinigameLeaderboard } from '../services/minigame.js';
 import { formatDate } from '../utils.js'; 
 
 const MESSAGE_ID = 'admin-message';
+
+// ===== NAVIGATION STATE =====
+let currentAdminView = 'menu'; // 'menu', 'list', 'detail'
+let currentListTitle = '';
+let currentListType = '';
+
+// Diese Funktion wird von main.js aufgerufen, wenn der globale Zurück-Button gedrückt wird
+// Rückgabe: true = Navigation wurde hier behandelt (Admin-Intern)
+// Rückgabe: false = Wir sind im Hauptmenü, App soll Admin verlassen
+export function handleAdminBack() {
+    const subView = document.getElementById('admin-sub-view');
+    const mainMenu = document.getElementById('admin-main-menu');
+    const container = document.getElementById('admin-ui-wrapper');
+    
+    // Fall 1: Wir sind in einer Detail-Ansicht -> Zurück zur Liste
+    if (currentAdminView === 'detail') {
+        openSubView(currentListType, currentListTitle); // Liste neu laden
+        return true; 
+    }
+
+    // Fall 2: Wir sind in einer Unterliste -> Zurück zum Admin Menü
+    if (currentAdminView === 'list') {
+        if(subView) subView.style.display = 'none';
+        if(mainMenu) mainMenu.style.display = 'block';
+        currentAdminView = 'menu';
+        return true; 
+    }
+
+    // Fall 3: Wir sind im Admin Menü -> false zurückgeben, damit main.js das Menü verlässt
+    return false;
+}
 
 // ===== HELPER: GENERIC IOS LIST ITEM =====
 function createIOSListItem(text, iconClass, onClick, extraHtml = '') {
@@ -54,6 +84,9 @@ export async function loadAdminUserData() {
         return;
     }
     
+    // Reset State
+    currentAdminView = 'menu';
+    
     container.innerHTML = '';
     
     const wrapper = document.createElement('div');
@@ -72,7 +105,7 @@ export async function loadAdminUserData() {
     wrapper.appendChild(subView);
     container.appendChild(wrapper);
 
-    // --- MENÜ STRUKTUR (HIER IST "TEST-LABOR" DABEI) ---
+    // --- MENÜ STRUKTUR ---
     mainMenu.appendChild(createIOSListItem('Benutzerverwaltung', 'fa-solid fa-users', () => openSubView('users', 'Benutzer')));
     mainMenu.appendChild(createIOSListItem('System-Status & Wartung', 'fa-solid fa-server', () => openSubView('system', 'System')));
     mainMenu.appendChild(createIOSListItem('Einstellungen (Kosten/Wetter)', 'fa-solid fa-gear', () => openSubView('settings', 'Einstellungen')));
@@ -87,20 +120,20 @@ async function openSubView(type, title) {
     const mainMenu = document.getElementById('admin-main-menu');
     const subView = document.getElementById('admin-sub-view');
     
+    currentAdminView = 'list';
+    currentListType = type;
+    currentListTitle = title;
+    
     mainMenu.style.display = 'none';
     subView.style.display = 'block';
+    
+    // KEIN eigener Zurück-Button mehr hier!
     subView.innerHTML = `
         <div style="display:flex; align-items:center; margin-bottom:20px; border-bottom:1px solid var(--border-color); padding-bottom:10px;">
-            <button id="admin-back-btn" class="button-small button-secondary" style="margin-right:15px;"><i class="fa-solid fa-arrow-left"></i> Zurück</button>
             <h3 style="margin:0;">${title}</h3>
         </div>
         <div id="admin-sub-content"></div>
     `;
-
-    document.getElementById('admin-back-btn').onclick = () => {
-        subView.style.display = 'none';
-        mainMenu.style.display = 'block';
-    };
 
     const contentDiv = document.getElementById('admin-sub-content');
     contentDiv.innerHTML = '<div class="skeleton-item"><div class="skeleton skeleton-line full"></div></div>'; 
@@ -144,17 +177,13 @@ async function renderUserListOverview(container) {
 }
 
 async function openUserDetail(user) {
-    const contentDiv = document.getElementById('admin-sub-content');
-    const backBtn = document.getElementById('admin-back-btn');
-    const oldOnClick = backBtn.onclick; 
+    // State auf Detail setzen
+    currentAdminView = 'detail';
     
-    backBtn.onclick = () => {
-        openSubView('users', 'Benutzer'); 
-        backBtn.onclick = oldOnClick; 
-    };
-
+    const contentDiv = document.getElementById('admin-sub-content');
     const karma = await getPartyKarma(user.partei);
 
+    // Hier ersetzen wir den Inhalt, aber die Header-Logik bleibt
     contentDiv.innerHTML = `
         <div class="user-detail-card" style="background:var(--secondary-color); padding:20px; border-radius:12px;">
             <h4 style="margin-top:0;">Bearbeiten: ${user.email}</h4>
@@ -382,8 +411,7 @@ async function renderTicketSettings(container) {
 }
 
 export function initAdminView() {
-    const backBtn = document.getElementById('back-to-menu-btn-6');
-    if(backBtn) backBtn.addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
+    // Legacy cleanup
 }
 
 async function handleSmartReset() {

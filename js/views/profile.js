@@ -76,7 +76,8 @@ export function initProfileView() {
     });
 
     document.getElementById('show-changelog-btn').addEventListener('click', showChangelog);
-    document.getElementById('back-to-menu-btn-4').addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
+    
+    // Listener für "Zurück" wurde entfernt. Der globale Button im Header übernimmt das nun.
 }
 
 // ===== HILFSFUNKTION: KARMA BILANZ (TOTAL - Historie & Zukunft) =====

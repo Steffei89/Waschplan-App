@@ -41,6 +41,7 @@ import { initKarmaForParty } from './services/karma.js';
 import { startSession, updateSession } from './services/analytics.js';
 import { initPushNotifications } from './services/push.js';
 import { initGestures } from './services/gestures.js';
+import { handleAdminBack } from './views/admin.js'; // NEU IMPORTIERT
 
 let allPrograms = []; 
 let currentTimerData = null; 
@@ -421,6 +422,23 @@ document.getElementById('logout-btn').addEventListener('click', handleLogout);
 dom.themeIcon.addEventListener('click', () => { const newTheme = getState().currentTheme === 'light' ? 'dark' : 'light'; setTheme(newTheme, true); });
 document.getElementById('refresh-app-btn').addEventListener('click', () => { const btn = document.getElementById('refresh-app-btn'); btn.classList.add('fa-spin'); location.reload(true); setTimeout(() => btn.classList.remove('fa-spin'), 1500); });
 
+// --- INTELLIGENTER GLOBALER ZURÜCK BUTTON ---
+const globalBackBtn = document.getElementById('global-back-btn');
+if (globalBackBtn) {
+    globalBackBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        
+        // 1. Prüfen, ob wir im Admin-Bereich sind und der Admin-Handler das übernehmen will
+        if (dom.adminSection && dom.adminSection.style.display !== 'none') {
+            const handledByAdmin = handleAdminBack(); // Ruft Funktion in admin.js auf
+            if (handledByAdmin) return; // Wenn Admin intern navigiert hat, fertig
+        }
+
+        // 2. Fallback: Zurück zum Hauptmenü
+        navigateTo(dom.mainMenu, 'back');
+    });
+}
+
 function setupMainMenuListeners() {
     document.getElementById('book-btn').addEventListener('click', () => { 
         trackMenuClick('btn_book'); unsubscribeForNavigation(); dom.bookingDateInput.value = getFormattedDate(tomorrow); dom.dateValidationMessage.textContent = ''; dom.bookingSlotSelect.value = ''; const costPreview = document.getElementById('booking-cost-display'); const bookBtn = dom.bookSubmitBtn; if(costPreview) costPreview.style.display = 'none'; if(bookBtn) { const btnText = document.getElementById("book-text"); if(btnText) btnText.textContent = "Buchen"; } navigateTo(dom.bookingSection); dom.bookingDateInput.dispatchEvent(new Event('change')); 
@@ -440,9 +458,8 @@ function setupMainMenuListeners() {
     document.getElementById('profile-btn').addEventListener('click', () => { unsubscribeForNavigation(); loadProfileData(); navigateTo(dom.profileSection); });
     
     const minigameBtn = document.getElementById('minigame-btn'); if (minigameBtn) { minigameBtn.addEventListener('click', async () => { trackMenuClick('btn_minigame'); unsubscribeForNavigation(); const { initMinigame } = await import('./services/minigame.js'); initMinigame(); navigateTo(dom.minigameSection); }); }
-    const backGameBtn = document.getElementById('back-to-menu-btn-game'); if (backGameBtn) { backGameBtn.addEventListener('click', () => navigateTo(dom.mainMenu, 'back')); }
+    
     const reportBtn = document.getElementById('report-issue-btn'); if (reportBtn) { reportBtn.addEventListener('click', () => { const maintSec = document.getElementById('maintenanceSection'); if (maintSec) navigateTo(maintSec); }); }
-    const maintBackBtn = document.getElementById('back-to-menu-btn-maint'); if (maintBackBtn) maintBackBtn.addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
     
     const submitMaintBtn = document.getElementById('submit-maintenance-btn'); 
     if (submitMaintBtn) { 
@@ -466,7 +483,6 @@ async function updateBookingCostPreview() {
     if(bookBtnText) { bookBtnText.textContent = `Buchen (-${cost} Karma)`; }
 }
 
-document.getElementById('back-to-menu-btn-1').addEventListener('click', () => navigateTo(dom.mainMenu, 'back'));
 dom.bookSubmitBtn.addEventListener("click", async () => { const date = dom.bookingDateInput.value; const slot = dom.bookingSlotSelect.value; const button = dom.bookSubmitBtn; const bookText = document.getElementById("book-text"); const bookIcon = document.getElementById("book-success-icon"); button.disabled = true; if (bookText) bookText.textContent = "Buche..."; if (bookIcon) bookIcon.style.display = 'none'; let success = false; try { success = await performBooking(date, slot, 'booking-error'); } catch (e) { console.error(e); showMessage('booking-error', 'Ein unerwarteter Fehler ist aufgetreten.', 'error'); success = false; } finally { if (success) { button.classList.add('booking-success'); if(bookText) bookText.style.display = 'none'; if(bookIcon) bookIcon.style.display = 'block'; setTimeout(() => { button.classList.remove('booking-success'); if(bookIcon) bookIcon.style.display = 'none'; if(bookText) { bookText.style.display = 'block'; bookText.textContent = "Buchen"; } button.disabled = false; dom.bookingDateInput.dispatchEvent(new Event('change')); }, 2000); } else { if(bookText) bookText.textContent = "Buchen"; button.disabled = false; } } });
 
 dom.bookingDateInput.addEventListener('change', async () => { 
@@ -483,13 +499,9 @@ dom.changelogCloseBtn.addEventListener('click', () => { dom.changelogModal.style
 
 function checkAppVersion() { 
     const seenVersion = localStorage.getItem('waschplan_version'); 
-    
-    // Wenn die Version neu ist: Nur speichern, damit sie als "bekannt" gilt, 
-    // aber KEIN showChangelog() aufrufen.
     if (seenVersion !== APP_VERSION) { 
         localStorage.setItem('waschplan_version', APP_VERSION); 
     } 
-    
     checkTutorialSeen(); 
 }
 

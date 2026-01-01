@@ -39,22 +39,12 @@ export function hideConfirmation() {
     dom.confirmationModal.style.display = 'none';
 }
 
-// ===== WICHTIG: Nur Seiten-Listener stoppen, Globale (Timer) behalten! =====
 export function unsubscribeForNavigation() {
     const unsubscribers = getUnsubscribers();
-    
-    // Wir stoppen NUR Listener, die spezifisch für eine Unterseite sind.
-    if (unsubscribers.overview) { 
-        unsubscribers.overview(); 
-        setUnsubscriber('overview', null); 
-    }
-    if (unsubscribers.calendar) { 
-        unsubscribers.calendar(); 
-        setUnsubscriber('calendar', null); 
-    }
+    if (unsubscribers.overview) { unsubscribers.overview(); setUnsubscriber('overview', null); }
+    if (unsubscribers.calendar) { unsubscribers.calendar(); setUnsubscriber('calendar', null); }
 }
 
-// Wird nur beim LOGOUT aufgerufen -> Killt alles
 export function unsubscribeAll() {
     const unsubscribers = getUnsubscribers();
     Object.values(unsubscribers).forEach(unsub => { if (unsub) unsub(); });
@@ -79,10 +69,7 @@ export const allSections = [
     document.getElementById('maintenanceSection') 
 ];
 
-// Navigation mit View Transitions und Richtungsangabe
-// direction kann 'forward' (Standard) oder 'back' sein
 export function navigateTo(sectionElement, direction = 'forward') {
-    // Wir setzen ein Attribut am HTML-Tag, damit CSS die Richtung kennt
     document.documentElement.dataset.transition = direction;
 
     if (document.startViewTransition) {
@@ -110,10 +97,27 @@ function performNavigation(sectionElement) {
                        sectionElement === dom.verifyEmailMessage;
     
     const isGame = sectionElement === dom.minigameSection;
+    const isMainMenu = sectionElement === dom.mainMenu;
 
+    // Header Steuerung
     if (dom.headerContainer) {
         dom.headerContainer.style.display = isGame ? 'none' : 'flex';
+        
+        // INTELLIGENTER ZURÜCK BUTTON MOVE
+        const globalBackBtn = document.getElementById('global-back-btn');
+        if (globalBackBtn) {
+            // Wenn wir auf einer Unterseite sind (nicht MainMenu, nicht Auth, nicht Game)
+            if (currentUser && !isMainMenu && !isAuthPage && !isGame && sectionElement) {
+                // Button in den aktuellen Container oben einfügen (verschiebt ihn im DOM)
+                sectionElement.prepend(globalBackBtn);
+                globalBackBtn.style.display = 'flex';
+            } else {
+                // Ansonsten verstecken
+                globalBackBtn.style.display = 'none';
+            }
+        }
     }
+
     if (dom.userInfo) {
         dom.userInfo.style.display = (currentUser && !isAuthPage && !isGame) ? 'flex' : 'none';
     }
@@ -163,7 +167,6 @@ export function setTheme(theme, save = true) {
             dom.themeIcon.title = 'Zum Dunkel-Modus wechseln';
         }
     }
-    // Falls Admin-Bereich offen ist, Charts neu laden (für Farbanpassung)
     if (dom.adminSection && dom.adminSection.style.display === 'block') {
         loadStatistics(true); 
     }

@@ -23,6 +23,8 @@
 <div id="app" style="display:none;">
 
   <div class="header-container">
+    <div style="flex-grow: 1;"></div> 
+
     <div class="header-controls-wrapper">
         <div id="header-karma-display" class="karma-badge" style="display:none; cursor: pointer;" title="Tippen für Erklärung">
             <i id="header-karma-icon" class="fa-solid fa-circle-check"></i>
@@ -33,7 +35,7 @@
         <i id="theme-icon" class="fa-solid fa-sun clickable"></i>
     </div>
     
-    <div style="display: flex; gap: 8px; align-items: center;">
+    <div style="display: flex; gap: 8px; align-items: center; margin-left: 8px;">
         <div id="machine-status-widget" class="status-widget" style="display:none;" title="Maschinen-Status">
             <i id="machine-status-icon" class="fa-solid fa-shirt"></i>
             <span id="machine-status-text">Lade...</span>
@@ -136,7 +138,6 @@
   </div>
 
   <div id="maintenanceSection" class="card" style="display:none;">
-      <button id="back-to-menu-btn-maint" class="back-button"><i class="fa-solid fa-chevron-left"></i> Zurück</button>
       <h2>Problem melden</h2>
       <div id="maintenance-message" class="message-box" style="display:none;"></div>
       <p>Was stimmt nicht mit der Maschine?</p>
@@ -152,7 +153,6 @@
   </div>
 
   <div id="minigameSection" class="card" style="display:none; text-align: center;">
-    <button id="back-to-menu-btn-game" class="back-button"><i class="fa-solid fa-chevron-left"></i> Zurück</button>
     <h2>Socken-Retter 🫧</h2>
     <div id="game-start-screen">
         <p style="font-size: 1.1em; margin-bottom: 20px;">
@@ -198,7 +198,6 @@
   </div>
 
   <div id="bookingSection" class="card" style="display:none;">
-    <button id="back-to-menu-btn-1" class="back-button"><i class="fa-solid fa-chevron-left"></i> Zurück</button>
     <h2>Buchung vornehmen</h2>
     <div id="booking-error" class="message-box" style="display:none;"></div>
     <input type="date" id="booking-date" required>
@@ -225,7 +224,6 @@
   </div>
 
   <div id="overviewSection" class="card" style="display:none;">
-    <button id="back-to-menu-btn-2" class="back-button"><i class="fa-solid fa-chevron-left"></i> Zurück</button>
     <h2>Wochenübersicht</h2>
     <div id="overview-message" class="message-box" style="display:none;"></div>
     <select id="kw-select" class="mb-10"></select>
@@ -233,7 +231,6 @@
   </div>
 
   <div id="calendarSection" class="card" style="display:none;">
-    <button id="back-to-menu-btn-3" class="back-button"><i class="fa-solid fa-chevron-left"></i> Zurück</button>
     <h2>Monatsübersicht</h2>
     <div class="calendar-controls">
       <button id="prev-month-btn"><i class="fa-solid fa-angle-left"></i></button>
@@ -264,7 +261,6 @@
   </div>
   
   <div id="adminSection" class="card" style="display:none;">
-    <button id="back-to-menu-btn-6" class="back-button"><i class="fa-solid fa-chevron-left"></i> Zurück</button>
     <h2>Admin-Konsole</h2>
     <div id="admin-message" class="message-box" style="display:none;"></div>
     
@@ -272,7 +268,6 @@
   </div>
 
   <div id="profileSection" class="card" style="display:none;">
-    <button id="back-to-menu-btn-4" class="back-button"><i class="fa-solid fa-chevron-left"></i> Zurück</button>
     <h2>Profil bearbeiten</h2>
     <div id="profile-message" class="message-box" style="display:none;"></div>
     <p><strong>E-Mail:</strong> <span id="profile-email"></span></p>
@@ -342,42 +337,9 @@
 
   <div id="karmaGuideModal" class="modal" style="display:none; z-index: 9999;">
     <div class="modal-content" style="max-width: 450px; width: 90%; max-height: 90vh; display: flex; flex-direction: column; padding: 20px;">
-        
         <h2 style="margin-top:0; color: var(--primary-color); text-align: center; flex-shrink: 0;">✨ Wasch-Karma Guide</h2>
-        
         <div style="overflow-y: auto; flex-grow: 1; text-align: left; padding-right: 5px;">
             <p style="margin-bottom: 20px;">Das System sorgt dafür, dass jeder fair drankommt. Hier sind alle Regeln im Detail:</p>
-            
-            <div style="margin-bottom: 15px; background: var(--secondary-color); padding: 15px; border-radius: 12px; border-left: 4px solid var(--primary-color);">
-                <h4 style="margin:0 0 5px 0;">💰 Punkte & Kosten</h4>
-                <ul style="margin:0; padding-left: 20px;">
-                    <li><strong>Startguthaben:</strong> 100 Punkte</li>
-                    <li><strong>Werktags buchen:</strong> -10 Punkte</li>
-                    <li><strong>Wochenende buchen:</strong> -20 Punkte (Prime Time)</li>
-                    <li><strong>Aufladung:</strong> +20 Punkte jeden Montag (automatisch)</li>
-                </ul>
-            </div>
-
-            <div style="margin-bottom: 15px; background: var(--secondary-color); padding: 15px; border-radius: 12px; border-left: 4px solid var(--success-color);">
-                <h4 style="margin:0 0 5px 0;">🎁 Boni verdienen</h4>
-                <ul style="margin:0; padding-left: 20px;">
-                    <li><strong>Früher fertig?</strong> Checke aus und erhalte <strong>+5 Punkte</strong> zurück.</li>
-                    <li><strong>Sozial sein:</strong> Nimm eine Tauschanfrage an und erhalte <strong>+15 Punkte</strong> Bonus!</li>
-                </ul>
-            </div>
-
-            <div style="margin-bottom: 15px; background: var(--secondary-color); padding: 15px; border-radius: 12px; border-left: 4px solid #FF9500;">
-                <h4 style="margin:0 0 5px 0;">🏆 Dein Status</h4>
-                <p style="font-size: 0.9em; margin: 0;">Dein Punktestand bestimmt, wie weit im Voraus du buchen darfst:</p>
-                <ul style="margin:5px 0 0 0; padding-left: 20px; font-size: 0.9em;">
-                    <li><strong>💎 VIP (>80):</strong> 4 Wochen Vorausbuchung</li>
-                    <li><strong>🙂 Standard (40-80):</strong> 2 Wochen Vorausbuchung</li>
-                    <li><strong>⚠️ Eingeschränkt (<40):</strong> 1 Woche Vorausbuchung</li>
-                </ul>
-            </div>
-        </div>
-
-        <div style="flex-shrink: 0; margin-top: 15px;">
             <button id="close-karma-guide-btn" class="button-primary" style="width: 100%;">Alles klar! 👍</button>
         </div>
     </div>
@@ -386,21 +348,6 @@
     <div class="modal-content" style="max-width: 400px; text-align: left;">
         <h2 style="margin-top:0; color: var(--primary-color);">✨ Neustart & Fairness</h2>
         <p>Hallo! Wir haben das System vereinfacht und für alle gerecht gemacht.</p>
-        
-        <div style="margin: 15px 0; background: var(--secondary-color); padding: 15px; border-radius: 12px;">
-            <p><strong>1. Dein Startguthaben</strong><br>
-            Jeder startet ab sofort wieder mit <span style="color:green">100 Punkten</span>.</p>
-            
-            <p><strong>2. Was kostet Waschen?</strong><br>
-            • Werktags: <span style="color:#007AFF">-10 Punkte</span><br>
-            • Wochenende: <span style="color:red">-20 Punkte</span></p>
-            
-            <p><strong>3. Aufladung</strong><br>
-            Jeden Montag bekommst du automatisch <span style="color:green">+20 Punkte</span> geschenkt.</p>
-        </div>
-
-        <p class="small-text" style="text-align:center;">Ziel: Wer viel wäscht, lässt anderen am Wochenende den Vortritt.</p>
-
         <button id="tutorial-confirm-btn" class="button-primary">Verstanden & Akzeptiert 👍</button>
     </div>
   </div>
@@ -417,6 +364,10 @@
         </div>
     </div>
 </div>
+
+<button id="global-back-btn" class="back-button" style="display:none;">
+    <i class="fa-solid fa-chevron-left"></i> Zurück
+</button>
 
 <script type="module" src="js/main.js"></script>
 </body>
