@@ -1,8 +1,10 @@
-// sw.js - Version 6.0 (Performance & Push)
+// sw.js - Version 7.0 (Network First für Updates)
 importScripts('https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.1/firebase-messaging-compat.js');
 
-const CACHE_NAME = 'waschplan-v6';
+// WICHTIG: Ändere diesen Namen bei JEDEM Update (z.B. v7, v8, v9...)
+const CACHE_NAME = 'waschplan-v7-network-first';
+
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -15,10 +17,17 @@ const ASSETS_TO_CACHE = [
   './js/utils.js',
   './js/ui.js',
   './js/config.js',
+  './js/views/admin.js',
+  './js/views/calendar.js',
+  './js/views/overview.js',
+  './js/views/profile.js',
+  './js/services/auth.js',
+  './js/services/booking.js',
+  './js/services/karma.js',
+  './js/services/stats.js',
+  './js/services/timers.js',
   './img/icon-192.png',
-  './img/icon-512.png', // Falls vorhanden
-  './img/bg-alps-day.jpg', // Falls vorhanden
-  './img/bg-alps-night.jpg' // Falls vorhanden
+  './img/icon-512.png'
 ];
 
 const firebaseConfig = {
@@ -33,21 +42,22 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-console.log('[sw.js] Service Worker v6.0 (Cache & Push) geladen.');
+console.log('[sw.js] Service Worker v7.0 geladen.');
 
-// INSTALL: App Shell cachen (Dateien für den Offline-Start)
+// INSTALL: App Shell cachen
 self.addEventListener('install', (event) => {
+    // Erzwingt, dass der neue SW sofort wartet und nicht erst beim nächsten Start
+    self.skipWaiting(); 
+    
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
-            console.log('[sw.js] Pre-caching Assets');
-            // Wir nutzen catch, damit ein fehlendes Bild nicht den ganzen Service Worker killt
-            return cache.addAll(ASSETS_TO_CACHE).catch(err => console.warn("Einige Assets konnten nicht gecacht werden (evtl. Bilder fehlen):", err));
+            console.log('[sw.js] Caching Assets');
+            return cache.addAll(ASSETS_TO_CACHE).catch(err => console.warn("Caching Fehler:", err));
         })
     );
-    self.skipWaiting();
 });
 
-// ACTIVATE: Alte Caches aufräumen
+// ACTIVATE: Alte Caches sofort löschen und Kontrolle übernehmen
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((cacheNames) => {
@@ -61,54 +71,67 @@ self.addEventListener('activate', (event) => {
             );
         })
     );
+    // Wichtig: Übernimmt sofort die Kontrolle über alle offenen Tabs
     self.clients.claim();
 });
 
-// FETCH: Strategie "Cache First, falling back to Network"
+// FETCH: "Network First" Strategie für Code, "Cache First" für Bilder
 self.addEventListener('fetch', (event) => {
-    // Nur GET Requests cachen
     if (event.request.method !== 'GET') return;
-    
-    // Keine Firestore/API/Google Requests cachen (Daten müssen aktuell sein)
+
     const url = new URL(event.request.url);
+    
+    // Google/Firebase APIs ignorieren
     if (url.origin.includes('googleapis.com') || url.origin.includes('firestore')) return;
 
-    event.respondWith(
-        caches.match(event.request).then((cachedResponse) => {
-            if (cachedResponse) {
-                return cachedResponse;
-            }
-            return fetch(event.request).then((networkResponse) => {
-                // Nur gültige Antworten cachen
-                if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+    // Strategie-Entscheidung:
+    // Ist es HTML, JS, CSS oder JSON? -> NETWORK FIRST (Erst Internet, dann Cache)
+    // Ist es ein Bild? -> CACHE FIRST (Erst Cache, dann Internet)
+    
+    const isCode = event.request.destination === 'document' || // HTML
+                   event.request.destination === 'script' ||   // JS
+                   event.request.destination === 'style' ||    // CSS
+                   event.request.url.includes('manifest.json');
+
+    if (isCode) {
+        event.respondWith(
+            fetch(event.request)
+                .then((networkResponse) => {
+                    // Wenn Netzwerk erfolgreich: Antwort klonen, in Cache speichern, an User geben
+                    if (networkResponse && networkResponse.status === 200) {
+                        const responseToCache = networkResponse.clone();
+                        caches.open(CACHE_NAME).then((cache) => {
+                            cache.put(event.request, responseToCache);
+                        });
+                    }
                     return networkResponse;
-                }
-                const responseToCache = networkResponse.clone();
-                caches.open(CACHE_NAME).then((cache) => {
-                    cache.put(event.request, responseToCache);
-                });
-                return networkResponse;
-            });
-        })
-    );
+                })
+                .catch(() => {
+                    // Wenn Netzwerk offline: Cache nutzen
+                    return caches.match(event.request);
+                })
+        );
+    } else {
+        // Bilder und Sonstiges: Cache First (schneller, spart Daten)
+        event.respondWith(
+            caches.match(event.request).then((cachedResponse) => {
+                return cachedResponse || fetch(event.request);
+            })
+        );
+    }
 });
 
-// PUSH: Hintergrund-Nachrichten
+// PUSH
 self.addEventListener('notificationclick', (event) => {
     event.notification.close();
     const urlToOpen = 'https://waschplanapp.web.app';
-
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
             for (let i = 0; i < windowClients.length; i++) {
                 const client = windowClients[i];
-                if (client.url.includes(urlToOpen) && 'focus' in client) {
-                    return client.focus();
-                }
+                if (client.url.includes(urlToOpen) && 'focus' in client) return client.focus();
             }
-            if (clients.openWindow) {
-                return clients.openWindow(urlToOpen);
-            }
+            if (clients.openWindow) return clients.openWindow(urlToOpen);
         })
     );
 });

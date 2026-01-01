@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 <script src="https://unpkg.com/html5-qrcode" type="text/javascript" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script> 
-<link rel="stylesheet" href="style.css?v=ios_menu_final">
+<link rel="stylesheet" href="style.css?v=3.4.1">
 </head>
 <body>
 
@@ -76,7 +76,7 @@
     <button id="login-btn">Einloggen</button>
     <p id="switch-register">Noch nicht registriert? <span id="show-register" class="clickable">Registrieren</span></p>
     <p style="text-align: center; margin-top: 10px;" class="small-text"><span id="show-reset-password" class="clickable">Passwort vergessen?</span></p>
-    <div class="app-version">Version 3.4.0</div>
+    <div class="app-version">Version 3.4.1</div>
   </div>
 
   <div id="registerForm" class="card" style="display:none;">
@@ -99,7 +99,7 @@
     </div>
     <button id="register-btn">Registrieren</button>
     <p id="switch-login">Bereits registriert? <span id="show-login" class="clickable">Login</span></p>
-    <div class="app-version">Version 3.4.0</div>
+    <div class="app-version">Version 3.4.1</div>
   </div>
 
   <div id="verifyEmailMessage" class="card" style="display:none;">
@@ -280,7 +280,7 @@
     <button id="show-changelog-btn" class="button-secondary"><i class="fa-solid fa-gift"></i> Letzte Änderungen anzeigen</button>
     <hr style="margin-top: 25px;">
     <button id="delete-account-btn" class="button-danger">Konto löschen</button>
-    <div class="app-version">Version 3.4.0</div>
+    <div class="app-version">Version 3.4.1</div>
   </div>
 
   <div id="confirmationModal" class="modal" style="display:none;">
@@ -340,6 +340,17 @@
         <h2 style="margin-top:0; color: var(--primary-color); text-align: center; flex-shrink: 0;">✨ Wasch-Karma Guide</h2>
         <div style="overflow-y: auto; flex-grow: 1; text-align: left; padding-right: 5px;">
             <p style="margin-bottom: 20px;">Das System sorgt dafür, dass jeder fair drankommt. Hier sind alle Regeln im Detail:</p>
+            <div style="margin-bottom: 15px; background: var(--secondary-color); padding: 15px; border-radius: 12px; border-left: 4px solid var(--primary-color);">
+                <h4 style="margin:0 0 5px 0;">💰 Punkte & Kosten</h4>
+                <ul style="margin:0; padding-left: 20px;">
+                    <li><strong>Startguthaben:</strong> 100 Punkte</li>
+                    <li><strong>Werktags buchen:</strong> -10 Punkte</li>
+                    <li><strong>Wochenende buchen:</strong> -20 Punkte (Prime Time)</li>
+                    <li><strong>Aufladung:</strong> +20 Punkte jeden Montag (automatisch)</li>
+                </ul>
+            </div>
+            </div>
+        <div style="flex-shrink: 0; margin-top: 15px;">
             <button id="close-karma-guide-btn" class="button-primary" style="width: 100%;">Alles klar! 👍</button>
         </div>
     </div>

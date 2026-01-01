@@ -1,15 +1,22 @@
-// js/main.js - Version 3.3.0 - iOS Style Admin & Live Config
+// js/main.js - Version 3.4.1 - Auto Update & Admin Back Fix
 
 // ===== INTELLIGENTER SERVICE WORKER (AUTO-UPDATE) =====
 if ('serviceWorker' in navigator) {
   let refreshing = false;
+
+  // Wenn der SW sich aktualisiert hat, Seite neu laden
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!refreshing) { refreshing = true; window.location.reload(); }
+    if (!refreshing) {
+      refreshing = true;
+      window.location.reload();
+    }
   });
+
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').then((registration) => {
+      // Bei jedem Start explizit nach Updates suchen
       registration.update();
-      if (registration.waiting) console.log('Wartendes Update gefunden...');
+      console.log("Service Worker registriert, suche nach Updates...");
     });
   });
 }
@@ -41,13 +48,13 @@ import { initKarmaForParty } from './services/karma.js';
 import { startSession, updateSession } from './services/analytics.js';
 import { initPushNotifications } from './services/push.js';
 import { initGestures } from './services/gestures.js';
-import { handleAdminBack } from './views/admin.js'; // NEU IMPORTIERT
+import { handleAdminBack } from './views/admin.js'; 
 
 let allPrograms = []; 
 let currentTimerData = null; 
 let activeTimerInterval = null; 
 let karmaUnsubscribe = null; 
-let configUnsubscribe = null; // NEU: Listener für Config
+let configUnsubscribe = null; 
 let myCurrentBooking = null;
 let autoCheckoutInterval = null;
 let machineStatusUnsubscribe = null;
@@ -124,7 +131,7 @@ onAuthStateChanged(auth, async (user) => {
         dom.loadingOverlay.style.display = 'none'; dom.appContainer.style.display = 'block';
         unsubscribeAll();
         if(karmaUnsubscribe) karmaUnsubscribe();
-        if(configUnsubscribe) configUnsubscribe(); // Cleanup
+        if(configUnsubscribe) configUnsubscribe(); 
         if(machineStatusUnsubscribe) machineStatusUnsubscribe();
         if (autoCheckoutInterval) clearInterval(autoCheckoutInterval);
         
@@ -166,7 +173,6 @@ function handleMachineStatus() {
     });
 }
 
-// ===== UPDATE: Live-Config Listener für den Header =====
 function setupKarmaHeaderListener(parteiName) {
     if(configUnsubscribe) configUnsubscribe();
     if(karmaUnsubscribe) karmaUnsubscribe();
@@ -177,7 +183,6 @@ function setupKarmaHeaderListener(parteiName) {
     
     if (!headerDisplay || !headerValue || !headerIcon) return;
 
-    // Klick-Listener (immer aktiv, falls sichtbar)
     headerDisplay.onclick = () => {
         const modal = document.getElementById('karmaGuideModal');
         const closeBtn = document.getElementById('close-karma-guide-btn');
@@ -187,7 +192,6 @@ function setupKarmaHeaderListener(parteiName) {
         }
     };
 
-    // 1. Config Listener: Schaltet Anzeige an/aus
     configUnsubscribe = onSnapshot(doc(db, 'app_settings', 'config'), (configSnap) => {
         const karmaActive = configSnap.exists() ? (configSnap.data().karmaSystemActive !== false) : true;
         
@@ -195,7 +199,6 @@ function setupKarmaHeaderListener(parteiName) {
             headerDisplay.style.display = 'none';
         } else {
             headerDisplay.style.display = 'flex';
-            // 2. Party Listener: Nur starten, wenn System aktiv ist (und noch nicht läuft)
             if (!karmaUnsubscribe) {
                 startPartyListener(parteiName, headerValue, headerDisplay, headerIcon);
             }
@@ -214,7 +217,6 @@ function startPartyListener(parteiName, headerValue, headerDisplay, headerIcon) 
         }
     });
 }
-// ====================================================
 
 function handleLoadNextBookings() {
     dom.myBookingsList.innerHTML = `<div class="skeleton-item"><div class="skeleton skeleton-line"></div><div class="skeleton skeleton-line short"></div></div>`;
