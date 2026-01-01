@@ -480,7 +480,18 @@ document.getElementById('confirm-cancel').addEventListener('click', hideConfirma
 dom.cancelDeleteAccountBtn.addEventListener('click', () => { dom.deleteAccountModal.style.display = 'none'; dom.deleteAccountPasswordInput.value = ''; showMessage('delete-account-message', '', 'error'); });
 dom.confirmDeleteAccountBtn.addEventListener('click', async () => { const password = dom.deleteAccountPasswordInput.value; await handleDeleteAccount(password); });
 dom.changelogCloseBtn.addEventListener('click', () => { dom.changelogModal.style.display = 'none'; localStorage.setItem('waschplan_version', APP_VERSION); });
-function checkAppVersion() { const seenVersion = localStorage.getItem('waschplan_version'); if (seenVersion !== APP_VERSION) { showChangelog(); } checkTutorialSeen(); }
+
+function checkAppVersion() { 
+    const seenVersion = localStorage.getItem('waschplan_version'); 
+    
+    // Wenn die Version neu ist: Nur speichern, damit sie als "bekannt" gilt, 
+    // aber KEIN showChangelog() aufrufen.
+    if (seenVersion !== APP_VERSION) { 
+        localStorage.setItem('waschplan_version', APP_VERSION); 
+    } 
+    
+    checkTutorialSeen(); 
+}
 
 initCalendarView(setUnsubscriber);
 initOverviewView(setUnsubscriber);
