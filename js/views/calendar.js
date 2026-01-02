@@ -14,7 +14,6 @@ import { COST_SLOT_NORMAL, COST_SLOT_PRIME } from '../config.js';
 let currentCalendarDate = new Date(); 
 
 export function initCalendarView(unsubscriberSetter) {
-    // Navigation Button Listener
     const prevBtn = document.getElementById('prev-month-btn');
     const nextBtn = document.getElementById('next-month-btn');
 
@@ -36,22 +35,19 @@ export function initCalendarView(unsubscriberSetter) {
         });
     }
 
-    // Action Buttons (Buchen, Löschen etc.)
     document.querySelectorAll('.calendar-action-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             await onCalendarActionClick(e);
         });
     });
 
-    // WICHTIG: Sofortiges Laden beim Start der App!
-    // (Das hat gefehlt, weshalb der Kalender erst leer war)
     loadBookingsForMonth(currentCalendarDate.getFullYear(), currentCalendarDate.getMonth(), unsubscriberSetter);
 }
 
 export function loadBookingsForMonth(year, monthIndex, unsubscriberSetter) {
     const unsubscribers = getUnsubscribers();
     if (unsubscribers && unsubscribers.calendar) {
-        unsubscribers.calendar(); // Alten Listener stoppen
+        unsubscribers.calendar(); 
     }
     
     const startOfMonth = new Date(year, monthIndex, 1);
@@ -59,7 +55,6 @@ export function loadBookingsForMonth(year, monthIndex, unsubscriberSetter) {
     const startDateString = formatDate(startOfMonth);
     const endDateString = formatDate(endOfMonth);
     
-    // Query erstellen
     const q = query(
         getBookingsCollectionRef(),
         where("date", ">=", startDateString), 
@@ -68,7 +63,6 @@ export function loadBookingsForMonth(year, monthIndex, unsubscriberSetter) {
         orderBy("slot")
     );
 
-    // Live-Listener starten
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
         const newBookings = {};
         querySnapshot.forEach(docSnap => {
@@ -83,7 +77,6 @@ export function loadBookingsForMonth(year, monthIndex, unsubscriberSetter) {
         setAllBookingsForMonth(newBookings);
         renderCalendar(year, monthIndex);
 
-        // Falls ein Tag ausgewählt war, Aktionen aktualisieren
         const { selectedCalendarDate } = getState();
         if (selectedCalendarDate) {
             updateCalendarDayActions(formatDate(selectedCalendarDate));
@@ -192,6 +185,7 @@ function renderCalendarLegend() {
     });
 }
 
+// === HIER IST DIE LOGIK FÜR DIE FARBIGEN PUNKTE ===
 function updateCalendarDayActions(dateString) {
     const { currentUser, userIsAdmin, allBookingsForMonth } = getState();
     if (!currentUser || !dom.calendarDayActions) return; 
@@ -234,11 +228,17 @@ function updateCalendarDayActions(dateString) {
         const booking = bookingsOnDay.find(b => b.slot === slotInfo.slot);
 
         if (booking) {
-            statusEl.textContent = `Gebucht (${booking.partei})`;
+            // --- FARBPUNKT-LOGIK START ---
+            const color = PARTEI_COLORS[booking.partei] || '#ccc';
+            // Wir bauen einen kleinen runden Punkt (span)
+            const dotHtml = `<span style="display:inline-block; width:10px; height:10px; background-color:${color}; border-radius:50%; margin-right:6px;"></span>`;
+            // --- FARBPUNKT-LOGIK ENDE ---
+
+            let statusText = `Gebucht (${booking.partei})`;
             statusEl.classList.add('booked');
 
             if (booking.partei === currentUser.userData.partei) {
-                statusEl.textContent = `Gebucht (Ihre Partei)`; 
+                statusText = `Gebucht (Ihre Partei)`; 
                 statusEl.classList.add('booked-me');
                 deleteBtn.style.display = 'block'; 
                 deleteBtn.dataset.id = booking.id;
@@ -255,6 +255,10 @@ function updateCalendarDayActions(dateString) {
                     requestBtn.dataset.id = booking.id; 
                 }
             }
+
+            // Hier setzen wir Punkt + Text
+            statusEl.innerHTML = `${dotHtml}${statusText}`;
+
         } else {
             if (hasDuplicateOnThisDay) {
                 statusEl.textContent = `Verfügbar (Sie haben bereits gebucht)`;
@@ -266,7 +270,7 @@ function updateCalendarDayActions(dateString) {
         }
         
         if (dateString < todayFormatted) {
-            statusEl.textContent = booking ? statusEl.textContent : 'Vergangen';
+            if(!booking) statusEl.textContent = 'Vergangen';
             bookBtn.style.display = 'none';
             deleteBtn.style.display = 'none';
             requestBtn.style.display = 'none';

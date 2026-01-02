@@ -69,7 +69,7 @@ export const allSections = [
     document.getElementById('maintenanceSection') 
 ];
 
-// --- NAVIGATION DOCK LOGIK (mit Callback) ---
+// --- NAVIGATION DOCK LOGIK ---
 export function initBottomNav(onTabChange) {
     const navItems = document.querySelectorAll('.nav-item');
     navItems.forEach(item => {
@@ -82,7 +82,7 @@ export function initBottomNav(onTabChange) {
 
             if(targetEl) navigateTo(targetEl);
             
-            // Callback ausführen (für Minigame Start)
+            // Callback (Minigame Init)
             if (onTabChange) onTabChange(targetId);
         });
     });
@@ -109,22 +109,26 @@ function performNavigation(sectionElement) {
                        sectionElement === dom.resetPasswordForm ||
                        sectionElement === dom.verifyEmailMessage;
     
-    const isGame = sectionElement === dom.minigameSection;
-
-    // Header Steuerung (Im Spiel ausgeblendet)
+    // Header
     if (dom.headerContainer) {
-        dom.headerContainer.style.display = isGame ? 'none' : 'flex';
+        // Immer anzeigen (außer Login). Vollbild regelt das CSS.
+        dom.headerContainer.style.display = isAuthPage ? 'none' : 'flex';
     }
 
-    // --- DOCK STEUERUNG ---
+    // Dock Steuerung
     const bottomNav = document.getElementById('bottom-nav');
     if (bottomNav) {
         if (currentUser && !isAuthPage) {
             bottomNav.style.display = 'flex';
             
+            let activeTabId = sectionElement.id;
+            if (activeTabId === 'maintenanceSection') activeTabId = 'profileSection';
+            if (activeTabId === 'adminSection') activeTabId = 'mainMenu';
+            if (activeTabId === 'bookingSection') activeTabId = 'calendarSection';
+
             const navItems = document.querySelectorAll('.nav-item');
             navItems.forEach(item => {
-                if(item.dataset.target === sectionElement.id) {
+                if(item.dataset.target === activeTabId) {
                     item.classList.add('active');
                 } else {
                     item.classList.remove('active');
@@ -135,7 +139,7 @@ function performNavigation(sectionElement) {
         }
     }
     
-    // --- BACK BUTTON ---
+    // Back Button
     const isMainTab = ['mainMenu', 'calendarSection', 'profileSection', 'minigameSection'].includes(sectionElement.id);
     const globalBackBtn = document.getElementById('global-back-btn');
     
@@ -149,12 +153,13 @@ function performNavigation(sectionElement) {
     }
 
     if (dom.userInfo) {
-        dom.userInfo.style.display = (currentUser && !isAuthPage && !isGame) ? 'flex' : 'none';
+        dom.userInfo.style.display = (currentUser && !isAuthPage) ? 'flex' : 'none';
     }
 
     if (dom.liveTimerSection) {
         const hasContent = dom.liveTimerSection.innerHTML.trim() !== '';
-        const shouldShowTimer = currentUser && !isAuthPage && !isGame && hasContent;
+        // Timer auch im Spiel-Tab anzeigen, solange nicht im Vollbild (CSS regelt das)
+        const shouldShowTimer = currentUser && !isAuthPage && hasContent;
 
         if (shouldShowTimer) {
             dom.liveTimerSection.style.display = 'block';
@@ -166,7 +171,7 @@ function performNavigation(sectionElement) {
     }
 
     if(sectionElement) {
-        sectionElement.style.display = isGame ? 'flex' : 'block';
+        sectionElement.style.display = (sectionElement.id === 'minigameSection') ? 'flex' : 'block';
         setTimeout(() => sectionElement.classList.add('active'), 50);
     }
 }
@@ -274,12 +279,9 @@ export async function showChangelog() {
         const text = await response.text();
         
         let htmlContent = '';
-        
-        // Versuche zu parsen
         try {
             const sections = text.split('## [');
             if (sections.length < 2) throw new Error("Format");
-            
             let latestChanges = sections[1].split('## [')[0];
             const lines = latestChanges.split('\n');
             const version = lines[0].split(']')[0]; 
@@ -292,7 +294,6 @@ export async function showChangelog() {
             });
             htmlContent += '</ul>';
         } catch(parseError) {
-            // Fallback: Einfach den Text anzeigen
             htmlContent = `<pre style="white-space: pre-wrap; font-family: inherit;">${text}</pre>`;
         }
 

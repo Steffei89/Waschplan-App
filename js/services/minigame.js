@@ -87,6 +87,14 @@ export async function initMinigame() {
         return;
     }
     ctx = dom.gameCanvas.getContext('2d');
+    
+    // UI Reset für Tab-Modus
+    document.body.classList.remove('game-running'); // Sicherstellen dass Vollbild aus ist
+    if (dom.gameStartScreen) dom.gameStartScreen.style.display = 'flex';
+    if (dom.gameContainer) dom.gameContainer.style.display = 'none';
+    if (dom.gameOverScreen) dom.gameOverScreen.style.display = 'none';
+    
+    // Resize für Vorschau
     resizeCanvas();
     
     initBackgroundElements();
@@ -266,15 +274,21 @@ function playTone(freq, type, duration) {
 function vibrate(pattern) { if (navigator.vibrate) navigator.vibrate(pattern); }
 
 function resizeCanvas() {
-    dom.gameCanvas.width = window.innerWidth;
-    dom.gameCanvas.height = window.innerHeight;
+    // WICHTIG: Canvas muss im Vollbild und im Tab gut aussehen
+    const container = dom.gameContainer.offsetParent || document.body;
+    dom.gameCanvas.width = container.clientWidth;
+    dom.gameCanvas.height = container.clientHeight || window.innerHeight;
+    
     basket.y = dom.gameCanvas.height - 180; 
 }
 
 function startGameWithCountdown() {
+    // 1. VOLLBILD AKTIVIEREN
+    document.body.classList.add('game-running'); 
+
     dom.gameStartScreen.style.display = 'none'; dom.gameOverScreen.style.display = 'none';
     if(dom.gamePauseMenu) dom.gamePauseMenu.style.display = 'none';
-    dom.gameContainer.style.display = 'flex'; 
+    dom.gameContainer.style.display = 'block'; // Canvas anzeigen
     if(dom.gamePauseBtn) dom.gamePauseBtn.style.display = 'none'; 
     if(dom.gameMuteBtn) dom.gameMuteBtn.style.display = 'none';
 
@@ -288,6 +302,9 @@ function startGameWithCountdown() {
     gameStartTime = Date.now();
     document.getElementById('game-score-display').textContent = `0`;
     
+    // Nach Vollbild-Wechsel Größe anpassen
+    setTimeout(resizeCanvas, 100);
+
     drawScene(); 
 
     runCountdown(() => {
@@ -343,6 +360,10 @@ function togglePause() {
 
 function quitToMenu() {
     isGameRunning = false; isPaused = false;
+    
+    // 2. VOLLBILD BEENDEN
+    document.body.classList.remove('game-running');
+
     if(dom.gamePauseMenu) dom.gamePauseMenu.style.display = 'none';
     if(dom.gameOverScreen) dom.gameOverScreen.style.display = 'none';
     dom.gameContainer.style.display = 'none';

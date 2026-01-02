@@ -122,11 +122,6 @@
         <p class="widget-title">Deine nächsten Wäschen</p>
         <div id="my-bookings-list"></div>
     </div>
-
-    <div id="report-issue-btn" class="dashboard-tile clickable-tile issue-tile">
-        <i class="fa-solid fa-triangle-exclamation"></i>
-        <span>Problem melden</span>
-    </div>
     
     <button id="admin-btn" class="button-secondary" style="display:none; margin-top:20px;">
         <i class="fa-solid fa-screwdriver-wrench"></i> Admin-Konsole
@@ -222,6 +217,10 @@
     <button id="enable-notifications-btn" class="button-secondary"><i class="fa-solid fa-bell"></i> Benachrichtigungen</button>
     <button id="show-changelog-btn" class="button-secondary"><i class="fa-solid fa-gift"></i> Neuheiten</button>
     
+    <button id="report-issue-btn-profile" class="button-secondary" style="margin-top: 20px;">
+        <i class="fa-solid fa-triangle-exclamation"></i> Problem melden
+    </button>
+    
     <button id="logout-btn-profile" class="button-danger outline" style="margin-top:30px;">
         <i class="fa-solid fa-power-off"></i> Abmelden
     </button>
@@ -238,8 +237,38 @@
   <div id="adminSection" class="card" style="display:none;">
       <h2>Admin-Konsole</h2><div id="admin-message" class="message-box"></div><div id="admin-ui-wrapper" style="margin-top:15px;"></div>
   </div>
+  
   <div id="maintenanceSection" class="card" style="display:none;">
-      <h2>Problem melden</h2><div id="maintenance-message" class="message-box"></div><select id="maintenance-reason"><option>Defekt</option></select><textarea id="maintenance-details"></textarea><button id="submit-maintenance-btn">Senden</button>
+      <h2>Problem melden</h2>
+      <div id="maintenance-message" class="message-box"></div>
+      
+      <select id="maintenance-reason">
+          <option value="" disabled selected>Bitte Grund wählen...</option>
+          
+          <optgroup label="📱 App-Probleme">
+              <option value="app_bug">Fehler / Bug in der App</option>
+              <option value="app_login">Login / Konto Probleme</option>
+              <option value="app_calendar">Kalender / Buchung geht nicht</option>
+              <option value="app_feature">Vorschlag / Wunsch</option>
+          </optgroup>
+
+          <optgroup label="washing_machine Waschmaschine / Trockner">
+              <option value="machine_start">Maschine startet nicht</option>
+              <option value="machine_door">Tür klemmt / geht nicht auf</option>
+              <option value="machine_error">Fehlercode im Display</option>
+              <option value="machine_drain">Pumpt nicht ab / Wasser steht</option>
+              <option value="machine_dirty">Maschine verschmutzt</option>
+          </optgroup>
+
+          <optgroup label="🏠 Waschküche & Sonstiges">
+              <option value="room_water">Wasser am Boden / Leck</option>
+              <option value="room_trash">Müll / Unordnung</option>
+              <option value="other">Sonstiges</option>
+          </optgroup>
+      </select>
+      
+      <textarea id="maintenance-details" placeholder="Bitte beschreibe das Problem kurz..."></textarea>
+      <button id="submit-maintenance-btn">Senden</button>
   </div>
 
   <nav id="bottom-nav" style="display:none;">

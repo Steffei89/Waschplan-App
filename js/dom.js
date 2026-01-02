@@ -1,4 +1,4 @@
-// js/dom.js - Version 3.5.0 (Minigame Fix)
+// js/dom.js - Version 3.6.5
 
 // --- AUTH & FORMS ---
 export const loginForm = document.getElementById('loginForm');
@@ -97,7 +97,7 @@ export const deleteAccountBtn = document.getElementById('delete-account-btn');
 export const enableNotificationsBtn = document.getElementById('enable-notifications-btn');
 export const showChangelogBtn = document.getElementById('show-changelog-btn');
 
-// --- MINIGAME SPECIFIC (NEU HINZUGEFÜGT!) ---
+// --- MINIGAME SPECIFIC ---
 export const gameCanvas = document.getElementById('gameCanvas');
 export const gameStartScreen = document.getElementById('game-start-screen');
 export const gameOverScreen = document.getElementById('game-over-screen');
@@ -118,3 +118,6 @@ export const countdownDisplay = document.getElementById('countdown-display');
 // --- CHANGELOG & OTHER ---
 export const changelogContent = document.getElementById('changelogContent');
 export const changelogCloseBtn = document.getElementById('changelogCloseBtn');
+
+// --- NEU: REPORT BUTTON ---
+export const reportIssueBtnProfile = document.getElementById('report-issue-btn-profile');

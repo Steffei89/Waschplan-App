@@ -1,9 +1,9 @@
-// sw.js - Version 7.0 (Network First für Updates)
+// sw.js - Version 3.6.5 (Force Update)
 importScripts('https://www.gstatic.com/firebasejs/10.13.1/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.13.1/firebase-messaging-compat.js');
 
-// WICHTIG: Ändere diesen Namen bei JEDEM Update (z.B. v7, v8, v9...)
-const CACHE_NAME = 'waschplan-v7-network-first';
+// WICHTIG: Ich habe den Namen hier geändert. Das zwingt den Browser zum Update!
+const CACHE_NAME = 'waschplan-v3.6.5-force-update';
 
 const ASSETS_TO_CACHE = [
   './',
@@ -26,6 +26,8 @@ const ASSETS_TO_CACHE = [
   './js/services/karma.js',
   './js/services/stats.js',
   './js/services/timers.js',
+  // Maintenance Service hinzufügen, damit er auch gecacht wird
+  './js/services/maintenance.js', 
   './img/icon-192.png',
   './img/icon-512.png'
 ];
@@ -42,22 +44,22 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const messaging = firebase.messaging();
 
-console.log('[sw.js] Service Worker v7.0 geladen.');
+console.log('[sw.js] Service Worker v3.6.5 wird installiert...');
 
 // INSTALL: App Shell cachen
 self.addEventListener('install', (event) => {
-    // Erzwingt, dass der neue SW sofort wartet und nicht erst beim nächsten Start
+    // Zwingt den neuen SW sofort in die "Waiting" Phase zu überspringen
     self.skipWaiting(); 
     
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
-            console.log('[sw.js] Caching Assets');
+            console.log('[sw.js] Caching Assets für v3.6.5');
             return cache.addAll(ASSETS_TO_CACHE).catch(err => console.warn("Caching Fehler:", err));
         })
     );
 });
 
-// ACTIVATE: Alte Caches sofort löschen und Kontrolle übernehmen
+// ACTIVATE: Alte Caches (alles was nicht v3.6.5 heißt) sofort löschen
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((cacheNames) => {
@@ -71,11 +73,11 @@ self.addEventListener('activate', (event) => {
             );
         })
     );
-    // Wichtig: Übernimmt sofort die Kontrolle über alle offenen Tabs
+    // Sofort die Kontrolle über die Seite übernehmen
     self.clients.claim();
 });
 
-// FETCH: "Network First" Strategie für Code, "Cache First" für Bilder
+// FETCH: Network First Strategie
 self.addEventListener('fetch', (event) => {
     if (event.request.method !== 'GET') return;
 
@@ -84,10 +86,6 @@ self.addEventListener('fetch', (event) => {
     // Google/Firebase APIs ignorieren
     if (url.origin.includes('googleapis.com') || url.origin.includes('firestore')) return;
 
-    // Strategie-Entscheidung:
-    // Ist es HTML, JS, CSS oder JSON? -> NETWORK FIRST (Erst Internet, dann Cache)
-    // Ist es ein Bild? -> CACHE FIRST (Erst Cache, dann Internet)
-    
     const isCode = event.request.destination === 'document' || // HTML
                    event.request.destination === 'script' ||   // JS
                    event.request.destination === 'style' ||    // CSS
@@ -97,7 +95,7 @@ self.addEventListener('fetch', (event) => {
         event.respondWith(
             fetch(event.request)
                 .then((networkResponse) => {
-                    // Wenn Netzwerk erfolgreich: Antwort klonen, in Cache speichern, an User geben
+                    // Wenn Netzwerk da ist: Nimm das Neue und speichere es im Cache
                     if (networkResponse && networkResponse.status === 200) {
                         const responseToCache = networkResponse.clone();
                         caches.open(CACHE_NAME).then((cache) => {
@@ -107,12 +105,12 @@ self.addEventListener('fetch', (event) => {
                     return networkResponse;
                 })
                 .catch(() => {
-                    // Wenn Netzwerk offline: Cache nutzen
+                    // Wenn offline: Nimm Cache
                     return caches.match(event.request);
                 })
         );
     } else {
-        // Bilder und Sonstiges: Cache First (schneller, spart Daten)
+        // Bilder: Cache First
         event.respondWith(
             caches.match(event.request).then((cachedResponse) => {
                 return cachedResponse || fetch(event.request);

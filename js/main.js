@@ -1,4 +1,4 @@
-// js/main.js - Version 3.5.0 (Complete Repair)
+// js/main.js - Version 3.5.0 (Final Logic)
 
 // 1. Service Worker Update
 if ('serviceWorker' in navigator) {
@@ -91,7 +91,7 @@ onAuthStateChanged(auth, async (user) => {
                 if (autoCheckoutInterval) clearInterval(autoCheckoutInterval);
                 autoCheckoutInterval = setInterval(checkAndAutoCheckoutOldBookings, 60000);
                 
-                initPushNotifications();
+                initPushNotifications(false); // Silent Check
                 initGestures();
 
                 if (userData.partei) {
@@ -104,7 +104,6 @@ onAuthStateChanged(auth, async (user) => {
                 updateUserInfo(userData);
                 setupMainMenuListeners(); 
                 
-                // Wetter laden (mit Fehler-Schutz)
                 try { loadWeather(); } catch(e) { console.warn("Wetter konnte nicht geladen werden."); }
                 
                 dom.loadingOverlay.style.display = 'none'; dom.appContainer.style.display = 'block';
@@ -259,11 +258,7 @@ function setupMainMenuListeners() {
         });
     }
 
-    // 4. REPORT BUTTON
-    const reportBtn = document.getElementById('report-issue-btn'); 
-    if (reportBtn) { reportBtn.addEventListener('click', () => { const maintSec = document.getElementById('maintenanceSection'); if (maintSec) navigateTo(maintSec); }); }
-
-    // 5. MAINTENANCE SUBMIT
+    // 4. MAINTENANCE SUBMIT
     const submitMaintBtn = document.getElementById('submit-maintenance-btn'); 
     if (submitMaintBtn) { 
         submitMaintBtn.addEventListener('click', async () => { 
@@ -483,15 +478,32 @@ document.getElementById('back-to-login-from-verify-btn').addEventListener('click
 dom.themeIcon.addEventListener('click', () => { const newTheme = getState().currentTheme === 'light' ? 'dark' : 'light'; setTheme(newTheme, true); });
 document.getElementById('refresh-app-btn').addEventListener('click', () => { const btn = document.getElementById('refresh-app-btn'); btn.classList.add('fa-spin'); location.reload(true); setTimeout(() => btn.classList.remove('fa-spin'), 1500); });
 
-// Global Back Button Listener
+// Global Back Button Listener (VERBESSERT!)
 const globalBackBtn = document.getElementById('global-back-btn');
 if (globalBackBtn) {
     globalBackBtn.addEventListener('click', (e) => {
         e.preventDefault();
+        
+        // 1. Sonderfall: Admin Bereich
         if (dom.adminSection && dom.adminSection.style.display !== 'none') {
             const handledByAdmin = handleAdminBack(); 
             if (handledByAdmin) return;
         }
+
+        // 2. Sonderfall: Problem melden -> Zurück zum Profil
+        if (dom.maintenanceSection && dom.maintenanceSection.style.display !== 'none') {
+            loadProfileData(); // Daten sicherheitshalber auffrischen
+            navigateTo(dom.profileSection, 'back');
+            return;
+        }
+        
+        // 3. Sonderfall: Buchen -> Zurück zum Kalender (Neu!)
+        if (dom.bookingSection && dom.bookingSection.style.display !== 'none') {
+            navigateTo(dom.calendarSection, 'back');
+            return;
+        }
+
+        // Standard: Zurück zum Hauptmenü
         navigateTo(dom.mainMenu, 'back');
     });
 }

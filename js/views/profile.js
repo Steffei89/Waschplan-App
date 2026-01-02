@@ -2,18 +2,18 @@ import * as dom from '../dom.js';
 import { getState } from '../state.js';
 import { handleLogout, handleChangePassword } from '../services/auth.js';
 import { initPushNotifications } from '../services/push.js';
+import { navigateTo } from '../ui.js'; 
 
 export function initProfileView() {
     console.log("Profile View initialized");
 
-    // 1. Button-Logik: Passwort ändern (Aufklappen)
+    // 1. Button-Logik: Passwort ändern
     if (dom.changePasswordBtn) {
         dom.changePasswordBtn.onclick = () => {
             if (dom.passwordChangeContainer) {
                 const isHidden = dom.passwordChangeContainer.style.display === 'none';
                 dom.passwordChangeContainer.style.display = isHidden ? 'block' : 'none';
                 
-                // Icon ändern für besseres Feedback
                 dom.changePasswordBtn.innerHTML = isHidden 
                     ? '<i class="fa-solid fa-chevron-up"></i> Abbrechen' 
                     : '<i class="fa-solid fa-key"></i> Passwort ändern';
@@ -28,20 +28,18 @@ export function initProfileView() {
         };
     }
 
-    // Live-Validierung der Passwörter
+    // Validierung der Passwörter
     if (dom.newPasswordInput && dom.newPasswordConfirmInput) {
         const validatePasswords = () => {
             const p1 = dom.newPasswordInput.value;
             const p2 = dom.newPasswordConfirmInput.value;
             
-            // Zurücksetzen wenn leer
             if (p1 === "" && p2 === "") {
                 dom.newPasswordInput.classList.remove('input-valid', 'input-invalid');
                 dom.newPasswordConfirmInput.classList.remove('input-valid', 'input-invalid');
                 return;
             }
             
-            // Prüfen ob gleich und lang genug
             if (p1 === p2 && p1.length >= 6) {
                 dom.newPasswordInput.classList.add('input-valid');
                 dom.newPasswordInput.classList.remove('input-invalid');
@@ -54,12 +52,11 @@ export function initProfileView() {
                 dom.newPasswordConfirmInput.classList.remove('input-valid');
             }
         };
-        
         dom.newPasswordInput.oninput = validatePasswords;
         dom.newPasswordConfirmInput.oninput = validatePasswords;
     }
 
-    // 3. Button-Logik: Neuigkeiten (Im Popup)
+    // 3. Changelog
     if (dom.showChangelogBtn && dom.changelogModal && dom.changelogContent) {
         dom.showChangelogBtn.onclick = async () => {
             dom.changelogContent.innerHTML = '<div class="spinner" style="margin: 20px auto;"></div><p style="text-align:center">Lade Neuigkeiten...</p>';
@@ -68,7 +65,6 @@ export function initProfileView() {
             try {
                 const response = await fetch('CHANGELOG.md?v=' + new Date().getTime());
                 if (!response.ok) throw new Error("Konnte Datei nicht laden");
-                
                 const text = await response.text();
                 
                 let formattedHtml = text
@@ -81,25 +77,19 @@ export function initProfileView() {
                 dom.changelogContent.innerHTML = formattedHtml;
             } catch (e) {
                 dom.changelogContent.innerHTML = "<p>Keine Neuigkeiten verfügbar.</p>";
-                console.error(e);
             }
         };
     }
 
-    // Modal Schließen-Button
     if (dom.changelogCloseBtn && dom.changelogModal) {
-        dom.changelogCloseBtn.onclick = () => {
-            dom.changelogModal.style.display = 'none';
-        };
+        dom.changelogCloseBtn.onclick = () => { dom.changelogModal.style.display = 'none'; };
     }
 
-    // 4. Button-Logik: Benachrichtigungen (REPARIERT & VERBESSERT)
+    // 4. Push Notifications (mit Test-Funktion)
     if (dom.enableNotificationsBtn) {
         dom.enableNotificationsBtn.onclick = async () => {
-            // Fall 1: Push ist schon erlaubt -> Wir machen einen TEST
             if (Notification.permission === 'granted') {
                 try {
-                    // Wir versuchen, den Service Worker für die Anzeige zu nutzen (zuverlässiger)
                     const reg = await navigator.serviceWorker.ready;
                     if (reg) {
                         reg.showNotification("Push Test 🔔", {
@@ -108,38 +98,39 @@ export function initProfileView() {
                             vibrate: [200, 100, 200]
                         });
                     } else {
-                        // Fallback
-                        new Notification("Push Test 🔔", {
-                            body: "Super! Push-Nachrichten funktionieren."
-                        });
+                        new Notification("Push Test 🔔", { body: "Super! Push-Nachrichten funktionieren." });
                     }
                 } catch (e) {
                     alert("Test konnte nicht gesendet werden: " + e);
                 }
-                
-                // Trotzdem nochmal initialisieren, um sicherzugehen, dass der Token aktuell ist
-                initPushNotifications();
-            } 
-            // Fall 2: Push ist noch nicht erlaubt -> Wir fragen an
-            else {
-                initPushNotifications();
+                initPushNotifications(true);
+            } else {
+                initPushNotifications(true);
             }
-
-            // Button Status kurz danach aktualisieren
             setTimeout(loadProfileData, 1000);
         };
     }
 
-    // 5. Logout
-    if (dom.logoutBtnProfile) {
-        dom.logoutBtnProfile.onclick = () => {
-            if(confirm("Wirklich abmelden?")) {
-                handleLogout();
+    // 5. PROBLEM MELDEN (NEU) - Leitet zur Wartungsseite
+    if (dom.reportIssueBtnProfile) {
+        dom.reportIssueBtnProfile.onclick = () => {
+            const maintSec = document.getElementById('maintenanceSection');
+            if (maintSec) {
+                navigateTo(maintSec);
+            } else {
+                alert("Fehler: Wartungs-Seite nicht gefunden.");
             }
         };
     }
 
-    // 6. Konto löschen (Modal öffnen)
+    // 6. Logout
+    if (dom.logoutBtnProfile) {
+        dom.logoutBtnProfile.onclick = () => {
+            if(confirm("Wirklich abmelden?")) handleLogout();
+        };
+    }
+
+    // 7. Konto löschen
     if (dom.deleteAccountBtn) {
         dom.deleteAccountBtn.onclick = () => {
             if (dom.deleteAccountModal) {
@@ -150,7 +141,6 @@ export function initProfileView() {
     }
 }
 
-// Funktion zum Laden der Benutzerdaten
 export function loadProfileData() {
     const { currentUser } = getState();
     
@@ -158,14 +148,13 @@ export function loadProfileData() {
         if (dom.profileEmail) dom.profileEmail.textContent = currentUser.userData.email || '...';
         if (dom.profilePartei) dom.profilePartei.textContent = currentUser.userData.partei || '...';
         
-        // Push Button Status
         if (dom.enableNotificationsBtn) {
             if (Notification.permission === 'granted') {
                 dom.enableNotificationsBtn.innerHTML = '<i class="fa-solid fa-bell"></i> Push testen 🔔';
-                dom.enableNotificationsBtn.className = 'button-primary'; // Grün oder hervorgehoben
+                dom.enableNotificationsBtn.className = 'button-primary'; 
             } else {
                 dom.enableNotificationsBtn.innerHTML = '<i class="fa-solid fa-bell-slash"></i> Push aktivieren';
-                dom.enableNotificationsBtn.className = 'button-secondary'; // Grau oder neutral
+                dom.enableNotificationsBtn.className = 'button-secondary'; 
             }
         }
     }
