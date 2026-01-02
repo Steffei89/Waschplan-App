@@ -1,4 +1,4 @@
-/* style.css - Version 3.5.0 (Lower Navbar & Clean Header) */
+/* style.css - Version 3.6.0 (Floating Navbar & Clean Look) */
 
 /* 1. GRUNDEINSTELLUNGEN & FONTS */
 :root {
@@ -263,24 +263,44 @@ input[type="checkbox"]:checked::after { transform: translateX(20px); }
     background: var(--bg-secondary); border-radius: 12px; font-size: 0.9em; flex: 1; 
 }
 
-/* NAVIGATION */
+/* NAVIGATION - JETZT IM "FLOATING" LOOK */
 #bottom-nav { 
     position: fixed; 
-    /* HIER GEÄNDERT: Smarte Positionierung */
-    /* Auf Mac/PC: 10px Abstand */
-    /* Auf iPhone: safe-area + 2px (sitzt tief, aber nicht am Rand) */
-    bottom: max(0px, calc(env(safe-area-inset-bottom) + 2px)) !important;
+    
+    /* HIER GEÄNDERT: Mehr Abstand nach unten für den Schwebe-Effekt */
+    bottom: calc(env(safe-area-inset-bottom) + 0px) !important;
 
-    left: 50%; transform: translateX(-50%); 
-    width: 90%; max-width: 400px; height: 80px; 
-    background: rgba(255, 255, 255, 0.85); 
-    backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px); 
-    border-radius: 40px; 
-    display: flex; justify-content: space-evenly; align-items: center; 
-    box-shadow: 0 20px 50px rgba(0,0,0,0.15); 
-    border: 1px solid rgba(255,255,255,0.5); z-index: 1000; padding: 5px; 
+    left: 50%; 
+    transform: translateX(-50%); 
+    
+    width: 90%; 
+    max-width: 380px; 
+    height: 75px; 
+    
+    background: rgba(255, 255, 255, 0.9); 
+    backdrop-filter: blur(30px); 
+    -webkit-backdrop-filter: blur(30px); 
+    
+    border-radius: 50px; 
+    
+    display: flex; 
+    justify-content: space-evenly; 
+    align-items: center; 
+    
+    /* Kräftigerer Schatten damit es "schwebt" */
+    box-shadow: 0 15px 40px rgba(0,0,0,0.25), 0 5px 15px rgba(0,0,0,0.1); 
+    
+    border: 1px solid rgba(255,255,255,0.6); 
+    z-index: 5000; /* Ganz oben */
+    padding: 5px; 
 }
-[data-theme="dark"] #bottom-nav { background: rgba(30, 30, 35, 0.85); border-color: rgba(255,255,255,0.1); }
+
+[data-theme="dark"] #bottom-nav { 
+    background: rgba(30, 30, 35, 0.9); 
+    border-color: rgba(255,255,255,0.15); 
+    box-shadow: 0 15px 40px rgba(0,0,0,0.5);
+}
+
 .nav-item { opacity: 0.5; transition: all 0.3s; cursor: pointer; flex: 1; height: 100%; border-radius: 35px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; }
 .nav-icon-container { font-size: 1.5em; width: 45px; height: 35px; display: flex; justify-content: center; align-items: center; transition: transform 0.2s; }
 .nav-item span { font-size: 0.75em; font-weight: 700; }
@@ -430,6 +450,7 @@ body.game-running canvas#gameCanvas {
 
 /* =========================================
    NEU: Design-Upgrade für den Game-Screen
+   (Angepasst: Kein Zurück-Button, kleinerer Titel, breitere Highscores)
    ========================================= */
 
 /* 1. Der Hintergrund: Ein frischer Himmel-Verlauf */
@@ -443,27 +464,32 @@ body.game-running canvas#gameCanvas {
     position: relative;
 }
 
-/* 2. Der Titel "Socken-Retter" wieder sichtbar & stylisch machen */
+/* WICHTIG: Hier verstecken wir den Zurück-Button */
+#back-to-menu-btn-game {
+    display: none !important;
+}
+
+/* 2. Der Titel "Socken-Retter" - Jetzt kleiner (1.6em statt 2.2em) */
 #minigameSection h2 {
-    display: block !important;  /* Zwingt den Titel dazu, sichtbar zu sein */
-    font-size: 2.2em;
+    display: block !important;
+    font-size: 1.6em; 
     color: #fff;
-    text-shadow: 0 4px 0 #2a8df8, 0 8px 5px rgba(0,0,0,0.2); /* 3D-Effekt */
-    margin-top: 10px;
-    margin-bottom: 20px;
-    letter-spacing: 1px;
-    transform: rotate(-3deg);   /* Leicht schräg für mehr Dynamik */
+    text-shadow: 0 3px 0 #2a8df8, 0 6px 4px rgba(0,0,0,0.2); /* 3D-Effekt */
+    margin-top: 15px;
+    margin-bottom: 10px;
+    letter-spacing: 0.5px;
+    transform: rotate(-2deg);   /* Leicht schräg für mehr Dynamik */
     font-weight: 900;
 }
 
-/* 3. Die Highscore-Liste als schicke Karte */
+/* 3. Die Highscore-Liste - Breiter gemacht (96% statt 90%) */
 .leaderboard-container {
     background: rgba(255, 255, 255, 0.9); /* Milchglas-Effekt */
     border-radius: 20px;
-    padding: 15px;
-    width: 90%;
-    max-width: 320px;
-    margin: 10px auto 25px auto;
+    padding: 10px;
+    width: 96%;
+    max-width: 380px; /* Mehr Platz in der Breite */
+    margin: 5px auto 15px auto;
     box-shadow: 0 8px 25px rgba(0,0,0,0.15);
     color: #333;
     backdrop-filter: blur(5px);
@@ -471,34 +497,33 @@ body.game-running canvas#gameCanvas {
 }
 
 .leaderboard-container h4 {
-    margin: 0 0 10px 0;
-    font-size: 1.1em;
+    margin: 0 0 8px 0;
+    font-size: 1.0em;
     text-transform: uppercase;
     letter-spacing: 1px;
     color: #007AFF;
     border-bottom: 2px solid #e5e5ea;
-    padding-bottom: 8px;
+    padding-bottom: 6px;
 }
 
-/* Die Liste der Namen etwas aufräumen */
+/* Die Liste der Namen */
 #minigame-leaderboard {
-    font-family: 'Courier New', monospace; /* Monospace für Retro-Feeling */
-    font-size: 0.95em;
-    line-height: 1.6;
+    font-family: 'Courier New', monospace; /* Retro-Look */
+    font-size: 0.9em;
+    line-height: 1.5;
     font-weight: 600;
 }
 
-/* 4. Der "Spiel Starten" Button - Groß und Auffällig */
+/* 4. Der "Spiel Starten" Button */
 #start-game-btn {
     background: linear-gradient(to bottom, #ffcf00, #ff9d00) !important; /* Gold-Orange */
     color: #fff;
-    font-size: 1.4em;
+    font-size: 1.3em;
     font-weight: 800;
     text-transform: uppercase;
-    padding: 15px 40px;
+    padding: 14px 40px;
     border: none;
     border-radius: 50px;
-    /* Ein dicker Schatten unten lässt ihn wie einen echten Knopf wirken */
     box-shadow: 0 6px 0 #cc7a00, 0 15px 20px rgba(0,0,0,0.2); 
     transition: transform 0.1s, box-shadow 0.1s;
     margin-top: 10px;
@@ -507,29 +532,32 @@ body.game-running canvas#gameCanvas {
     cursor: pointer;
 }
 
-/* Effekt beim Drücken des Buttons */
 #start-game-btn:active {
     transform: translateY(6px); /* Button bewegt sich nach unten */
     box-shadow: 0 0 0 #cc7a00, inset 0 2px 5px rgba(0,0,0,0.2); /* Schatten weg */
 }
 
-/* 5. Kleine Anpassungen */
-/* Zurück-Button weiß machen, damit man ihn auf Blau sieht */
-#minigameSection .back-button {
-    color: rgba(255,255,255,0.8);
-}
-#minigameSection .back-button:hover {
-    color: white;
-}
-
-/* Regel-Text besser lesbar machen */
+/* 5. Regel-Text: Kleiner und einzeilig erzwingen */
 #minigame-rules-text {
     font-weight: bold;
     color: #fff !important; 
     text-shadow: 0 1px 2px rgba(0,0,0,0.3);
     background: rgba(0,0,0,0.15);
-    padding: 6px 15px;
+    padding: 4px 12px;
     border-radius: 20px;
+    font-size: 0.75em;  /* Schrift kleiner machen */
+    white-space: nowrap; /* Erzwingt eine Zeile */
+    display: inline-block;
+}
+
+/* Icon vor dem Regeltext etwas anpassen */
+#game-start-screen p.small-text i {
+    font-size: 0.8em;
+    margin-right: 4px;
+}
+
+#minigameSection .back-button {
+    color: rgba(255,255,255,0.8);
 }
 
 /* =========================================

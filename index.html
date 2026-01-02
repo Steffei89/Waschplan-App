@@ -166,14 +166,15 @@
   </div>
 
   <div id="minigameSection" class="card" style="display:none;">
-      <button id="back-to-menu-btn-game" class="back-button"><i class="fa-solid fa-chevron-left"></i> Zurück</button>
       <h2 style="margin-bottom:10px;">Socken-Retter 🧦</h2>
       <div id="game-start-screen">
           <div class="leaderboard-container">
               <h4>👑 Highscores</h4>
               <div id="minigame-leaderboard">Lade...</div>
           </div>
-          <p class="small-text" style="color: var(--success-color);"><i class="fa-solid fa-gift"></i> <span id="minigame-rules-text">Lade Regeln...</span></p>
+          <p class="small-text" style="color: var(--success-color); white-space: nowrap; overflow: visible;">
+              <i class="fa-solid fa-gift"></i> <span id="minigame-rules-text">Lade Regeln...</span>
+          </p>
           <button id="start-game-btn" class="button-success">Spiel Starten</button>
       </div>
       <div id="game-container" style="display:none;">
