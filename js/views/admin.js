@@ -13,6 +13,7 @@ import { updateKarma, getPartyKarma } from '../services/karma.js';
 import { getSystemStatus, setSystemStatus, subscribeToTickets, toggleTicketStatus } from '../services/maintenance.js';
 import { loadWashPrograms, addWashProgram, deleteWashProgram } from '../services/timers.js';
 import { deleteMinigameScore, resetMinigameLeaderboard } from '../services/minigame.js';
+import { loadStatistics } from '../services/stats.js'; // [NEU] Import für Statistiken
 import { formatDate } from '../utils.js'; 
 
 const MESSAGE_ID = 'admin-message';
@@ -123,6 +124,10 @@ export async function loadAdminUserData() {
                         <i class="fa-solid fa-users"></i>
                         <span>Benutzer</span>
                     </div>
+                    <div class="admin-tile" id="tile-stats">
+                        <i class="fa-solid fa-chart-pie"></i>
+                        <span>Statistik</span>
+                    </div>
                     <div class="admin-tile" id="tile-system">
                         <i class="fa-solid fa-server"></i>
                         <span>System</span>
@@ -185,6 +190,7 @@ export async function loadAdminUserData() {
 
     // Tile Klicks -> openSubView
     document.getElementById('tile-users').onclick = () => openSubView('users', 'Benutzer');
+    document.getElementById('tile-stats').onclick = () => openSubView('stats', 'Statistiken'); // [NEU] Handler
     document.getElementById('tile-system').onclick = () => openSubView('system', 'System & Wartung');
     document.getElementById('tile-tickets').onclick = () => openSubView('tickets', 'Tickets & Logs');
     document.getElementById('tile-programs').onclick = () => openSubView('programs', 'Wasch-Programme');
@@ -219,6 +225,7 @@ async function openSubView(type, title) {
     try {
         switch (type) {
             case 'users': await renderUserListOverview(contentDiv); break;
+            case 'stats': await renderStatsOverview(contentDiv); break; // [NEU] Case
             case 'system': await renderSystemSettings(contentDiv); break;
             case 'settings': await renderConfigSettings(contentDiv); break;
             case 'debug': await renderDebugSettings(contentDiv); break;
@@ -232,8 +239,98 @@ async function openSubView(type, title) {
 }
 
 // =========================================================
-// HIER FOLGEN DIE SUB-VIEW RENDER FUNKTIONEN (UNVERÄNDERT)
+// HIER FOLGEN DIE SUB-VIEW RENDER FUNKTIONEN (UNVERÄNDERT + STATS)
 // =========================================================
+
+// --- [NEU] STATISTIK ---
+async function renderStatsOverview(container) {
+    container.innerHTML = `
+        <div style="padding:10px;">
+            <div style="display:flex; justify-content:flex-end; margin-bottom:15px;">
+                <select id="stats-filter" style="padding:8px; border-radius:8px; border:1px solid var(--border-color); background:var(--secondary-color); color:var(--text-color);">
+                    <option value="ytd" selected>Dieses Jahr</option>
+                    <option value="6m">Letzte 6 Monate</option>
+                    <option value="30d">Letzte 30 Tage</option>
+                    <option value="all">Gesamt</option>
+                </select>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin-bottom:20px;">
+                <div style="background:var(--secondary-color); padding:10px; border-radius:12px; text-align:center;">
+                    <div id="kpi-total-bookings" style="font-size:1.5em; font-weight:bold;">-</div>
+                    <div style="font-size:0.8em; opacity:0.7;">Buchungen</div>
+                </div>
+                <div style="background:var(--secondary-color); padding:10px; border-radius:12px; text-align:center;">
+                    <div id="kpi-most-active" style="font-size:1.2em; font-weight:bold; margin-bottom:4px;">-</div>
+                    <div style="font-size:0.8em; opacity:0.7;">Top Partei</div>
+                </div>
+                <div style="background:var(--secondary-color); padding:10px; border-radius:12px; text-align:center;">
+                    <div id="kpi-most-popular-day" style="font-size:1.2em; font-weight:bold; margin-bottom:4px;">-</div>
+                    <div style="font-size:0.8em; opacity:0.7;">Top Tag</div>
+                </div>
+            </div>
+
+            <div style="background:var(--secondary-color); padding:15px; border-radius:12px; margin-bottom:15px;">
+                <h4 style="margin-top:0;">Karma Verteilung</h4>
+                <canvas id="karmaChart"></canvas>
+            </div>
+
+            <div style="background:var(--secondary-color); padding:15px; border-radius:12px; margin-bottom:15px;">
+                <h4 style="margin-top:0;">Anteile</h4>
+                <canvas id="parteiChart"></canvas>
+            </div>
+
+            <div style="background:var(--secondary-color); padding:15px; border-radius:12px; margin-bottom:15px;">
+                <h4 style="margin-top:0;">Slot Nutzung</h4>
+                <canvas id="slotChart"></canvas>
+                <p id="slot-stats-text" class="small-text" style="margin-top:10px; opacity:0.7; text-align:center;"></p>
+            </div>
+
+            <div style="background:var(--secondary-color); padding:15px; border-radius:12px; margin-bottom:15px;">
+                 <h4 style="margin-top:0;">Buchungsverlauf</h4>
+                 <div><canvas id="bookingsOverTimeChart"></canvas></div>
+            </div>
+            
+            <div style="background:var(--secondary-color); padding:15px; border-radius:12px; margin-bottom:15px;">
+                 <h4 style="margin-top:0;">Wochentage</h4>
+                 <canvas id="dayOfWeekChart"></canvas>
+            </div>
+
+            <div id="advanced-stats-container">
+                <div id="stats-heatmap-wrapper" style="display:none; background:var(--secondary-color); padding:15px; border-radius:12px; margin-bottom:15px;">
+                    <h4 style="margin-top:0;">Auslastung (Heatmap)</h4>
+                    <div id="heatmap-container" style="overflow-x:auto;"></div>
+                </div>
+
+                <div id="stats-user-lists-wrapper" style="display:none; background:var(--secondary-color); padding:15px; border-radius:12px; margin-bottom:15px;">
+                    <h4 style="margin-top:0;">Top Listen</h4>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+                        <div>
+                            <h5 style="margin:0 0 5px 0;">Top Wäscher</h5>
+                            <div id="list-top-washers" class="small-text"></div>
+                        </div>
+                        <div>
+                            <h5 style="margin:0 0 5px 0;">Top User (Login)</h5>
+                            <div id="list-top-users" class="small-text"></div>
+                        </div>
+                    </div>
+                    <div style="margin-top:15px;">
+                        <h5 style="margin:0 0 5px 0;">Top Gamer</h5>
+                        <div id="list-top-gamers" class="small-text"></div>
+                    </div>
+                </div>
+
+                <div id="stats-game-balancing-wrapper" style="display:none; background:var(--secondary-color); padding:15px; border-radius:12px; margin-bottom:15px;">
+                     <h4 style="margin-top:0;">Minigame Balancing</h4>
+                     <canvas id="gameBalancingChart"></canvas>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('stats-filter').onchange = () => loadStatistics(true);
+    await loadStatistics();
+}
 
 // --- 1. BENUTZER LISTE ---
 async function renderUserListOverview(container) {
