@@ -23,16 +23,13 @@ let currentListTitle = '';
 let currentListType = '';
 
 // Diese Funktion wird von main.js aufgerufen, wenn der globale Zurück-Button gedrückt wird
-// Rückgabe: true = Navigation wurde hier behandelt (Admin-Intern)
-// Rückgabe: false = Wir sind im Hauptmenü, App soll Admin verlassen
 export function handleAdminBack() {
     const subView = document.getElementById('admin-sub-view');
     const mainMenu = document.getElementById('admin-main-menu');
-    const container = document.getElementById('admin-ui-wrapper');
     
     // Fall 1: Wir sind in einer Detail-Ansicht -> Zurück zur Liste
     if (currentAdminView === 'detail') {
-        openSubView(currentListType, currentListTitle); // Liste neu laden
+        openSubView(currentListType, currentListTitle); 
         return true; 
     }
 
@@ -48,7 +45,7 @@ export function handleAdminBack() {
     return false;
 }
 
-// ===== HELPER: GENERIC IOS LIST ITEM =====
+// ===== HELPER: GENERIC IOS LIST ITEM (Bleibt für Unterlisten erhalten) =====
 function createIOSListItem(text, iconClass, onClick, extraHtml = '') {
     const div = document.createElement('div');
     div.style.cssText = `
@@ -72,47 +69,128 @@ function createIOSListItem(text, iconClass, onClick, extraHtml = '') {
     div.onclick = onClick;
     return div;
 }
-// =========================================
 
+// ===== HAUPTFUNKTION: ADMIN UI RENDERN =====
 export async function loadAdminUserData() {
     const { userIsAdmin } = getState();
     if (!userIsAdmin) { showMessage(MESSAGE_ID, 'Zugriff verweigert.', 'error'); return; }
 
     const container = document.getElementById('admin-ui-wrapper');
     if (!container) {
-        console.error("ADMIN ERROR: #admin-ui-wrapper fehlt. Index.html prüfen.");
+        console.error("ADMIN ERROR: #admin-ui-wrapper fehlt.");
         return;
     }
     
     // Reset State
     currentAdminView = 'menu';
+    container.innerHTML = '<div class="spinner"></div>';
+
+    // 1. Karma-Status laden (für den Toggle Switch)
+    let karmaActive = true;
+    try {
+        const settingsSnap = await getDoc(doc(db, 'app_settings', 'config'));
+        if (settingsSnap.exists()) {
+            // Standard ist true, falls Feld nicht existiert
+            karmaActive = (settingsSnap.data().karmaSystemActive !== false);
+        }
+    } catch (e) {
+        console.warn("Konnte Karma-Settings nicht laden", e);
+    }
     
-    container.innerHTML = '';
-    
-    const wrapper = document.createElement('div');
-    wrapper.id = 'admin-ios-wrapper';
-    wrapper.style.position = 'relative';
-    wrapper.style.minHeight = '300px';
+    // 2. HTML Struktur aufbauen (Neues Kachel-Design)
+    const html = `
+        <div id="admin-ios-wrapper" style="position:relative; min-height:300px;">
+            
+            <div id="admin-main-menu">
+                
+                <div class="admin-section-title">System & Konfiguration</div>
+                
+                <div class="setting-row">
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <i class="fa-solid fa-star" style="color: gold;"></i>
+                        <span>Karma-System</span>
+                    </div>
+                    <label class="switch">
+                        <input type="checkbox" id="main-karma-toggle" ${karmaActive ? 'checked' : ''}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
 
-    const mainMenu = document.createElement('div');
-    mainMenu.id = 'admin-main-menu';
+                <div class="admin-section-title">Verwaltung</div>
+                
+                <div class="admin-grid">
+                    <div class="admin-tile" id="tile-users">
+                        <i class="fa-solid fa-users"></i>
+                        <span>Benutzer</span>
+                    </div>
+                    <div class="admin-tile" id="tile-system">
+                        <i class="fa-solid fa-server"></i>
+                        <span>System</span>
+                    </div>
+                    <div class="admin-tile" id="tile-tickets">
+                        <i class="fa-solid fa-clipboard-list"></i>
+                        <span>Tickets</span>
+                    </div>
+                    <div class="admin-tile" id="tile-programs">
+                        <i class="fa-solid fa-clock"></i>
+                        <span>Programme</span>
+                    </div>
+                     <div class="admin-tile" id="tile-minigame">
+                        <i class="fa-solid fa-gamepad"></i>
+                        <span>Minigame</span>
+                    </div>
+                    <div class="admin-tile" id="tile-settings">
+                        <i class="fa-solid fa-gear"></i>
+                        <span>Config</span>
+                    </div>
+                </div>
 
-    const subView = document.createElement('div');
-    subView.id = 'admin-sub-view';
-    subView.style.display = 'none'; 
+                <div class="admin-section-title">Entwicklung</div>
+                <div class="admin-grid">
+                    <div class="admin-tile" id="tile-debug" style="background: rgba(255, 59, 48, 0.1); color: var(--error-color);">
+                        <i class="fa-solid fa-flask" style="color: var(--error-color);"></i>
+                        <span>Test-Labor</span>
+                    </div>
+                </div>
 
-    wrapper.appendChild(mainMenu);
-    wrapper.appendChild(subView);
-    container.appendChild(wrapper);
+            </div>
 
-    // --- MENÜ STRUKTUR ---
-    mainMenu.appendChild(createIOSListItem('Benutzerverwaltung', 'fa-solid fa-users', () => openSubView('users', 'Benutzer')));
-    mainMenu.appendChild(createIOSListItem('System-Status & Wartung', 'fa-solid fa-server', () => openSubView('system', 'System')));
-    mainMenu.appendChild(createIOSListItem('Einstellungen (Kosten/Wetter)', 'fa-solid fa-gear', () => openSubView('settings', 'Einstellungen')));
-    mainMenu.appendChild(createIOSListItem('Test-Labor & Debug', 'fa-solid fa-flask', () => openSubView('debug', 'Test-Labor')));
-    mainMenu.appendChild(createIOSListItem('Minigame Highscores', 'fa-solid fa-gamepad', () => openSubView('minigame', 'Minigame')));
-    mainMenu.appendChild(createIOSListItem('Wasch-Programme', 'fa-solid fa-clock', () => openSubView('programs', 'Programme')));
-    mainMenu.appendChild(createIOSListItem('Tickets & Logs', 'fa-solid fa-clipboard-list', () => openSubView('tickets', 'Tickets')));
+            <div id="admin-sub-view" style="display:none;"></div>
+        </div>
+    `;
+
+    container.innerHTML = html;
+
+    // 3. Event Listener hinzufügen
+
+    // Toggle Switch Logik
+    const toggle = document.getElementById('main-karma-toggle');
+    if(toggle) {
+        toggle.addEventListener('change', async (e) => {
+            const newState = e.target.checked;
+            try {
+                await setDoc(doc(db, 'app_settings', 'config'), { karmaSystemActive: newState }, { merge: true });
+                
+                // Header Badge sofort updaten (Optional, für visuelles Feedback ohne Reload)
+                const badge = document.getElementById('header-karma-display');
+                if(badge) badge.style.display = newState ? 'flex' : 'none';
+
+                showMessage(MESSAGE_ID, `Karma System ${newState ? 'aktiviert' : 'deaktiviert'}`, 'success');
+            } catch(err) {
+                e.target.checked = !newState; // Zurücksetzen bei Fehler
+                showMessage(MESSAGE_ID, "Fehler beim Speichern", "error");
+            }
+        });
+    }
+
+    // Tile Klicks -> openSubView
+    document.getElementById('tile-users').onclick = () => openSubView('users', 'Benutzer');
+    document.getElementById('tile-system').onclick = () => openSubView('system', 'System & Wartung');
+    document.getElementById('tile-tickets').onclick = () => openSubView('tickets', 'Tickets & Logs');
+    document.getElementById('tile-programs').onclick = () => openSubView('programs', 'Wasch-Programme');
+    document.getElementById('tile-minigame').onclick = () => openSubView('minigame', 'Highscores');
+    document.getElementById('tile-settings').onclick = () => openSubView('settings', 'Einstellungen');
+    document.getElementById('tile-debug').onclick = () => openSubView('debug', 'Test-Labor');
 }
 
 // ===== NAVIGATION LOGIC =====
@@ -127,7 +205,7 @@ async function openSubView(type, title) {
     mainMenu.style.display = 'none';
     subView.style.display = 'block';
     
-    // KEIN eigener Zurück-Button mehr hier!
+    // Header der Unterseite
     subView.innerHTML = `
         <div style="display:flex; align-items:center; margin-bottom:20px; border-bottom:1px solid var(--border-color); padding-bottom:10px;">
             <h3 style="margin:0;">${title}</h3>
@@ -136,7 +214,7 @@ async function openSubView(type, title) {
     `;
 
     const contentDiv = document.getElementById('admin-sub-content');
-    contentDiv.innerHTML = '<div class="skeleton-item"><div class="skeleton skeleton-line full"></div></div>'; 
+    contentDiv.innerHTML = '<div class="spinner"></div>'; 
 
     try {
         switch (type) {
@@ -149,10 +227,13 @@ async function openSubView(type, title) {
             case 'tickets': await renderTicketSettings(contentDiv); break;
         }
     } catch(e) {
-        contentDiv.innerHTML = `<p class="error">Fehler: ${e.message}</p>`;
+        contentDiv.innerHTML = `<p class="message-box error">Fehler: ${e.message}</p>`;
     }
 }
-// =============================
+
+// =========================================================
+// HIER FOLGEN DIE SUB-VIEW RENDER FUNKTIONEN (UNVERÄNDERT)
+// =========================================================
 
 // --- 1. BENUTZER LISTE ---
 async function renderUserListOverview(container) {
@@ -164,7 +245,7 @@ async function renderUserListOverview(container) {
 
     querySnapshot.forEach(docSnap => {
         const user = { id: docSnap.id, ...docSnap.data() };
-        const parteiLabel = user.partei ? `<span class="tag">${user.partei}</span>` : '<span style="opacity:0.5;">-</span>';
+        const parteiLabel = user.partei ? `<span class="tag" style="background:var(--primary-color); color:white; padding:2px 8px; border-radius:10px; font-size:0.8em;">${user.partei}</span>` : '<span style="opacity:0.5;">-</span>';
         
         const item = createIOSListItem(
             `<strong>${user.email}</strong>`, 
@@ -177,25 +258,22 @@ async function renderUserListOverview(container) {
 }
 
 async function openUserDetail(user) {
-    // State auf Detail setzen
     currentAdminView = 'detail';
-    
     const contentDiv = document.getElementById('admin-sub-content');
     const karma = await getPartyKarma(user.partei);
 
-    // Hier ersetzen wir den Inhalt, aber die Header-Logik bleibt
     contentDiv.innerHTML = `
         <div class="user-detail-card" style="background:var(--secondary-color); padding:20px; border-radius:12px;">
             <h4 style="margin-top:0;">Bearbeiten: ${user.email}</h4>
-            <div class="admin-action-row"><label>Name:</label><input type="text" id="edit-user-name" value="${user.username||''}" placeholder="Name"></div>
-            <div class="admin-action-row"><label>Partei:</label>
+            <div class="admin-action-row" style="margin-bottom:10px;"><label>Name:</label><input type="text" id="edit-user-name" value="${user.username||''}" placeholder="Name"></div>
+            <div class="admin-action-row" style="margin-bottom:10px;"><label>Partei:</label>
                 <select id="edit-user-partei">
                     <option value="" ${!user.partei?'selected':''}>Keine</option>
                     ${ALL_PARTEIEN.map(p => `<option value="${p}" ${user.partei===p?'selected':''}>${p}</option>`).join('')}
                 </select>
             </div>
-            <div class="admin-action-row"><label>Karma:</label><input type="number" id="edit-user-karma" value="${user.partei ? karma : 0}" ${!user.partei?'disabled':''}></div>
-            <div class="admin-action-row"><label>Admin:</label><input type="checkbox" id="edit-user-admin" ${user.isAdmin?'checked':''}></div>
+            <div class="admin-action-row" style="margin-bottom:10px;"><label>Karma:</label><input type="number" id="edit-user-karma" value="${user.partei ? karma : 0}" ${!user.partei?'disabled':''}></div>
+            <div class="admin-action-row" style="margin-bottom:10px;"><label>Admin:</label><input type="checkbox" id="edit-user-admin" ${user.isAdmin?'checked':''}></div>
             
             <div style="margin-top:20px; display:flex; gap:10px;">
                 <button class="button-success" id="save-user-btn">Speichern</button>
@@ -231,16 +309,15 @@ async function renderSystemSettings(container) {
     const status = await getSystemStatus();
     container.innerHTML = `
         <div style="padding:10px;">
-            <div id="system-status-box" style="margin-bottom:20px; padding:15px; border:1px solid #ccc; border-radius:8px;">
-                <div id="system-status-display" style="font-size:1.2em; margin-bottom:10px;">Lade...</div>
+            <div id="system-status-box" style="margin-bottom:20px; padding:15px; border:1px solid var(--border-color); border-radius:18px; background:white;">
+                <div id="system-status-display" style="font-size:1.1em; margin-bottom:15px;">Lade...</div>
                 <button id="toggle-maintenance-btn" class="button-small">Lade...</button>
-                <button id="toggle-karma-system-btn" class="button-small" style="margin-top:10px; width:100%;">Lade...</button>
             </div>
 
-            <hr>
+            <hr style="border-color:var(--border-color); opacity:0.5;">
             <h4>Notfall / Reset</h4>
             <button id="smart-reset-btn" class="button-danger" style="width:100%;"><i class="fa-solid fa-calculator"></i> Smart Reset (Total)</button>
-            <p class="small-text">Setzt alle Karma-Punkte auf 100 zurück und berechnet Historie neu.</p>
+            <p class="small-text" style="opacity:0.6; margin-top:5px;">Setzt alle Karma-Punkte auf 100 zurück und berechnet Historie neu.</p>
         </div>
     `;
 
@@ -261,27 +338,6 @@ async function renderSystemSettings(container) {
         await setSystemStatus(newS); updateMaintUI(newS);
     };
 
-    const settingsSnap = await getDoc(doc(db, 'app_settings', 'config'));
-    let karmaActive = settingsSnap.exists() ? (settingsSnap.data().karmaSystemActive !== false) : true;
-    
-    const updateKarmaUI = (active) => {
-        const b = document.getElementById('toggle-karma-system-btn');
-        if (active) {
-            b.innerHTML = '<i class="fa-solid fa-eye"></i> Karma: <strong>SICHTBAR & AKTIV</strong>';
-            b.className = 'button-small button-primary';
-        } else {
-            b.innerHTML = '<i class="fa-solid fa-eye-slash"></i> Karma: <strong>VERSTECKT</strong>';
-            b.className = 'button-small button-secondary';
-        }
-    };
-    updateKarmaUI(karmaActive);
-    document.getElementById('toggle-karma-system-btn').onclick = async () => {
-        karmaActive = !karmaActive;
-        await setDoc(doc(db, 'app_settings', 'config'), { karmaSystemActive: karmaActive }, { merge: true });
-        updateKarmaUI(karmaActive);
-        showMessage(MESSAGE_ID, `Karma System jetzt ${karmaActive ? 'AKTIV' : 'VERSTECKT'}`, 'success');
-    };
-
     document.getElementById('smart-reset-btn').onclick = handleSmartReset;
 }
 
@@ -292,20 +348,24 @@ async function renderConfigSettings(container) {
     
     container.innerHTML = `
         <div style="padding:10px;">
-             <div class="admin-action-row">
+             <div class="admin-action-row" style="margin-bottom:15px;">
                 <label>Wetter PLZ:</label>
-                <input type="number" id="weather-plz-input" value="${data.plz || ''}" placeholder="12345">
-                <button class="button-small" id="save-plz-btn">Save</button>
+                <div style="display:flex; gap:10px;">
+                    <input type="number" id="weather-plz-input" value="${data.plz || ''}" placeholder="12345" style="margin:0;">
+                    <button class="button-small" id="save-plz-btn" style="margin:0;">Save</button>
+                </div>
             </div>
-            <hr>
+            <hr style="border-color:var(--border-color); opacity:0.5;">
             <div class="admin-action-row">
                 <label>QR Code Secret:</label>
-                <input type="text" id="qr-secret-input" value="${data.qrCodeSecret || ''}" placeholder="Geheimcode">
-                <button class="button-small" id="gen-qr-btn">Generieren</button>
+                <div style="display:flex; gap:10px;">
+                    <input type="text" id="qr-secret-input" value="${data.qrCodeSecret || ''}" placeholder="Geheimcode" style="margin:0;">
+                    <button class="button-small" id="gen-qr-btn" style="margin:0;">Gen</button>
+                </div>
             </div>
-            <div id="qr-code-display" style="display:none; text-align:center; margin-top:15px;">
+            <div id="qr-code-display" style="display:none; text-align:center; margin-top:15px; background:white; padding:10px; border-radius:10px;">
                 <img id="qr-image" src="" style="width:150px; height:150px;">
-                <p id="qr-code-text-display"></p>
+                <p id="qr-code-text-display" style="font-family:monospace; margin-top:5px;"></p>
             </div>
         </div>
     `;
@@ -323,11 +383,11 @@ async function renderConfigSettings(container) {
     };
 }
 
-// --- 4. TEST-LABOR & DEBUG (NEU) ---
+// --- 4. TEST-LABOR & DEBUG ---
 async function renderDebugSettings(container) {
     container.innerHTML = `
         <div style="padding:10px;">
-            <p><strong>Achtung:</strong> Diese Funktionen beeinflussen direkt die Datenbank und sind zum Testen gedacht.</p>
+            <p class="small-text"><strong>Achtung:</strong> Diese Funktionen beeinflussen direkt die Datenbank.</p>
             <div style="display:flex; flex-direction:column; gap:10px; margin-top:15px;">
                 <button id="debug-create-booking-btn" class="button-secondary"><i class="fa-regular fa-calendar-plus"></i> Fake Buchung erstellen (Heute)</button>
                 <button id="debug-force-checkin-btn" class="button-secondary"><i class="fa-solid fa-qrcode"></i> Check-in erzwingen (ohne Scan)</button>
@@ -353,7 +413,7 @@ async function renderMinigameSettings(container) {
         const d = docSnap.data();
         let name = d.partei + (d.username ? ` (${d.username})` : '');
         html += `
-            <div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #eee;">
+            <div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid var(--border-color);">
                 <span><strong>${d.score}</strong> - ${name}</span>
                 <button class="button-small button-danger delete-score-btn" data-id="${docSnap.id}"><i class="fa-solid fa-trash"></i></button>
             </div>
@@ -370,27 +430,73 @@ async function renderMinigameSettings(container) {
 async function renderProgramSettings(container) {
     container.innerHTML = `
         <div style="padding:10px;">
-            <div style="display:flex; gap:5px; margin-bottom:15px;">
-                <input type="text" id="program-name-input" placeholder="Name" style="flex:2;">
-                <input type="number" id="program-duration-input" placeholder="Min" style="width:60px;">
-                <button id="add-program-btn" class="button-success">+</button>
+            <div style="display:flex; gap:10px; margin-bottom:15px; align-items:center;">
+                <input type="text" id="program-name-input" placeholder="Programm Name" style="flex:1; margin:0;">
+                
+                <input type="number" id="program-duration-input" placeholder="Min" style="width:80px; margin:0; text-align:center;">
+                
+                <button id="add-program-btn" class="button-success" style="width:52px; height:52px; margin:0; padding:0; display:flex; align-items:center; justify-content:center; border-radius:16px;">
+                    <i class="fa-solid fa-plus" style="font-size:1.2em;"></i>
+                </button>
             </div>
             <div id="program-list">Lade...</div>
         </div>
     `;
+
     const loadList = () => loadWashPrograms((progs) => {
-        const list = document.getElementById('program-list'); if(!list) return; list.innerHTML = '';
+        const list = document.getElementById('program-list'); 
+        if(!list) return; 
+        list.innerHTML = '';
+        
+        if(progs.length === 0) {
+            list.innerHTML = '<p style="text-align:center; opacity:0.5;">Keine Programme definiert.</p>';
+            return;
+        }
+
         progs.forEach(p => {
-            const row = document.createElement('div'); row.style.cssText = "display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #eee;";
-            row.innerHTML = `<span>${p.name} (${p.durationMinutes}m)</span><button class="button-small button-danger del-prog-btn" data-id="${p.id}">X</button>`;
+            const row = document.createElement('div'); 
+            
+            // KORREKTUR: background: var(--secondary-color) statt white
+            // Das sorgt dafür, dass es im Dark Mode dunkel wird.
+            row.style.cssText = `
+                display: flex; 
+                justify-content: space-between; 
+                padding: 12px; 
+                background: var(--secondary-color); 
+                margin-bottom: 8px; 
+                border-radius: 12px; 
+                align-items: center; 
+                border: 1px solid var(--border-color);
+                color: var(--text-color); /* Sicherstellen, dass Textfarbe stimmt */
+            `;
+            
+            // Für den runden Kreis nutzen wir jetzt eine leichte Transparenz, damit er sich abhebt
+            row.innerHTML = `
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <div style="background:rgba(128,128,128,0.15); width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;">
+                        <span style="font-weight:800; font-size:0.9em;">${p.durationMinutes}</span>
+                    </div>
+                    <span style="font-weight:600;">${p.name}</span>
+                </div>
+                <button class="button-small button-danger del-prog-btn" data-id="${p.id}" style="margin:0; width:35px; height:35px; padding:0; display:flex; align-items:center; justify-content:center; border-radius:50%;">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            `;
             list.appendChild(row);
         });
-        list.querySelectorAll('.del-prog-btn').forEach(b => b.onclick = (e) => deleteWashProgram(e.target.dataset.id));
+        
+        list.querySelectorAll('.del-prog-btn').forEach(b => b.onclick = (e) => deleteWashProgram(e.target.closest('button').dataset.id));
     }, () => {});
+    
     loadList();
+    
     document.getElementById('add-program-btn').onclick = async () => {
-        const n = document.getElementById('program-name-input').value; const d = document.getElementById('program-duration-input').value;
-        if(await addWashProgram(n, d)) { document.getElementById('program-name-input').value = ''; document.getElementById('program-duration-input').value = ''; }
+        const n = document.getElementById('program-name-input').value; 
+        const d = document.getElementById('program-duration-input').value;
+        if(await addWashProgram(n, d)) { 
+            document.getElementById('program-name-input').value = ''; 
+            document.getElementById('program-duration-input').value = ''; 
+        }
     };
 }
 
@@ -402,8 +508,8 @@ async function renderTicketSettings(container) {
         if(tickets.length === 0) { list.innerHTML = 'Keine Tickets.'; return; }
         tickets.forEach(t => {
             const isOpen = t.status === 'open'; const color = isOpen ? 'var(--error-color)' : 'var(--success-color)';
-            const div = document.createElement('div'); div.style.cssText = `border-left:5px solid ${color}; padding:10px; background:var(--secondary-color); margin-bottom:10px; border-radius:4px;`;
-            div.innerHTML = `<div style="font-weight:bold;">${t.reason} <span style="font-weight:normal; font-size:0.8em;">(${new Date(t.timestamp).toLocaleDateString()})</span></div><div style="font-size:0.9em; margin:5px 0;">${t.details||'-'}</div><div style="font-size:0.8em;">Von: ${t.partei}</div><button class="button-small ${isOpen?'button-success':'button-secondary'} toggle-ticket-btn" style="margin-top:5px;">${isOpen?'Erledigt':'Öffnen'}</button>`;
+            const div = document.createElement('div'); div.style.cssText = `border-left:5px solid ${color}; padding:15px; background:var(--secondary-color); margin-bottom:10px; border-radius:12px;`;
+            div.innerHTML = `<div style="font-weight:bold;">${t.reason} <span style="font-weight:normal; font-size:0.8em; opacity:0.6;">(${new Date(t.timestamp).toLocaleDateString()})</span></div><div style="font-size:0.9em; margin:5px 0;">${t.details||'-'}</div><div style="font-size:0.8em; opacity:0.7;">Von: ${t.partei}</div><button class="button-small ${isOpen?'button-success':'button-secondary'} toggle-ticket-btn" style="margin-top:10px;">${isOpen?'Erledigt markieren':'Wieder öffnen'}</button>`;
             div.querySelector('.toggle-ticket-btn').onclick = () => toggleTicketStatus(t.id, t.status);
             list.appendChild(div);
         });
@@ -411,15 +517,100 @@ async function renderTicketSettings(container) {
 }
 
 export function initAdminView() {
-    // Legacy cleanup
+    // Legacy cleanup if needed
 }
+
+// --- HELPER FUNCTIONS FOR DEBUG/RESET ---
 
 async function handleSmartReset() {
     if (!confirm(`⚠️ TOTALER NEUSTART:\n\nAlle Karmastände werden neu berechnet. Fortfahren?`)) return;
-    try { showMessage(MESSAGE_ID, 'Berechne...', 'success'); const partiesSnap = await getDocs(collection(db, "parties")); const bookingsSnap = await getDocs(collection(db, "bookings")); const partyBalance = {}; bookingsSnap.forEach(doc => { const b = doc.data(); if (b.partei) { if (!partyBalance[b.partei]) partyBalance[b.partei] = 0; const dateObj = new Date(b.date); const isWeekend = (dateObj.getDay() === 0 || dateObj.getDay() === 6); const cost = Math.abs(isWeekend ? COST_SLOT_PRIME : COST_SLOT_NORMAL); partyBalance[b.partei] -= cost; if (b.checkOutTime || b.isReleased) partyBalance[b.partei] += 5; } }); const batch = writeBatch(db); partiesSnap.forEach(docSnap => { const partei = docSnap.id; const data = docSnap.data(); const bookingImpact = partyBalance[partei] || 0; const minigameBonus = data.minigame_earned_this_week || 0; const newKarma = 100 + minigameBonus + bookingImpact; batch.update(docSnap.ref, { karma: newKarma, last_karma_update: Timestamp.now() }); }); await batch.commit(); alert("System erfolgreich neu kalibriert!"); showMessage(MESSAGE_ID, 'Fertig!', 'success'); openSubView('system', 'System'); } catch (e) { showMessage(MESSAGE_ID, `Fehler: ${e.message}`, 'error'); }
+    try { 
+        showMessage(MESSAGE_ID, 'Berechne...', 'success'); 
+        const partiesSnap = await getDocs(collection(db, "parties")); 
+        const bookingsSnap = await getDocs(collection(db, "bookings")); 
+        const partyBalance = {}; 
+        
+        bookingsSnap.forEach(doc => { 
+            const b = doc.data(); 
+            if (b.partei) { 
+                if (!partyBalance[b.partei]) partyBalance[b.partei] = 0; 
+                const dateObj = new Date(b.date); 
+                const isWeekend = (dateObj.getDay() === 0 || dateObj.getDay() === 6); 
+                const cost = Math.abs(isWeekend ? COST_SLOT_PRIME : COST_SLOT_NORMAL); 
+                partyBalance[b.partei] -= cost; 
+                if (b.checkOutTime || b.isReleased) partyBalance[b.partei] += 5; 
+            } 
+        }); 
+        
+        const batch = writeBatch(db); 
+        partiesSnap.forEach(docSnap => { 
+            const partei = docSnap.id; 
+            const data = docSnap.data(); 
+            const bookingImpact = partyBalance[partei] || 0; 
+            const minigameBonus = data.minigame_earned_this_week || 0; 
+            const newKarma = 100 + minigameBonus + bookingImpact; 
+            batch.update(docSnap.ref, { karma: newKarma, last_karma_update: Timestamp.now() }); 
+        }); 
+        
+        await batch.commit(); 
+        alert("System erfolgreich neu kalibriert!"); 
+        showMessage(MESSAGE_ID, 'Fertig!', 'success'); 
+        openSubView('system', 'System'); 
+    } catch (e) { showMessage(MESSAGE_ID, `Fehler: ${e.message}`, 'error'); }
 }
 
-async function debugCreateBooking() { const { currentUser } = getState(); if(!currentUser) return; try { await addDoc(collection(db, "bookings"), { date: formatDate(new Date()), slot: "00:00-23:59", partei: currentUser.userData.partei, userId: currentUser.uid, bookedAt: new Date().toISOString(), isSwap: false, checkInTime: null, checkOutTime: null, isReleased: false }); showMessage(MESSAGE_ID, "Test-Buchung erstellt!", "success"); } catch(e) { showMessage(MESSAGE_ID, e.message, "error"); } }
-async function debugForceCheckin() { const { currentUser } = getState(); if(!currentUser) return; try { const q = query(collection(db, "bookings"), where("date", "==", formatDate(new Date())), where("partei", "==", currentUser.userData.partei)); const snap = await getDocs(q); const docSnap = snap.docs.find(d => !d.data().isReleased); if(docSnap) { await updateDoc(docSnap.ref, { checkInTime: new Date().toISOString() }); showMessage(MESSAGE_ID, "Check-in erzwungen!", "success"); } else showMessage(MESSAGE_ID, "Keine Buchung.", "error"); } catch(e) { showMessage(MESSAGE_ID, e.message, "error"); } }
-async function debugResetStatus() { const { currentUser } = getState(); if (!currentUser) return; try { const q = query(collection(db, "bookings"), where("date", "==", formatDate(new Date())), where("partei", "==", currentUser.userData.partei)); const snap = await getDocs(q); const batch = writeBatch(db); snap.forEach(d => batch.delete(d.ref)); await batch.commit(); await debugKillTimer(); showMessage(MESSAGE_ID, "Reset OK.", "success"); } catch(e) { showMessage(MESSAGE_ID, e.message, "error"); } }
-async function debugKillTimer() { const { currentUser } = getState(); if(!currentUser) return; try { await deleteDoc(doc(db, "active_timers", currentUser.userData.partei)); showMessage(MESSAGE_ID, "Timer gelöscht.", "success"); } catch(e) { showMessage(MESSAGE_ID, e.message, "error"); } }
+async function debugCreateBooking() { 
+    const { currentUser } = getState(); 
+    if(!currentUser) return; 
+    try { 
+        await addDoc(collection(db, "bookings"), { 
+            date: formatDate(new Date()), 
+            slot: "00:00-23:59", 
+            partei: currentUser.userData.partei, 
+            userId: currentUser.uid, 
+            bookedAt: new Date().toISOString(), 
+            isSwap: false, 
+            checkInTime: null, 
+            checkOutTime: null, 
+            isReleased: false 
+        }); 
+        showMessage(MESSAGE_ID, "Test-Buchung erstellt!", "success"); 
+    } catch(e) { showMessage(MESSAGE_ID, e.message, "error"); } 
+}
+
+async function debugForceCheckin() { 
+    const { currentUser } = getState(); 
+    if(!currentUser) return; 
+    try { 
+        const q = query(collection(db, "bookings"), where("date", "==", formatDate(new Date())), where("partei", "==", currentUser.userData.partei)); 
+        const snap = await getDocs(q); 
+        const docSnap = snap.docs.find(d => !d.data().isReleased); 
+        if(docSnap) { 
+            await updateDoc(docSnap.ref, { checkInTime: new Date().toISOString() }); 
+            showMessage(MESSAGE_ID, "Check-in erzwungen!", "success"); 
+        } else showMessage(MESSAGE_ID, "Keine Buchung.", "error"); 
+    } catch(e) { showMessage(MESSAGE_ID, e.message, "error"); } 
+}
+
+async function debugResetStatus() { 
+    const { currentUser } = getState(); 
+    if (!currentUser) return; 
+    try { 
+        const q = query(collection(db, "bookings"), where("date", "==", formatDate(new Date())), where("partei", "==", currentUser.userData.partei)); 
+        const snap = await getDocs(q); 
+        const batch = writeBatch(db); 
+        snap.forEach(d => batch.delete(d.ref)); 
+        await batch.commit(); 
+        await debugKillTimer(); 
+        showMessage(MESSAGE_ID, "Reset OK.", "success"); 
+    } catch(e) { showMessage(MESSAGE_ID, e.message, "error"); } 
+}
+
+async function debugKillTimer() { 
+    const { currentUser } = getState(); 
+    if(!currentUser) return; 
+    try { 
+        await deleteDoc(doc(db, "active_timers", currentUser.userData.partei)); 
+        showMessage(MESSAGE_ID, "Timer gelöscht.", "success"); 
+    } catch(e) { showMessage(MESSAGE_ID, e.message, "error"); } 
+}
