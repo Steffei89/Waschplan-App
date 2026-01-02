@@ -6,15 +6,25 @@ Hier werden alle wichtigen Änderungen an der Waschplan-App festgehalten.
 
 ### 🎨 Großes Design-Redesign ("Glassmorphism")
 Die App hat einen komplett neuen, modernen Look erhalten!
-* **Milchglas-Optik:** Elemente haben nun einen halbtransparenten Hintergrund, der die Umgebung durchschimmern lässt (Glassmorphism).
+* **Neue Hintergründe:** Statt statischer Bilder nutzen wir jetzt moderne, fließende Farbverläufe ("Lavender" im Tag-Modus, "Deep Ocean" im Nacht-Modus).
+* **Milchglas-Optik:** Elemente haben nun einen halbtransparenten Hintergrund, der die Umgebung durchschimmern lässt.
 * **Neue Schriftart:** Wir nutzen jetzt "Nunito" für einen freundlicheren, runderen Look.
-* **Formen & Farben:** Buttons sind jetzt komplett rund ("Pill-Shape"), Karten haben weichere Ecken und frische Farbverläufe (Blau/Türkis).
+* **Formen & Farben:** Buttons sind jetzt komplett rund ("Pill-Shape"), Karten haben weichere Ecken.
 * **Schwebende Elemente:** Durch farbige, weiche Schatten wirken Buttons und Boxen, als würden sie schweben.
 
-### 🛠️ Verbesserungen
-* **Neuigkeiten-Popup:** Das Änderungsprotokoll (dieses Fenster) öffnet sich nun als elegantes Popup über der App und ist scrollbar.
-* **Navigation:** Die Navigationsleiste unten wurde überarbeitet und schwebt nun über dem Inhalt.
-* **Code-Bereinigung:** Interne Optimierungen für stabilere Performance.
+### 📱 Funktions-Updates & Navigation
+* **Problem melden:** Der Button wurde ins Profil verschoben ("Aufgeräumtes Menü") und bietet nun detaillierte Kategorien (App, Maschine, Raum).
+* **Push-Nachrichten:** Der "Test"-Button im Profil sendet nun sofort eine echte Probe-Nachricht, damit du siehst, ob es funktioniert.
+* **Smarte Navigation:** Der "Zurück"-Button weiß jetzt besser, wo du herkommst (z.B. geht es nach dem Buchen zurück in den Kalender, nicht ins Hauptmenü).
+* **Menüleiste:** Die untere Leiste zeigt nun immer korrekt an, wo du dich befindest, auch auf Unterseiten.
+
+### 🎮 Minigame & Kalender
+* **Vollbild-Gaming:** Das "Socken-Retter" Spiel startet erst im Vollbild, wenn du wirklich spielst. Das Menü davor ist übersichtlicher.
+* **Kalender-Legende:** Im Buchungskalender zeigen kleine farbige Punkte jetzt direkt an, welche Partei gebucht hat.
+
+### 🛠️ Technik
+* **Sofort-Updates:** Änderungen an der App werden nun sofort geladen, ohne dass du den Cache leeren musst.
+* **Neuigkeiten-Popup:** Das Änderungsprotokoll öffnet sich nun als elegantes Popup.
 
 ---
 
