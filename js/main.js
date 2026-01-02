@@ -1,4 +1,4 @@
-// js/main.js - Version 3.5.0 (Final Logic)
+// js/main.js - Version 3.5.0 (Final Logic with Karma Toggle)
 
 // 1. Service Worker Update
 if ('serviceWorker' in navigator) {
@@ -16,7 +16,8 @@ if ('serviceWorker' in navigator) {
 // 2. Imports
 import { auth, onAuthStateChanged, getDoc, getUserProfileDocRef, doc, onSnapshot, db, updateDoc } from './firebase.js';
 import * as dom from './dom.js';
-import { getState, setCurrentUser, setUnsubscriber, getIsRegistering } from './state.js';
+// NEU: setIsKarmaActive importieren
+import { getState, setCurrentUser, setUnsubscriber, getIsRegistering, setIsKarmaActive } from './state.js';
 import { getFormattedDate, today, tomorrow, createAndDownloadIcsFile } from './utils.js';
 import { 
     showMessage, navigateTo, updateUserInfo, setTheme, unsubscribeAll, unsubscribeForNavigation,
@@ -193,7 +194,18 @@ function setupKarmaHeaderListener(parteiName) {
 
     configUnsubscribe = onSnapshot(doc(db, 'app_settings', 'config'), (configSnap) => {
         const karmaActive = configSnap.exists() ? (configSnap.data().karmaSystemActive !== false) : true;
-        if (!karmaActive) { headerDisplay.style.display = 'none'; } else { headerDisplay.style.display = 'flex'; if (!karmaUnsubscribe) { startPartyListener(parteiName, headerValue, headerDisplay, headerIcon); } }
+        
+        // NEU: Globalen Status setzen!
+        setIsKarmaActive(karmaActive);
+
+        if (!karmaActive) { 
+            headerDisplay.style.display = 'none'; 
+        } else { 
+            headerDisplay.style.display = 'flex'; 
+            if (!karmaUnsubscribe) { 
+                startPartyListener(parteiName, headerValue, headerDisplay, headerIcon); 
+            } 
+        }
     });
 }
 
@@ -478,32 +490,24 @@ document.getElementById('back-to-login-from-verify-btn').addEventListener('click
 dom.themeIcon.addEventListener('click', () => { const newTheme = getState().currentTheme === 'light' ? 'dark' : 'light'; setTheme(newTheme, true); });
 document.getElementById('refresh-app-btn').addEventListener('click', () => { const btn = document.getElementById('refresh-app-btn'); btn.classList.add('fa-spin'); location.reload(true); setTimeout(() => btn.classList.remove('fa-spin'), 1500); });
 
-// Global Back Button Listener (VERBESSERT!)
+// Global Back Button Listener
 const globalBackBtn = document.getElementById('global-back-btn');
 if (globalBackBtn) {
     globalBackBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        
-        // 1. Sonderfall: Admin Bereich
         if (dom.adminSection && dom.adminSection.style.display !== 'none') {
             const handledByAdmin = handleAdminBack(); 
             if (handledByAdmin) return;
         }
-
-        // 2. Sonderfall: Problem melden -> Zurück zum Profil
         if (dom.maintenanceSection && dom.maintenanceSection.style.display !== 'none') {
-            loadProfileData(); // Daten sicherheitshalber auffrischen
+            loadProfileData(); 
             navigateTo(dom.profileSection, 'back');
             return;
         }
-        
-        // 3. Sonderfall: Buchen -> Zurück zum Kalender (Neu!)
         if (dom.bookingSection && dom.bookingSection.style.display !== 'none') {
             navigateTo(dom.calendarSection, 'back');
             return;
         }
-
-        // Standard: Zurück zum Hauptmenü
         navigateTo(dom.mainMenu, 'back');
     });
 }

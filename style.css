@@ -362,3 +362,303 @@ body.game-running #game-container,
 body.game-running canvas#gameCanvas { 
     border-radius: 0; 
 }
+
+/* =========================================
+   NEU: Styling für die Kalender-Legende
+   ========================================= */
+
+/* Der Container für die Legende */
+#partei-legend {
+    display: flex;              /* Macht, dass die Elemente nebeneinander stehen */
+    flex-wrap: wrap;            /* Zeilenumbruch, falls es zu viele sind */
+    justify-content: center;    /* Mittig ausrichten */
+    gap: 15px;                  /* Abstand zwischen den Parteien */
+    margin-top: 20px;           /* Abstand nach oben zum Kalender */
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color); /* Eine feine Linie zur Trennung */
+}
+
+/* Ein einzelner Eintrag (Punkt + Name) */
+.legend-item {
+    display: flex;
+    align-items: center;        /* Vertikal mittig ausrichten */
+    gap: 8px;                   /* Abstand zwischen Punkt und Text */
+    font-size: 0.9em;           /* Schrift etwas kleiner */
+    font-weight: 600;           /* Schrift etwas fetter */
+    color: var(--text-color);
+    opacity: 0.8;               /* Leicht transparent, damit es nicht zu dominant ist */
+}
+
+/* Der farbige Punkt selbst */
+.legend-color {
+    width: 12px;                /* Breite */
+    height: 12px;               /* Höhe */
+    border-radius: 50%;         /* 50% Radius macht aus dem Viereck einen Kreis */
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2); /* Kleiner Schatten für 3D-Effekt */
+    border: 1px solid rgba(0,0,0,0.1);     /* Zarter Rand */
+    flex-shrink: 0;             /* Verhindert, dass der Punkt eingedrückt wird */
+}
+
+/* Hilfsklasse für Abstände (falls noch nicht vorhanden) */
+.mt-15 {
+    margin-top: 15px;
+}
+
+/* =========================================
+   NEU: Design-Upgrade für den Game-Screen
+   ========================================= */
+
+/* 1. Der Hintergrund: Ein frischer Himmel-Verlauf */
+#minigameSection {
+    background: linear-gradient(160deg, #4facfe 0%, #00f2fe 100%) !important;
+    border: 4px solid white;    /* Weißer Rahmen wie bei einem Sticker */
+    box-shadow: 0 10px 30px rgba(0, 150, 255, 0.4); /* Leuchtender Schatten */
+    color: white;
+    text-align: center;
+    overflow: hidden;
+    position: relative;
+}
+
+/* 2. Der Titel "Socken-Retter" wieder sichtbar & stylisch machen */
+#minigameSection h2 {
+    display: block !important;  /* Zwingt den Titel dazu, sichtbar zu sein */
+    font-size: 2.2em;
+    color: #fff;
+    text-shadow: 0 4px 0 #2a8df8, 0 8px 5px rgba(0,0,0,0.2); /* 3D-Effekt */
+    margin-top: 10px;
+    margin-bottom: 20px;
+    letter-spacing: 1px;
+    transform: rotate(-3deg);   /* Leicht schräg für mehr Dynamik */
+    font-weight: 900;
+}
+
+/* 3. Die Highscore-Liste als schicke Karte */
+.leaderboard-container {
+    background: rgba(255, 255, 255, 0.9); /* Milchglas-Effekt */
+    border-radius: 20px;
+    padding: 15px;
+    width: 90%;
+    max-width: 320px;
+    margin: 10px auto 25px auto;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+    color: #333;
+    backdrop-filter: blur(5px);
+    border: 2px solid rgba(255,255,255,1);
+}
+
+.leaderboard-container h4 {
+    margin: 0 0 10px 0;
+    font-size: 1.1em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #007AFF;
+    border-bottom: 2px solid #e5e5ea;
+    padding-bottom: 8px;
+}
+
+/* Die Liste der Namen etwas aufräumen */
+#minigame-leaderboard {
+    font-family: 'Courier New', monospace; /* Monospace für Retro-Feeling */
+    font-size: 0.95em;
+    line-height: 1.6;
+    font-weight: 600;
+}
+
+/* 4. Der "Spiel Starten" Button - Groß und Auffällig */
+#start-game-btn {
+    background: linear-gradient(to bottom, #ffcf00, #ff9d00) !important; /* Gold-Orange */
+    color: #fff;
+    font-size: 1.4em;
+    font-weight: 800;
+    text-transform: uppercase;
+    padding: 15px 40px;
+    border: none;
+    border-radius: 50px;
+    /* Ein dicker Schatten unten lässt ihn wie einen echten Knopf wirken */
+    box-shadow: 0 6px 0 #cc7a00, 0 15px 20px rgba(0,0,0,0.2); 
+    transition: transform 0.1s, box-shadow 0.1s;
+    margin-top: 10px;
+    width: auto;
+    display: inline-block;
+    cursor: pointer;
+}
+
+/* Effekt beim Drücken des Buttons */
+#start-game-btn:active {
+    transform: translateY(6px); /* Button bewegt sich nach unten */
+    box-shadow: 0 0 0 #cc7a00, inset 0 2px 5px rgba(0,0,0,0.2); /* Schatten weg */
+}
+
+/* 5. Kleine Anpassungen */
+/* Zurück-Button weiß machen, damit man ihn auf Blau sieht */
+#minigameSection .back-button {
+    color: rgba(255,255,255,0.8);
+}
+#minigameSection .back-button:hover {
+    color: white;
+}
+
+/* Regel-Text besser lesbar machen */
+#minigame-rules-text {
+    font-weight: bold;
+    color: #fff !important; 
+    text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    background: rgba(0,0,0,0.15);
+    padding: 6px 15px;
+    border-radius: 20px;
+}
+
+/* =========================================
+   NEU: Design-Upgrade (Navi, Status, Profil)
+   [KORRIGIERTE VERSION MIT DARK MODE]
+   ========================================= */
+
+/* 1. Pulsierender "Besetzt"-Status */
+@keyframes pulse-red {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.7); }
+    70% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(255, 59, 48, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 59, 48, 0); }
+}
+
+#machine-status-widget.status-busy {
+    animation: pulse-red 2s infinite;
+    border: 1px solid rgba(255, 59, 48, 0.3) !important;
+    background: rgba(255, 59, 48, 0.1) !important;
+}
+
+/* 2. Schwebende Navigation (LIGHT MODE - Standard) */
+#bottom-nav {
+    bottom: 25px !important;
+    border: none !important;
+    background: rgba(255, 255, 255, 0.95) !important; /* Weißer Hintergrund */
+    box-shadow: 0 15px 35px rgba(0,0,0,0.2) !important;
+    max-width: 360px !important;
+}
+
+/* Die Icons im Light Mode müssen DUNKEL sein, damit man sie sieht */
+.nav-item {
+    color: #333333 !important; 
+    opacity: 0.5; /* Inaktive Icons etwas blasser */
+}
+
+/* 3. Schwebende Navigation (DARK MODE) */
+/* Sobald der Dark Mode an ist, wird der Hintergrund dunkel und Icons weiß */
+[data-theme="dark"] #bottom-nav {
+    background: rgba(35, 35, 40, 0.95) !important; /* Dunkelgrau */
+    box-shadow: 0 15px 35px rgba(0,0,0,0.5) !important;
+}
+
+[data-theme="dark"] .nav-item {
+    color: #ffffff !important; /* Weiße Icons */
+}
+
+/* 4. Der aktive Reiter (Gilt für Hell & Dunkel) */
+.nav-item.active {
+    background: transparent !important;
+    transform: translateY(-5px);
+    opacity: 1 !important;
+}
+
+.nav-item.active .nav-icon-container {
+    color: #007AFF !important; /* Leuchtendes Blau */
+    transform: scale(1.3);
+    filter: drop-shadow(0 0 10px rgba(0,122,255,0.6)); /* Blauer Schein */
+}
+
+/* 5. Die Profil-Box "Gold-Card" */
+#profileSection div[style*="--bg-secondary"] {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
+    border: 1px solid rgba(255,255,255,0.4) !important;
+    box-shadow: 0 10px 25px rgba(0, 100, 255, 0.3) !important;
+    color: white !important;
+}
+
+#profileSection div[style*="--bg-secondary"] p {
+    color: rgba(255,255,255,0.95) !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+#profile-partei {
+    color: #fff !important;
+    font-size: 1.6em !important;
+    font-weight: 800 !important;
+    letter-spacing: 1px;
+    display: block;
+    margin-top: 5px;
+}
+
+/* =========================================
+   NEU: Abstand der Buttons (Kalender/Löschen)
+   ========================================= */
+.booking-actions {
+    display: flex;        /* Ordnet die Buttons nebeneinander an */
+    gap: 15px;            /* 15px Platz zwischen den Buttons */
+    align-items: center;  /* Mittig ausrichten */
+}
+
+/* =========================================
+   NEU: iPhone & iOS Spezial-Tuning
+   ========================================= */
+
+/* 1. Schrift schärfer machen (Retina-Effekt) */
+body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* 2. Navigation "Home-Bar" sicher machen */
+/* Schiebt die Leiste auf iPhones mit FaceID automatisch höher, 
+   damit sie nicht unter dem schwarzen Wisch-Strich liegt */
+#bottom-nav {
+    bottom: calc(20px + env(safe-area-inset-bottom)) !important;
+}
+
+/* 3. "Gummi-Band"-Scrollen für Listen aktivieren */
+/* Fühlt sich auf dem iPhone natürlicher an */
+.dashboard-widget, .modal-content, #bookingsList, .changelog-content-box {
+    -webkit-overflow-scrolling: touch;
+}
+
+/* 4. Text-Auswahl Farbe anpassen */
+/* Wenn man Text markiert, soll es zur App passen */
+::selection {
+    background: rgba(0, 122, 255, 0.2); /* Zartes Blau */
+    color: inherit;
+}
+
+/* 5. Verhindert grauen Hintergrund beim Tippen */
+/* iOS macht oft graue Boxen um Buttons beim Klicken - das entfernen wir */
+button, .clickable, .nav-item {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation; /* Reagiert schneller auf Tippen */
+}
+
+/* =========================================
+   FIX: Lesbarkeit Kalender-Auswahl (Dark Mode)
+   ========================================= */
+
+/* Im Dark Mode: Hintergrund dunkel machen statt weiß */
+[data-theme="dark"] .calendar-day.selected-day {
+    background: rgba(255, 255, 255, 0.15) !important; /* Transparenter Grauton */
+    color: #ffffff !important;      /* Text bleibt weiß */
+    border: 1px solid var(--primary-color); /* Blauer Rand bleibt */
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+}
+
+/* Optional: Auch die "Heute"-Markierung im Dark Mode etwas anpassen */
+[data-theme="dark"] .calendar-day.is-today {
+    color: white !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.5); /* Textschatten für besseren Kontrast */
+}
+
+/* =========================================
+   FIX: Unsichtbarer Text in den Slots (Dark Mode)
+   ========================================= */
+
+/* Verhindert, dass die Box beim Antippen weiß wird */
+[data-theme="dark"] .slot-action-item:hover,
+[data-theme="dark"] .slot-action-item:active {
+    background: rgba(255, 255, 255, 0.1) !important; /* Wird nur leicht heller */
+    color: #ffffff !important;      /* Text bleibt weiß sichtbar */
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}

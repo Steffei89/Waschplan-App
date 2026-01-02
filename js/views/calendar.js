@@ -4,6 +4,7 @@ import {
 } from '../firebase.js';
 import * as dom from '../dom.js';
 import { navigateTo } from '../ui.js';
+// NEU: isKarmaActive holen
 import { getState, setAllBookingsForMonth, setSelectedCalendarDate, ALL_PARTEIEN, PARTEI_COLORS, getUnsubscribers } from '../state.js';
 import { formatDate } from '../utils.js';
 import { performBooking, performDeletion } from '../services/booking.js';
@@ -185,9 +186,9 @@ function renderCalendarLegend() {
     });
 }
 
-// === HIER IST DIE LOGIK FÜR DIE FARBIGEN PUNKTE ===
 function updateCalendarDayActions(dateString) {
-    const { currentUser, userIsAdmin, allBookingsForMonth } = getState();
+    // NEU: isKarmaActive holen
+    const { currentUser, userIsAdmin, allBookingsForMonth, isKarmaActive } = getState();
     if (!currentUser || !dom.calendarDayActions) return; 
     
     if(dom.calendarActionMessage) dom.calendarActionMessage.style.display = 'none';
@@ -204,6 +205,9 @@ function updateCalendarDayActions(dateString) {
 
     const isWeekend = (date.getDay() === 0 || date.getDay() === 6);
     const cost = Math.abs(isWeekend ? COST_SLOT_PRIME : COST_SLOT_NORMAL);
+
+    // NEU: Karma-Text nur anzeigen, wenn System aktiv ist
+    const costSuffix = isKarmaActive ? ` (-${cost} Karma)` : '';
 
     const slots = [ { id: '07', slot: '07:00-13:00' }, { id: '13', slot: '13:00-19:00' } ];
 
@@ -222,17 +226,15 @@ function updateCalendarDayActions(dateString) {
         requestBtn.disabled = false;
         requestBtn.title = '';
 
-        bookBtn.textContent = `Buchen (-${cost} Karma)`;
-        requestBtn.textContent = `Slot anfragen (-${cost} Karma)`;
+        // NEU: Buttons mit bedingtem Text
+        bookBtn.textContent = `Buchen${costSuffix}`;
+        requestBtn.textContent = `Slot anfragen${costSuffix}`;
 
         const booking = bookingsOnDay.find(b => b.slot === slotInfo.slot);
 
         if (booking) {
-            // --- FARBPUNKT-LOGIK START ---
             const color = PARTEI_COLORS[booking.partei] || '#ccc';
-            // Wir bauen einen kleinen runden Punkt (span)
             const dotHtml = `<span style="display:inline-block; width:10px; height:10px; background-color:${color}; border-radius:50%; margin-right:6px;"></span>`;
-            // --- FARBPUNKT-LOGIK ENDE ---
 
             let statusText = `Gebucht (${booking.partei})`;
             statusEl.classList.add('booked');
@@ -256,7 +258,6 @@ function updateCalendarDayActions(dateString) {
                 }
             }
 
-            // Hier setzen wir Punkt + Text
             statusEl.innerHTML = `${dotHtml}${statusText}`;
 
         } else {

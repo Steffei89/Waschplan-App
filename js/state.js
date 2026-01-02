@@ -1,3 +1,5 @@
+// js/state.js
+
 // App-Zustand
 let currentUser = null; 
 let currentUserId = null;
@@ -6,6 +8,7 @@ let currentTheme = 'light';
 let selectedCalendarDate = null; 
 let allBookingsForMonth = {}; 
 let isRegistering = false; 
+let isKarmaActive = true; // <--- NEU: Standardmäßig an
 
 // Listener-Unsubscriber
 let overviewUnsubscribe = null; 
@@ -26,7 +29,7 @@ export const PARTEI_COLORS = {
     "Micha & Stefan": "#007AFF", 
     "Sarah & Florian": "#FF9500", 
     "Christa & Uli": "#34C759",
-    "Admin": "#8e8e93" // <--- NEU: Graue Farbe für Admin-Tests
+    "Admin": "#8e8e93"
 };
 export const ALL_PARTEIEN = Object.keys(PARTEI_COLORS);
 
@@ -39,11 +42,16 @@ export const getState = () => ({
     selectedCalendarDate,
     allBookingsForMonth,
     parteiChart,
-    slotChart
+    slotChart,
+    isKarmaActive // <--- NEU: Wird mit ausgegeben
 });
 
 export const getIsRegistering = () => isRegistering;
 export const setIsRegistering = (value) => { isRegistering = value; };
+
+// <--- NEU: Getter und Setter für Karma-Status
+export const getIsKarmaActive = () => isKarmaActive;
+export const setIsKarmaActive = (val) => { isKarmaActive = val; };
 
 export function setCurrentUser(user) {
     currentUser = user;

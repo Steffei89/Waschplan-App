@@ -115,7 +115,7 @@
   </div>
 
   <div id="mainMenu" class="card" style="display:none;">
-    <h2 style="text-align:left; margin-bottom:10px; font-size:1.8em;">Hallo 👋</h2>
+    <h2 id="home-greeting" style="text-align:left; margin-bottom:10px; font-size:1.8em;">Hallo 👋</h2>
     <div id="main-menu-message" class="message-box" style="display:none;"></div>
     
     <div id="my-upcoming-bookings" class="dashboard-widget">
@@ -314,5 +314,53 @@
 
 </div> 
 <script type="module" src="js/main.js"></script>
+
+<script type="module">
+    import { getState } from './js/state.js';
+
+    function updateGreeting() {
+        const greetingElement = document.getElementById('home-greeting');
+        const state = getState();
+        const user = state.currentUser;
+
+        if (greetingElement && user) {
+            let name = "";
+
+            // 1. Wir prüfen, ob ein Benutzername in der Datenbank (UserData) gespeichert ist
+            if (user.userData && user.userData.username) {
+                name = user.userData.username;
+            } 
+            // 2. Fallback: Wir nehmen den Namen aus der E-Mail (nur falls kein Username da ist)
+            else if (user.email) {
+                name = user.email.split('@')[0];
+                name = name.charAt(0).toUpperCase() + name.slice(1);
+            }
+
+            // Wenn wir einen Namen haben, zeigen wir ihn an
+            if (name) {
+                // Zeit bestimmen
+                const hour = new Date().getHours();
+                let timeGreeting = "Hallo";
+
+                if (hour >= 5 && hour < 11) {
+                    timeGreeting = "Guten Morgen";
+                } else if (hour >= 11 && hour < 18) {
+                    timeGreeting = "Guten Tag";
+                } else if (hour >= 18 && hour < 22) {
+                    timeGreeting = "Guten Abend";
+                } else {
+                    timeGreeting = "Gute Nacht";
+                }
+
+                // Text setzen
+                greetingElement.textContent = `${timeGreeting}, ${name} 👋`;
+            }
+        }
+    }
+
+    // Wir prüfen regelmäßig, ob der Nutzer eingeloggt ist, um den Text zu aktualisieren
+    setInterval(updateGreeting, 1000);
+</script>
+
 </body>
 </html>
