@@ -1,8 +1,11 @@
-/* style.css - Version 3.5.0 (Cleanup) */
+/* style.css - Version 3.5.0 (Stable Fallback) */
 
 /* 1. GRUNDEINSTELLUNGEN & FONTS */
 :root {
   --font-family: 'Nunito', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* HIER: Die Fallback-Farbe für den Light Mode */
+  --bg-fallback: #e0c3fc;
 
   /* --- COLORS LIGHT MODE --- */
   --text-color: #1d1d1f; 
@@ -35,6 +38,9 @@
 }
 
 [data-theme="dark"] {
+  /* HIER: Die Fallback-Farbe für den Dark Mode */
+  --bg-fallback: #0f2027;
+
   --text-color: #f5f5f7; 
   --bg-gradient: linear-gradient(to bottom right, #0f2027, #203a43, #2c5364);
   
@@ -55,9 +61,15 @@
 
 * { -webkit-tap-highlight-color: transparent; box-sizing: border-box; }
 
-html, body { 
+/* html transparent, damit body die Farbe bestimmt */
+html {
+  background-color: transparent;
+}
+
+body { 
   margin: 0; padding: 0; width: 100%; min-height: 100vh; min-height: 100dvh;
-  background-color: transparent; 
+  /* Die variable Farbe nutzen */
+  background-color: var(--bg-fallback); 
   font-family: var(--font-family); 
   color: var(--text-color); 
   overscroll-behavior-y: none; 
