@@ -80,6 +80,7 @@ export async function performBooking(date, slot, messageElementId) {
     if (selectedDate < today) { showMessage(messageElementId, "Vergangenheit!", 'error'); return false; }
     
     let cost = 0;
+    let ignoreKarmaLimit = false; 
     
     // NEU: Kostenberechnung mit Eco-Check
     if (!userIsAdmin) {
@@ -89,6 +90,7 @@ export async function performBooking(date, slot, messageElementId) {
         
         // Standard-Kosten aus dem Check
         cost = check.cost; 
+        ignoreKarmaLimit = check.ignoreKarmaLimit; 
 
         // Eco-Rabatt anwenden?
         // Wenn es "Standard" (Werktag) oder "Prime" (Wochenende) ist, prüfen wir auf Eco-Wetter
@@ -127,7 +129,7 @@ export async function performBooking(date, slot, messageElementId) {
                 throw "Eure Partei hat an diesem Tag bereits gebucht.";
             }
 
-            if (!userIsAdmin && (currentKarma + cost < 0)) {
+            if (!userIsAdmin && !ignoreKarmaLimit && (currentKarma + cost < 0)) {
                 throw "Nicht genug Karma.";
             }
 

@@ -137,7 +137,7 @@ export async function checkBookingPermission(dateStr, slot) {
     // --- BYPASS LOGIK WENN SYSTEM INAKTIV ---
     if (!karmaSystemActive) {
         // Wir erlauben ALLES, geben aber die Kosten zurück, damit sie im Hintergrund abgezogen werden
-        return { allowed: true, cost: cost };
+        return { allowed: true, cost: cost, ignoreKarmaLimit: true };
     }
     // ----------------------------------------
 
@@ -159,7 +159,7 @@ export async function checkBookingPermission(dateStr, slot) {
         return { allowed: false, error: `Nicht genug Karma-Punkte (${karma}). Benötigt: ${Math.abs(cost)}.` };
     }
 
-    return { allowed: true, cost: cost };
+    return { allowed: true, cost: cost, ignoreKarmaLimit: false };
 }
 
 // ===== NEU: MINIGAME REWARD LOGIK MIT WOCHENLIMIT =====
